@@ -1,31 +1,33 @@
+
+App · PY
 """
 MargeMax — Outil de sourcing et de recherche de produits AliExpress
 pour e-commerçants et dropshippers.
-
+ 
 Stack : Streamlit + Supabase (DB / Auth) + AliExpress Open Platform (Gateway TOP)
 """
-
+ 
 import hashlib
 import math
 import random
 import time
 from datetime import datetime, timezone
-
+ 
 import requests
 import streamlit as st
 from supabase import Client, create_client
-
+ 
 # ============================================================
 # CONFIGURATION GÉNÉRALE
 # ============================================================
-
+ 
 st.set_page_config(
     page_title="MargeMax — Sourcing AliExpress",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
+ 
 def _require_secret(name: str, help_text: str = "") -> str:
     value = st.secrets.get(name, "")
     if not value:
@@ -35,22 +37,25 @@ def _require_secret(name: str, help_text: str = "") -> str:
         )
         st.stop()
     return value
-
-
-SUPABASE_URL = _require_secret("SUPABASE_URL")
-SUPABASE_KEY = _require_secret("SUPABASE_KEY")
-
+ 
+ 
+SUPABASE_URL = _require_secret("SUPABASE_URL").strip()
+SUPABASE_KEY = _require_secret("SUPABASE_KEY").strip()
+ 
+with st.expander("🔧 Diagnostic technique (temporaire)", expanded=False):
+    st.code(f"SUPABASE_URL = {SUPABASE_URL!r}\nLongueur = {len(SUPABASE_URL)} caractères")
+ 
 ALIEXPRESS_APP_KEY = st.secrets.get("ALIEXPRESS_APP_KEY", "")
 ALIEXPRESS_APP_SECRET = st.secrets.get("ALIEXPRESS_APP_SECRET", "")
 ALIEXPRESS_GATEWAY = "https://eco.taobao.com/router/rest"
-
+ 
 ADMIN_EMAIL = "jimmy.leguennec@gmail.com"
-
+ 
 FREE_SEARCH_LIMIT = 3
 VAT_RATE = 0.20
 PAYMENT_FEE_RATE = 0.02
 MARGIN_TARGET = 0.45  # prix conseillé = coût réel / 0.45
-
+ 
 PLANS = {
     "pass_flash": {
         "label": "Pass Flash",
@@ -87,11 +92,11 @@ PLANS = {
 }
 # 'free' est le plan par défaut posé par le trigger Supabase — il n'a pas
 # besoin d'entrée dans PLANS puisqu'il n'a pas de carte tarifaire dédiée.
-
+ 
 # ============================================================
 # THÈME "DARK LUXURY" — CSS PERSONNALISÉ
 # ============================================================
-
+ 
 def inject_custom_css() -> None:
     st.markdown(
         """
@@ -105,17 +110,17 @@ def inject_custom_css() -> None:
             --text-light: #F5F6FA;
             --text-muted: #8B8FA3;
         }
-
+ 
         .stApp {
             background: var(--bg-primary);
             color: var(--text-light);
         }
-
+ 
         section[data-testid="stSidebar"] {
             background-color: #0B0C10;
             border-right: 1px solid var(--border-subtle);
         }
-
+ 
         .mm-header {
             display: flex;
             align-items: center;
@@ -145,7 +150,7 @@ def inject_custom_css() -> None:
             height: 16px;
             filter: brightness(0) invert(1) opacity(0.85);
         }
-
+ 
         .mm-card {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -176,7 +181,7 @@ def inject_custom_css() -> None:
             color: #34D399;
             margin-top: 12px;
         }
-
+ 
         .mm-score-badge {
             display: inline-block;
             padding: 6px 14px;
@@ -187,7 +192,7 @@ def inject_custom_css() -> None:
         .mm-score-high { background: rgba(52, 211, 153, 0.12); color: #34D399; }
         .mm-score-mid  { background: rgba(250, 204, 21, 0.12); color: #FACC15; }
         .mm-score-low  { background: rgba(248, 113, 113, 0.12); color: #F87171; }
-
+ 
         .mm-channel-badge {
             display: inline-block;
             background: rgba(79, 70, 229, 0.12);
@@ -198,7 +203,7 @@ def inject_custom_css() -> None:
             margin: 3px 4px 0 0;
             font-size: 0.78rem;
         }
-
+ 
         .mm-admin-badge {
             background: var(--accent-indigo);
             color: white;
@@ -209,7 +214,7 @@ def inject_custom_css() -> None:
             text-align: center;
             margin-bottom: 12px;
         }
-
+ 
         .mm-plan-card {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -246,7 +251,7 @@ def inject_custom_css() -> None:
             font-size: 0.85rem;
             margin-bottom: 14px;
         }
-
+ 
         .mm-trust-row {
             display: flex;
             justify-content: center;
@@ -261,7 +266,7 @@ def inject_custom_css() -> None:
             font-size: 0.78rem;
             color: var(--text-muted);
         }
-
+ 
         div.stButton > button {
             background: var(--accent-indigo);
             color: white;
@@ -273,7 +278,7 @@ def inject_custom_css() -> None:
         div.stButton > button:hover {
             background: var(--accent-indigo-hover);
         }
-
+ 
         .mm-hero {
             text-align: center;
             padding: 40px 10px 20px 10px;
@@ -297,7 +302,7 @@ def inject_custom_css() -> None:
             gap: 12px;
             flex-wrap: wrap;
         }
-
+ 
         .mm-feature-card {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -322,7 +327,7 @@ def inject_custom_css() -> None:
             font-size: 0.88rem;
             margin: 0;
         }
-
+ 
         .mm-section-title {
             text-align: center;
             font-size: 1.4rem;
@@ -335,7 +340,7 @@ def inject_custom_css() -> None:
             font-size: 0.92rem;
             margin-bottom: 26px;
         }
-
+ 
         .mm-mini-plan {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
@@ -355,7 +360,7 @@ def inject_custom_css() -> None:
             color: var(--text-muted);
             font-size: 0.85rem;
         }
-
+ 
         .mm-footer-cta {
             text-align: center;
             padding: 44px 10px 30px 10px;
@@ -374,8 +379,8 @@ def inject_custom_css() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
+ 
+ 
 def render_header() -> None:
     st.markdown(
         """
@@ -389,8 +394,8 @@ def render_header() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
+ 
+ 
 def render_trust_badges() -> None:
     st.markdown(
         """
@@ -402,24 +407,24 @@ def render_trust_badges() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
+ 
+ 
 # ============================================================
 # CLIENT SUPABASE
 # ============================================================
-
+ 
 @st.cache_resource(show_spinner=False)
 def get_supabase_client() -> Client:
     return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
+ 
+ 
 supabase = get_supabase_client()
-
-
+ 
+ 
 # ============================================================
 # ÉTAT DE SESSION
 # ============================================================
-
+ 
 def init_session_state() -> None:
     defaults = {
         "user": None,
@@ -433,12 +438,12 @@ def init_session_state() -> None:
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-
-
+ 
+ 
 def is_logged_in() -> bool:
     return st.session_state.get("user") is not None
-
-
+ 
+ 
 def is_admin() -> bool:
     profile = st.session_state.get("profile")
     if not profile:
@@ -447,13 +452,13 @@ def is_admin() -> bool:
         return True
     user = st.session_state.get("user")
     return bool(user and user.get("email") == ADMIN_EMAIL)
-
-
+ 
+ 
 def is_suspended() -> bool:
     profile = st.session_state.get("profile") or {}
     return bool(profile.get("is_suspended")) and not is_admin()
-
-
+ 
+ 
 def has_active_subscription() -> bool:
     if is_admin():
         return True
@@ -469,21 +474,21 @@ def has_active_subscription() -> bool:
         return expiry > datetime.now(timezone.utc)
     except ValueError:
         return True
-
-
+ 
+ 
 def get_search_count() -> int:
     if not is_logged_in():
         return 0
     profile = st.session_state.get("profile") or {}
     return int(profile.get("searches_used") or 0)
-
-
+ 
+ 
 def searches_remaining() -> int:
     if is_admin() or has_active_subscription():
         return math.inf
     return max(0, FREE_SEARCH_LIMIT - get_search_count())
-
-
+ 
+ 
 def ad_slots_for_current_user() -> int:
     """Nombre de bannières pub à afficher : 2 (gratuit), 1 (Pass Flash), 0 (Pro / admin)."""
     if is_admin():
@@ -495,12 +500,12 @@ def ad_slots_for_current_user() -> int:
     if plan == "pass_flash" and has_active_subscription():
         return 1
     return 0
-
-
+ 
+ 
 # ============================================================
 # AUTHENTIFICATION
 # ============================================================
-
+ 
 def fetch_profile(user_id: str) -> dict | None:
     try:
         response = (
@@ -513,8 +518,8 @@ def fetch_profile(user_id: str) -> dict | None:
         return response.data if response else None
     except Exception:
         return None
-
-
+ 
+ 
 def ensure_profile_exists(user_id: str, email: str) -> dict:
     profile = fetch_profile(user_id)
     if profile:
@@ -532,8 +537,8 @@ def ensure_profile_exists(user_id: str, email: str) -> dict:
     except Exception:
         pass
     return fetch_profile(user_id) or new_profile
-
-
+ 
+ 
 def log_in(email: str, password: str, remember_me: bool) -> None:
     try:
         auth_response = supabase.auth.sign_in_with_password(
@@ -549,8 +554,8 @@ def log_in(email: str, password: str, remember_me: bool) -> None:
         st.session_state["auth_error"] = None
     except Exception as exc:
         st.session_state["auth_error"] = f"Connexion impossible : {exc}"
-
-
+ 
+ 
 def sign_up(email: str, password: str) -> None:
     try:
         auth_response = supabase.auth.sign_up({"email": email, "password": password})
@@ -563,8 +568,8 @@ def sign_up(email: str, password: str) -> None:
         st.success("Compte créé ! Vous pouvez maintenant vous connecter.")
     except Exception as exc:
         st.session_state["auth_error"] = f"Inscription impossible : {exc}"
-
-
+ 
+ 
 def log_out() -> None:
     try:
         supabase.auth.sign_out()
@@ -573,8 +578,8 @@ def log_out() -> None:
     for key in ("user", "profile", "last_result", "remember_me"):
         st.session_state[key] = None
     st.session_state["page"] = "recherche"
-
-
+ 
+ 
 def increment_search_count() -> None:
     if is_admin() or has_active_subscription():
         return
@@ -590,11 +595,11 @@ def increment_search_count() -> None:
             ).execute()
         except Exception:
             pass
-
-
+ 
+ 
 def render_landing_page() -> None:
     render_header()
-
+ 
     st.markdown(
         """
         <div class="mm-hero">
@@ -605,7 +610,7 @@ def render_landing_page() -> None:
         """,
         unsafe_allow_html=True,
     )
-
+ 
     col_left, col_mid, col_right = st.columns([1, 1, 1])
     with col_mid:
         if st.button("Commencer gratuitement — 3 recherches offertes", use_container_width=True):
@@ -614,15 +619,15 @@ def render_landing_page() -> None:
         if st.button("J'ai déjà un compte — Se connecter", use_container_width=True):
             st.session_state["public_page"] = "auth"
             st.rerun()
-
+ 
     render_trust_badges()
-
+ 
     st.markdown('<div class="mm-section-title">Comment ça marche</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="mm-section-subtitle">Trois indicateurs, une seule recherche.</div>',
         unsafe_allow_html=True,
     )
-
+ 
     feat_col1, feat_col2, feat_col3 = st.columns(3)
     features = [
         ("💰", "Finance instantanée", "Coût réel, TVA estimée, prix de vente conseillé et marge nette calculés automatiquement."),
@@ -641,13 +646,13 @@ def render_landing_page() -> None:
                 """,
                 unsafe_allow_html=True,
             )
-
+ 
     st.markdown('<div class="mm-section-title">Des tarifs simples</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="mm-section-subtitle">Commence gratuitement, passe Pro quand tu es prêt.</div>',
         unsafe_allow_html=True,
     )
-
+ 
     pricing_cols = st.columns(4)
     mini_plans = [
         ("Gratuit", "0 €", "3 recherches", False),
@@ -668,7 +673,7 @@ def render_landing_page() -> None:
                 """,
                 unsafe_allow_html=True,
             )
-
+ 
     st.markdown(
         """
         <div class="mm-footer-cta">
@@ -683,8 +688,8 @@ def render_landing_page() -> None:
         if st.button("Créer mon compte gratuit", use_container_width=True, key="footer_cta"):
             st.session_state["public_page"] = "auth"
             st.rerun()
-
-
+ 
+ 
 def render_auth_forms() -> None:
     if st.button("← Retour à l'accueil", key="back_to_landing"):
         st.session_state["public_page"] = "accueil"
@@ -693,9 +698,9 @@ def render_auth_forms() -> None:
     render_trust_badges()
     st.markdown("### Bienvenue sur MargeMax")
     st.caption("Connectez-vous pour lancer vos recherches de sourcing AliExpress.")
-
+ 
     tab_connexion, tab_inscription = st.tabs(["Se connecter", "Créer un compte"])
-
+ 
     with tab_connexion:
         with st.form("form_connexion"):
             email = st.text_input("Adresse e-mail", key="login_email")
@@ -709,7 +714,7 @@ def render_auth_forms() -> None:
                 log_in(email, password, remember_me)
                 if is_logged_in():
                     st.rerun()
-
+ 
     with tab_inscription:
         with st.form("form_inscription"):
             new_email = st.text_input("Adresse e-mail", key="signup_email")
@@ -729,22 +734,22 @@ def render_auth_forms() -> None:
                 st.session_state["auth_error"] = "Le mot de passe doit contenir au moins 8 caractères."
             else:
                 sign_up(new_email, new_password)
-
+ 
     if st.session_state.get("auth_error"):
         st.error(st.session_state["auth_error"])
-
-
+ 
+ 
 # ============================================================
 # AliExpress — GATEWAY TOP
 # ============================================================
-
+ 
 def _sign_top_params(params: dict, app_secret: str) -> str:
     """Signature MD5 requise par le Gateway TOP AliExpress (méthode 'md5')."""
     sorted_items = sorted(params.items())
     base_string = app_secret + "".join(f"{k}{v}" for k, v in sorted_items) + app_secret
     return hashlib.md5(base_string.encode("utf-8")).hexdigest().upper()
-
-
+ 
+ 
 def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
     """
     Appelle le Gateway TOP AliExpress. Nécessite ALIEXPRESS_APP_SECRET
@@ -753,7 +758,7 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
     """
     if not ALIEXPRESS_APP_SECRET:
         return None
-
+ 
     params = {
         "method": method,
         "app_key": ALIEXPRESS_APP_KEY,
@@ -764,15 +769,15 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
         **extra_params,
     }
     params["sign"] = _sign_top_params(params, ALIEXPRESS_APP_SECRET)
-
+ 
     try:
         response = requests.get(ALIEXPRESS_GATEWAY, params=params, timeout=8)
         response.raise_for_status()
         return response.json()
     except Exception:
         return None
-
-
+ 
+ 
 def search_product(query: str) -> dict:
     """
     Recherche un produit sur AliExpress via le Gateway TOP.
@@ -782,14 +787,14 @@ def search_product(query: str) -> dict:
     api_result = call_aliexpress_gateway(
         "aliexpress.affiliate.product.query", {"keywords": query, "page_size": "1"}
     )
-
+ 
     if api_result:
         # À adapter selon le schéma exact retourné par le Gateway TOP.
         return _parse_aliexpress_payload(api_result, query)
-
+ 
     return _generate_demo_estimate(query)
-
-
+ 
+ 
 def _parse_aliexpress_payload(payload: dict, query: str) -> dict:
     # Squelette d'extraction — à ajuster une fois l'App Secret et la
     # méthode d'API définitive branchés en production.
@@ -806,8 +811,8 @@ def _parse_aliexpress_payload(payload: dict, query: str) -> dict:
         return _build_result(title, base_price, shipping, image_url, vendor_rating, orders, query)
     except Exception:
         return _generate_demo_estimate(query)
-
-
+ 
+ 
 def _generate_demo_estimate(query: str) -> dict:
     """Estimation déterministe (mode démo) tant que l'App Secret n'est pas configuré."""
     seed = int(hashlib.sha256(query.encode("utf-8")).hexdigest(), 16) % (10**6)
@@ -818,8 +823,8 @@ def _generate_demo_estimate(query: str) -> dict:
     orders = rng.randint(80, 12000)
     image_url = "https://placehold.co/400x400/0F1117/38BDF8?text=MargeMax"
     return _build_result(query.title(), base_price, shipping, image_url, vendor_rating, orders, query)
-
-
+ 
+ 
 def _build_result(
     title: str,
     base_price: float,
@@ -833,10 +838,10 @@ def _build_result(
     prix_conseille = math.floor(cout_total / MARGIN_TARGET) + 0.99
     frais_paiement = round(prix_conseille * PAYMENT_FEE_RATE, 2)
     marge_nette = round(prix_conseille - cout_total - frais_paiement, 2)
-
+ 
     fiabilite_score = round(min(99, max(35, vendor_rating * 100 - (0 if orders > 300 else 15))))
     potentiel_score = round(min(99, max(20, 55 + (vendor_rating - 0.85) * 200 + (orders / 500))))
-
+ 
     canaux = []
     if potentiel_score >= 70:
         canaux.append("TikTok Ads")
@@ -846,7 +851,7 @@ def _build_result(
         canaux.append("Vinted")
     if not canaux:
         canaux.append("Shopify")
-
+ 
     return {
         "titre": title,
         "requete": query,
@@ -865,24 +870,24 @@ def _build_result(
         "delai_livraison": "12-20 jours" if shipping < 3 else "7-15 jours",
         "canaux": canaux,
     }
-
-
+ 
+ 
 # ============================================================
 # COMPOSANTS UI — DASHBOARD RÉSULTATS
 # ============================================================
-
+ 
 def score_class(score: float) -> str:
     if score >= 75:
         return "mm-score-high"
     if score >= 50:
         return "mm-score-mid"
     return "mm-score-low"
-
-
+ 
+ 
 def render_result_dashboard(result: dict) -> None:
     st.markdown(f"#### Résultats pour : *{result['titre']}*")
     col_finance, col_fiabilite, col_potentiel = st.columns(3)
-
+ 
     with col_finance:
         st.markdown(
             f"""
@@ -898,7 +903,7 @@ def render_result_dashboard(result: dict) -> None:
             """,
             unsafe_allow_html=True,
         )
-
+ 
     with col_fiabilite:
         cls = score_class(result["fiabilite_score"])
         st.markdown(
@@ -913,7 +918,7 @@ def render_result_dashboard(result: dict) -> None:
             """,
             unsafe_allow_html=True,
         )
-
+ 
     with col_potentiel:
         cls_p = score_class(result["potentiel_score"])
         badges = "".join(f'<span class="mm-channel-badge">{c}</span>' for c in result["canaux"])
@@ -928,12 +933,12 @@ def render_result_dashboard(result: dict) -> None:
             """,
             unsafe_allow_html=True,
         )
-
-
+ 
+ 
 # ============================================================
 # PAGE RECHERCHE
 # ============================================================
-
+ 
 def render_ad_banners() -> None:
     slots = ad_slots_for_current_user()
     if slots <= 0:
@@ -945,22 +950,22 @@ def render_ad_banners() -> None:
                 '<div class="mm-ad-banner">Espace publicitaire · Passez Pro pour le retirer</div>',
                 unsafe_allow_html=True,
             )
-
-
+ 
+ 
 def render_search_page() -> None:
     render_header()
     render_ad_banners()
-
+ 
     remaining = searches_remaining()
     if remaining != math.inf:
         st.info(f"Recherches gratuites restantes : {int(remaining)} / {FREE_SEARCH_LIMIT}")
-
+ 
     with st.form("form_recherche"):
         query = st.text_input(
             "Nom du produit à sourcer", placeholder="Ex : montre connectée sport"
         )
         submitted = st.form_submit_button("Lancer la recherche", use_container_width=True)
-
+ 
     if submitted:
         if not query.strip():
             st.warning("Merci de saisir un nom de produit.")
@@ -973,24 +978,24 @@ def render_search_page() -> None:
                 result = search_product(query.strip())
             increment_search_count()
             st.session_state["last_result"] = result
-
+ 
     if st.session_state.get("last_result"):
         st.divider()
         render_result_dashboard(st.session_state["last_result"])
-
-
+ 
+ 
 # ============================================================
 # PAGE TARIFS
 # ============================================================
-
+ 
 def render_pricing_page() -> None:
     render_header()
     st.markdown("### Passez à l'offre Pro")
     st.caption("Recherches illimitées, 0 publicité, et bien plus.")
-
+ 
     columns = st.columns(3)
     plan_keys = list(PLANS.keys())
-
+ 
     for col, plan_key in zip(columns, plan_keys):
         plan = PLANS[plan_key]
         with col:
@@ -1019,16 +1024,16 @@ def render_pricing_page() -> None:
                     "Le paiement en ligne arrive très bientôt. "
                     "Contacte-nous en attendant pour activer ton abonnement manuellement."
                 )
-
-
+ 
+ 
 # ============================================================
 # SIDEBAR
 # ============================================================
-
+ 
 def render_sidebar() -> None:
     with st.sidebar:
         st.markdown("## MargeMax ⚡")
-
+ 
         if is_logged_in():
             if is_admin():
                 st.markdown('<div class="mm-admin-badge">👑 ADMIN PRO</div>', unsafe_allow_html=True)
@@ -1036,10 +1041,10 @@ def render_sidebar() -> None:
                 plan = (st.session_state.get("profile") or {}).get("plan", "free")
                 plan_label = PLANS.get(plan, {}).get("label", "Plan Gratuit")
                 st.caption(f"Plan actuel : **{plan_label}**")
-
+ 
             st.caption(f"Connecté : {st.session_state['user']['email']}")
             st.divider()
-
+ 
             st.session_state["page"] = st.radio(
                 "Navigation",
                 options=["recherche", "tarifs"],
@@ -1047,32 +1052,32 @@ def render_sidebar() -> None:
                 index=0 if st.session_state.get("page") == "recherche" else 1,
                 label_visibility="collapsed",
             )
-
+ 
             st.divider()
             if st.button("Se déconnecter", use_container_width=True):
                 log_out()
                 st.rerun()
         else:
             st.caption("Connectez-vous pour commencer à sourcer vos produits.")
-
-
+ 
+ 
 # ============================================================
 # POINT D'ENTRÉE
 # ============================================================
-
+ 
 def main() -> None:
     init_session_state()
     inject_custom_css()
-
+ 
     if not is_logged_in():
         if st.session_state.get("public_page") == "auth":
             render_auth_forms()
         else:
             render_landing_page()
         return
-
+ 
     render_sidebar()
-
+ 
     if is_suspended():
         render_header()
         st.error(
@@ -1080,12 +1085,32 @@ def main() -> None:
             "qu'il s'agit d'une erreur."
         )
         return
-
+ 
     if st.session_state["page"] == "tarifs":
         render_pricing_page()
     else:
         render_search_page()
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
