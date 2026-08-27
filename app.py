@@ -836,7 +836,7 @@ def handle_stripe_return() -> None:
 # pas dans une session utilisateur : il est partagé par toute l'app.
 
 ALIEXPRESS_OAUTH_AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
-ALIEXPRESS_OAUTH_TOKEN_URL = "https://oauth.aliexpress.com/token"
+ALIEXPRESS_OAUTH_TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
 
 
 def get_app_config(key: str) -> str | None:
