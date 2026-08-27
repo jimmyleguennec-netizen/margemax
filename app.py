@@ -1525,8 +1525,10 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
     Appelle le Gateway TOP AliExpress. Nécessite ALIEXPRESS_APP_SECRET
     dans .streamlit/secrets.toml (non fourni par le AppKey seul).
     Retourne None si l'appel échoue, pour permettre un repli propre.
+    L'erreur exacte est conservée dans st.session_state pour diagnostic.
     """
     if not ALIEXPRESS_APP_SECRET:
+        st.session_state["last_aliexpress_error"] = "ALIEXPRESS_APP_SECRET vide."
         return None
 
     params = {
@@ -1541,10 +1543,14 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
     params["sign"] = _sign_top_params(params, ALIEXPRESS_APP_SECRET)
 
     try:
-        response = requests.get(ALIEXPRESS_GATEWAY, params=params, timeout=8)
+        response = requests.get(ALIEXPRESS_GATEWAY, params=params, timeout=15)
         response.raise_for_status()
-        return response.json()
-    except Exception:
+        data = response.json()
+        st.session_state["last_aliexpress_error"] = None
+        st.session_state["last_aliexpress_raw"] = data
+        return data
+    except Exception as exc:
+        st.session_state["last_aliexpress_error"] = f"{type(exc).__name__}: {exc}"
         return None
 
 
@@ -1785,6 +1791,14 @@ def render_search_page() -> None:
                     "App Secret VIDE côté app — les secrets Streamlit ne sont pas lus "
                     "correctement, ou pas encore sauvegardés."
                 )
+            last_error = st.session_state.get("last_aliexpress_error")
+            if last_error:
+                st.error(f"Dernière erreur d'appel AliExpress : {last_error}")
+            elif st.session_state.get("last_aliexpress_raw") is not None:
+                st.success("Dernier appel AliExpress réussi.")
+                st.json(st.session_state["last_aliexpress_raw"])
+            else:
+                st.caption("Aucun appel AliExpress tenté pour l'instant dans cette session.")
 
     render_ad_banners()
 
@@ -1858,21 +1872,16 @@ def render_pricing_page() -> None:
             )
 
         cards_html.append(
-            f"""
-            <div class="mm-plan-card {popular_class}">
-                {badge_html}
-                <div class="mm-plan-category {category_class}">{plan['category']}</div>
-                <h3>{plan['label']}</h3>
-                <div style="font-size:1.8rem;font-weight:800;margin:10px 0;">
-                    {plan['price']} {period_html}
-                </div>
-                {save_html}
-                <ul class="mm-plan-features">
-                    {features_html}
-                </ul>
-                {cta_html}
-            </div>
-            """
+            f'<div class="mm-plan-card {popular_class}">'
+            f'{badge_html}'
+            f'<div class="mm-plan-category {category_class}">{plan["category"]}</div>'
+            f'<h3>{plan["label"]}</h3>'
+            f'<div style="font-size:1.8rem;font-weight:800;margin:10px 0;">'
+            f'{plan["price"]} {period_html}</div>'
+            f'{save_html}'
+            f'<ul class="mm-plan-features">{features_html}</ul>'
+            f'{cta_html}'
+            f'</div>'
         )
 
     st.markdown(
