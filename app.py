@@ -48,6 +48,10 @@ ALIEXPRESS_GATEWAY = "https://eco.taobao.com/router/rest"
 
 ADMIN_EMAIL = "jimmy.leguennec@gmail.com"
 
+# URL publique de cette app — nécessaire pour construire le lien de retour
+# après autorisation OAuth AliExpress. À ajuster si tu changes de domaine.
+APP_BASE_URL = "https://margemax-app.streamlit.app/"
+
 # Logos encodés en base64 : intégrés directement dans le code pour ne
 # jamais dépendre d'un chargement d'image externe (évite tout souci de
 # CSP ou de blocage réseau depuis le navigateur de l'utilisateur).
@@ -821,6 +825,104 @@ def handle_stripe_return() -> None:
     st.query_params.clear()
 
 
+# ============================================================
+# AUTORISATION OAUTH ALIEXPRESS (API DROP SHIPPING)
+# ============================================================
+# Les méthodes "aliexpress.ds.*" (Drop Shipping) — contrairement à
+# "aliexpress.affiliate.*" — exigent qu'un compte AliExpress autorise
+# explicitement l'app une fois (flux OAuth2), ce qui produit un
+# access_token à joindre à chaque appel signé. Ce jeton est stocké dans
+# Supabase (table app_config, accessible uniquement via service_role),
+# pas dans une session utilisateur : il est partagé par toute l'app.
+
+ALIEXPRESS_OAUTH_AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+ALIEXPRESS_OAUTH_TOKEN_URL = "https://oauth.aliexpress.com/token"
+
+
+def get_app_config(key: str) -> str | None:
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+    try:
+        response = requests.get(
+            f"{REST_URL}/app_config",
+            headers=_service_role_headers(),
+            params={"key": f"eq.{key}", "select": "value"},
+            timeout=10,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0]["value"] if rows else None
+    except Exception:
+        return None
+
+
+def set_app_config(key: str, value: str) -> bool:
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        return False
+    try:
+        headers = _service_role_headers()
+        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+        response = requests.post(
+            f"{REST_URL}/app_config",
+            headers=headers,
+            json={"key": key, "value": value, "updated_at": datetime.now(timezone.utc).isoformat()},
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def get_aliexpress_authorize_url() -> str:
+    return (
+        f"{ALIEXPRESS_OAUTH_AUTHORIZE_URL}?response_type=code&force_auth=true"
+        f"&redirect_uri={requests.utils.quote(APP_BASE_URL, safe='')}"
+        f"&client_id={ALIEXPRESS_APP_KEY}"
+    )
+
+
+def exchange_aliexpress_code_for_token(code: str) -> dict | None:
+    try:
+        response = requests.post(
+            ALIEXPRESS_OAUTH_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "client_id": ALIEXPRESS_APP_KEY,
+                "client_secret": ALIEXPRESS_APP_SECRET,
+                "code": code,
+                "redirect_uri": APP_BASE_URL,
+                "sp": "ae",
+            },
+            timeout=15,
+        )
+        data = response.json()
+        if response.status_code >= 400 or "access_token" not in data:
+            st.session_state["last_aliexpress_oauth_error"] = data
+            return None
+        return data
+    except Exception as exc:
+        st.session_state["last_aliexpress_oauth_error"] = f"{type(exc).__name__}: {exc}"
+        return None
+
+
+def handle_aliexpress_oauth_return() -> None:
+    """À appeler tôt dans main(). Si AliExpress vient de rediriger avec un
+    code d'autorisation, l'échange contre un jeton d'accès et le stocke."""
+    code = st.query_params.get("code")
+    if not code:
+        return
+    token_data = exchange_aliexpress_code_for_token(code)
+    if token_data:
+        set_app_config("aliexpress_access_token", token_data.get("access_token", ""))
+        set_app_config("aliexpress_refresh_token", token_data.get("refresh_token", ""))
+        st.success("Autorisation AliExpress réussie ! L'app peut maintenant chercher de vrais produits.")
+    else:
+        st.error(
+            "Échec de l'autorisation AliExpress — vérifie le diagnostic admin "
+            "pour le détail de l'erreur."
+        )
+    st.query_params.clear()
+
+
 def supabase_sign_in(email: str, password: str) -> dict:
     """Retourne le JSON de réponse GoTrue, ou lève une exception avec le
     message d'erreur renvoyé par Supabase."""
@@ -1524,6 +1626,8 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
     """
     Appelle le Gateway TOP AliExpress. Nécessite ALIEXPRESS_APP_SECRET
     dans .streamlit/secrets.toml (non fourni par le AppKey seul).
+    Les méthodes "aliexpress.ds.*" nécessitent en plus un jeton d'accès
+    OAuth (paramètre "session"), obtenu via handle_aliexpress_oauth_return.
     Retourne None si l'appel échoue, pour permettre un repli propre.
     L'erreur exacte est conservée dans st.session_state pour diagnostic.
     """
@@ -1540,6 +1644,9 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
         "sign_method": "md5",
         **extra_params,
     }
+    access_token = get_app_config("aliexpress_access_token")
+    if access_token:
+        params["session"] = access_token
     params["sign"] = _sign_top_params(params, ALIEXPRESS_APP_SECRET)
 
     try:
@@ -1556,33 +1663,40 @@ def call_aliexpress_gateway(method: str, extra_params: dict) -> dict | None:
 
 def search_product(query: str) -> dict:
     """
-    Recherche un produit sur AliExpress via le Gateway TOP.
-    En l'absence de App Secret configuré (ou en cas d'échec réseau),
-    une estimation de démonstration est générée pour ne jamais bloquer l'UI.
+    Recherche un produit sur AliExpress via le Gateway TOP (API Drop
+    Shipping, aliexpress.ds.*). Nécessite un App Secret ET une
+    autorisation OAuth valide (voir handle_aliexpress_oauth_return).
+    En l'absence de l'un ou l'autre (ou en cas d'échec réseau), une
+    estimation de démonstration est générée pour ne jamais bloquer l'UI.
     """
     api_result = call_aliexpress_gateway(
-        "aliexpress.affiliate.product.query", {"keywords": query, "page_size": "1"}
+        "aliexpress.ds.text.search",
+        {"keyWord": query, "pageSize": "1", "pageIndex": "1", "local": "fr_FR"},
     )
 
     if api_result:
-        # À adapter selon le schéma exact retourné par le Gateway TOP.
+        # Squelette d'extraction — le nom exact des champs de réponse pour
+        # cette méthode n'est pas documenté publiquement de façon fiable ;
+        # à ajuster une fois qu'on voit la vraie réponse via le diagnostic.
         return _parse_aliexpress_payload(api_result, query)
 
     return _generate_demo_estimate(query)
 
 
 def _parse_aliexpress_payload(payload: dict, query: str) -> dict:
-    # Squelette d'extraction — à ajuster une fois l'App Secret et la
-    # méthode d'API définitive branchés en production.
+    # Squelette d'extraction — à ajuster une fois qu'on voit la vraie
+    # structure JSON renvoyée par aliexpress.ds.text.search (visible dans
+    # le diagnostic admin après un appel réussi).
     try:
-        item = payload["aliexpress_affiliate_product_query_response"]["resp_result"][
-            "result"
-        ]["products"]["product"][0]
+        response_root = next(
+            (v for k, v in payload.items() if k.endswith("_response")), payload
+        )
+        item = response_root["data"]["products"][0]
         base_price = float(item.get("target_sale_price", 0)) or 8.5
         shipping = 2.0
         image_url = item.get("product_main_image_url", "")
         product_url = item.get("product_detail_url", "")
-        vendor_rating = float(item.get("evaluate_rate", "92").replace("%", "")) / 100
+        vendor_rating = float(str(item.get("evaluate_rate", "92")).replace("%", "")) / 100
         orders = int(item.get("volume", 500))
         title = item.get("product_title", query)
         return _build_result(
@@ -1791,6 +1905,23 @@ def render_search_page() -> None:
                     "App Secret VIDE côté app — les secrets Streamlit ne sont pas lus "
                     "correctement, ou pas encore sauvegardés."
                 )
+
+            st.divider()
+            oauth_token = get_app_config("aliexpress_access_token")
+            if oauth_token:
+                st.success("Autorisation OAuth AliExpress active (jeton présent).")
+            else:
+                st.warning("Aucune autorisation OAuth AliExpress enregistrée pour l'instant.")
+            oauth_error = st.session_state.get("last_aliexpress_oauth_error")
+            if oauth_error:
+                st.error(f"Dernière erreur d'autorisation OAuth : {oauth_error}")
+            st.link_button("🔗 Autoriser / réautoriser AliExpress", get_aliexpress_authorize_url())
+            st.caption(
+                "Connecte-toi avec le compte AliExpress lié à l'app "
+                "(celui utilisé pour l'App Key) puis autorise l'accès."
+            )
+
+            st.divider()
             last_error = st.session_state.get("last_aliexpress_error")
             if last_error:
                 st.error(f"Dernière erreur d'appel AliExpress : {last_error}")
@@ -1984,6 +2115,7 @@ def main() -> None:
     init_session_state()
     inject_custom_css()
     handle_stripe_return()
+    handle_aliexpress_oauth_return()
 
     if not is_logged_in():
         if st.session_state.get("public_page") == "auth":
