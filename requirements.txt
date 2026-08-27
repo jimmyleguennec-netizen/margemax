@@ -1,3 +1,0 @@
-streamlit>=1.37
-supabase>=2.6
-requests>=2.31
