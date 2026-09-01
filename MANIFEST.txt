@@ -1,0 +1,8 @@
+.env
+README_LIRE_AVANT_LANCEMENT.txt
+__pycache__/app.cpython-313.pyc
+app.py
+assets/margemax_logo.png
+requirements.txt
+run_local.bat
+schema_margemax.sql

@@ -1,0 +1,24 @@
+# Liste de domaines d'e-mails jetables/temporaires connus.
+# Un domaine par ligne. Complète cette liste au besoin.
+mailinator.com
+guerrillamail.com
+guerrillamail.info
+guerrillamail.biz
+10minutemail.com
+10minutemail.net
+tempmail.com
+temp-mail.org
+throwawaymail.com
+yopmail.com
+yopmail.fr
+fakeinbox.com
+trashmail.com
+getnada.com
+maildrop.cc
+sharklasers.com
+dispostable.com
+mintemail.com
+mailnesia.com
+mohmal.com
+emailondeck.com
+moakt.com
