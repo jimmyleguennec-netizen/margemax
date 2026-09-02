@@ -3964,6 +3964,59 @@ def _extract_price_from_visible_text(html_text: str) -> float | None:
         return None
 
 
+def _extract_amount_near_label(html_text: str, label_pattern: str) -> float | None:
+    """Cherche un montant en euros situe pres (dans les ~200 caracteres
+    suivants) d'un libelle donne (ex: "Frais d'importation estimés",
+    "Total") dans le HTML VISIBLE (texte, pas JSON) -- utilise pour la
+    livraison/l'import/le total quand ces valeurs ne sont trouvees dans
+    aucune structure JSON (points 2/3/6). Repli volontairement prudent :
+    cherche le PREMIER montant apres le libelle, jamais une valeur
+    inventee si le libelle est absent."""
+    label_match = re.search(label_pattern, html_text, re.IGNORECASE)
+    if not label_match:
+        return None
+    window = html_text[label_match.end():label_match.end() + 200]
+    amount_match = re.search(r"(\d{1,4}(?:[.,]\d{2}))\s*€", window)
+    if not amount_match:
+        return None
+    try:
+        return float(amount_match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _extract_shipping_from_visible_text(html_text: str) -> float | None:
+    """Repli texte visible pour la livraison (point 2/4) : cherche un
+    montant pres du mot "Livraison"/"Shipping" quand aucune structure JSON
+    n'a donne de frais reels et qu'aucune mention de gratuite n'a ete
+    trouvee (voir _detect_free_shipping_text, teste avant celui-ci)."""
+    return _extract_amount_near_label(html_text, r"livraison|shipping")
+
+
+def _extract_import_fee_from_visible_text(html_text: str) -> float | None:
+    """Frais d'importation/droits de douane affiches par AliExpress pour
+    les acheteurs UE (point 3) : cherche un montant pres d'un libelle
+    "Frais d'importation", "Droits de douane" ou "Import ... fee". Ne
+    retourne None que si aucun de ces libelles n'est trouve dans la page
+    -- jamais de forfait invente (voir _finance_fields qui applique un
+    repli distinct, explicitement marque comme estimation, quand cette
+    fonction ne trouve rien)."""
+    return _extract_amount_near_label(
+        html_text, r"frais d.importation[^€\d]*|droits? de douane[^€\d]*|import(?:ation)?\s+(?:duty|fee)s?[^€\d]*"
+    )
+
+
+def _extract_checkout_total_from_visible_text(html_text: str) -> float | None:
+    """Total affiche pres du mot "Total" (checkout ou recap panier, point
+    6/7) -- utilise UNIQUEMENT pour une validation croisee optionnelle
+    (point 7 : badge "Coût vérifié" si prix+livraison+import retrouves
+    correspondent a ce total), jamais comme source du prix/livraison/import
+    eux-memes. Tres best-effort : la page produit standard n'affiche pas
+    toujours de "Total" exploitable, retourne None dans ce cas -- ce n'est
+    pas une erreur, juste une donnee absente de cette page."""
+    return _extract_amount_near_label(html_text, r"\btotal\b")
+
+
 def _parse_json_ld_product(html_text: str, soup) -> dict | None:
     """Source B (JSON-LD schema.org/Product) : name, image, offers.price,
     offers.priceCurrency, aggregateRating, et les frais de port reels
@@ -4121,9 +4174,19 @@ def _parse_aliexpress_embedded_json(embedded: dict) -> dict:
                 out["price"] = min_amount
                 if max_amount is not None and max_amount != min_amount:
                     out["price_max"] = max_amount
+        # Frais d'importation/droits de douane (point 3) affiches par
+        # AliExpress a certains acheteurs UE -- champs candidats non
+        # verifies en direct (meme reserve que le reste de ce parseur).
+        import_fee = _first_number(
+            (price_module.get("taxAmount") or {}).get("value"),
+            (price_module.get("customsAmount") or {}).get("value"),
+        )
+        if import_fee is not None:
+            out["import_fee"] = import_fee
 
     sku_module = data.get("skuModule") or {}
     variants: list[dict] = []
+    selected_sku_id = str(sku_module.get("skuId") or sku_module.get("defaultSkuId") or "") if isinstance(sku_module, dict) else ""
     if isinstance(sku_module, dict):
         label_by_value_id: dict[str, str] = {}
         for prop in (sku_module.get("productSKUPropertyList") or []):
@@ -4141,15 +4204,27 @@ def _parse_aliexpress_embedded_json(embedded: dict) -> dict:
             attr = str(sku_entry.get("skuAttr") or sku_entry.get("skuPropIds") or "")
             value_ids = re.findall(r":(\d+)(?:;|$)", attr) if attr else []
             label_parts = [label_by_value_id[v] for v in value_ids if v in label_by_value_id]
+            sku_id = str(sku_entry.get("skuId") or attr or len(variants))
             variants.append({
-                "id": str(sku_entry.get("skuId") or attr or len(variants)),
+                "id": sku_id,
                 "label": " / ".join(label_parts) if label_parts else (attr or f"Variante {len(variants) + 1}"),
                 "price": amount,
                 "stock": sku_val.get("availQuantity"),
                 "image": None,
+                "selected": bool(selected_sku_id) and sku_id == selected_sku_id,
             })
     if variants:
         out["variants"] = variants
+        # Variante REELLEMENT analysee (point 8) : quand la page identifie
+        # un SKU par defaut/selectionne (analyse par lien/ID direct sur un
+        # produit avec variantes, ex: "?sku_id=..." dans l'URL), son prix
+        # devient LE prix retenu -- jamais le minimum de la fourchette
+        # mélangé a une autre variante que celle reellement affichee.
+        selected_variant = next((v for v in variants if v.get("selected") and v.get("price") is not None), None)
+        if selected_variant:
+            out["price"] = selected_variant["price"]
+            out["price_max"] = None
+            out["selected_variant_label"] = selected_variant["label"]
 
     shipping_module = data.get("shippingModule") or {}
     if isinstance(shipping_module, dict):
@@ -4167,6 +4242,13 @@ def _parse_aliexpress_embedded_json(embedded: dict) -> dict:
         elif shipping_module.get("freeShipping") or shipping_module.get("isFreeShipping"):
             out["shipping"] = 0.0
             out["shipping_free"] = True
+        # Frais d'importation, chemin alternatif observe sur certaines
+        # pages (module shipping plutot que priceModule) -- meme reserve
+        # de fiabilite que ci-dessus.
+        if out.get("import_fee") is None:
+            import_fee_ship = _first_number((shipping_module.get("taxAmount") or {}).get("value"))
+            if import_fee_ship is not None:
+                out["import_fee"] = import_fee_ship
 
     feedback_module = data.get("feedbackModule") or {}
     if isinstance(feedback_module, dict):
@@ -4214,6 +4296,7 @@ def _extract_product_from_html(html_text: str) -> dict | None:
     mergeable_fields = (
         "title", "image", "image_gallery", "price", "price_max", "price_raw", "currency",
         "shipping", "shipping_free", "variants", "vendor_rating", "orders",
+        "import_fee", "selected_variant_label", "checkout_total",
     )
 
     def _fill(candidate: dict | None, source_label: str) -> None:
@@ -4236,16 +4319,38 @@ def _extract_product_from_html(html_text: str) -> dict | None:
     _fill(_parse_json_ld_product(html_text, soup), "JSON-LD (schema.org)")
     _fill(_parse_og_meta(html_text, soup), "OpenGraph / meta")
 
-    if result.get("shipping") is None and _detect_free_shipping_text(html_text):
-        result["shipping"] = 0.0
-        result["shipping_free"] = True
-        field_sources["shipping"] = "HTML visible (texte)"
+    # Repli texte visible (source E, point 2/3/4/6) : uniquement pour les
+    # champs qu'aucune structure JSON n'a fournis -- jamais une valeur
+    # inventee si le libelle correspondant est absent de la page.
+    if result.get("shipping") is None:
+        if _detect_free_shipping_text(html_text):
+            result["shipping"] = 0.0
+            result["shipping_free"] = True
+            field_sources["shipping"] = "HTML visible (texte, « livraison gratuite »)"
+        else:
+            text_shipping = _extract_shipping_from_visible_text(html_text)
+            if text_shipping is not None:
+                result["shipping"] = text_shipping
+                field_sources["shipping"] = "HTML visible (texte, libellé « Livraison »)"
 
     if result.get("price") is None:
         text_price = _extract_price_from_visible_text(html_text)
         if text_price is not None:
             result["price"] = text_price
             field_sources["price"] = "HTML visible (texte)"
+
+    if result.get("import_fee") is None:
+        text_import_fee = _extract_import_fee_from_visible_text(html_text)
+        if text_import_fee is not None:
+            result["import_fee"] = text_import_fee
+            field_sources["import_fee"] = "HTML visible (texte, libellé « Frais d'importation »)"
+
+    # Total checkout (point 6/7) : UNIQUEMENT pour validation croisee,
+    # jamais utilise comme source de prix/livraison/import eux-memes.
+    text_total = _extract_checkout_total_from_visible_text(html_text)
+    if text_total is not None:
+        result["checkout_total"] = text_total
+        field_sources["checkout_total"] = "HTML visible (texte, libellé « Total »)"
 
     if not result.get("title"):
         return None
@@ -4261,6 +4366,9 @@ def _extract_product_from_html(html_text: str) -> dict | None:
     result.setdefault("variants", [])
     result.setdefault("vendor_rating", None)
     result.setdefault("orders", None)
+    result.setdefault("import_fee", None)
+    result.setdefault("selected_variant_label", None)
+    result.setdefault("checkout_total", None)
     result["_field_sources"] = field_sources
     return result
 
@@ -4629,6 +4737,7 @@ def _merge_product_sources(api_data: dict | None, scraped_data: dict | None) -> 
     fields = (
         "title", "image", "image_gallery", "price", "price_max", "price_raw", "currency",
         "shipping", "shipping_free", "variants", "vendor_rating", "orders", "product_url",
+        "import_fee", "selected_variant_label", "checkout_total",
     )
     merged: dict = {}
     field_sources: dict[str, str] = {}
@@ -4680,6 +4789,8 @@ def _scrape_one_candidate(url: str, prefer_scraperapi: bool, try_api: bool) -> d
         "url": url,
         "erreur_api": None,
         "erreur_parsing_html": None,
+        "html_recu": None,
+        "note_fetch": None,
     }
 
     if try_api:
@@ -4706,9 +4817,25 @@ def _scrape_one_candidate(url: str, prefer_scraperapi: bool, try_api: bool) -> d
     needs_scraper = (
         api_data is None
         or api_data.get("shipping") is None
+        or api_data.get("import_fee") is None
         or not api_data.get("variants")
     )
     if needs_scraper:
+        if not prefer_scraperapi:
+            # Fetch direct SANS rendu JS (pas de SCRAPER_API_KEY) : verifie
+            # en direct sur une vraie page produit AliExpress (voir point
+            # 1-3 de la demande utilisateur) -- la page servie a un fetch
+            # non-rendu ne contient QUE le squelette/footer, aucune donnee
+            # produit (prix/livraison/JSON embarque tous absents). Ce n'est
+            # donc quasiment jamais exploitable pour l'extraction ; tente
+            # quand meme (peut fonctionner pour d'autres domaines/gardes-fous),
+            # mais le diagnostic le signale explicitement plutot que de
+            # laisser "Non disponible" sans explication.
+            diag["note_fetch"] = (
+                "Fetch direct sans rendu JS (SCRAPER_API_KEY absente) : AliExpress sert "
+                "généralement une page squelette (footer/nav) sans donnée produit dans ce cas — "
+                "configure SCRAPER_API_KEY pour un rendu JS complet."
+            )
         try:
             html_text = (
                 _scraperapi_fetch(url, render=True)
@@ -4722,6 +4849,12 @@ def _scrape_one_candidate(url: str, prefer_scraperapi: bool, try_api: bool) -> d
                         "Aucune donnée exploitable trouvée dans le HTML (JSON embarqué, "
                         "JSON-LD, OpenGraph et texte visible tous vides ou illisibles)."
                     )
+                    diag["html_recu"] = html_text[:1500]
+                elif scraped.get("price") is None:
+                    # Titre/image trouves mais prix introuvable (point 10) :
+                    # capture un extrait du HTML reellement recu pour que
+                    # l'admin puisse voir POURQUOI, au lieu de deviner.
+                    diag["html_recu"] = html_text[:1500]
             else:
                 diag["erreur_parsing_html"] = "Page produit inaccessible (récupération HTML échouée)."
         except Exception as exc:
@@ -4732,14 +4865,19 @@ def _scrape_one_candidate(url: str, prefer_scraperapi: bool, try_api: bool) -> d
     if merged:
         merged["_price_source"] = field_sources.get("price")
         merged["_shipping_source"] = field_sources.get("shipping")
+        merged["_import_fee_source"] = field_sources.get("import_fee")
     diag["prix_source"] = field_sources.get("price")
     diag["livraison_source"] = field_sources.get("shipping")
+    diag["import_source"] = field_sources.get("import_fee")
     diag["prix_brut"] = (merged or {}).get("price_raw") or (merged or {}).get("price")
     diag["devise"] = (merged or {}).get("currency")
     diag["prix_normalise_eur"] = (merged or {}).get("price")
     diag["livraison_brute"] = (merged or {}).get("shipping")
+    diag["import_brut"] = (merged or {}).get("import_fee")
+    diag["checkout_total_trouve"] = (merged or {}).get("checkout_total")
     diag["variante_selectionnee"] = (
-        (merged or {}).get("variants", [{}])[0].get("label") if (merged or {}).get("variants") else None
+        (merged or {}).get("selected_variant_label")
+        or ((merged or {}).get("variants", [{}])[0].get("label") if (merged or {}).get("variants") else None)
     )
 
     if merged and api_data and scraped:
@@ -4953,6 +5091,10 @@ def search_product(query: str) -> list[dict]:
             variants=scraped.get("variants") or [],
             price_source=scraped.get("_price_source") or "",
             shipping_source=scraped.get("_shipping_source") or "",
+            import_fee=scraped.get("import_fee"),
+            import_fee_source=scraped.get("_import_fee_source") or "",
+            checkout_total=scraped.get("checkout_total"),
+            selected_variant_label=scraped.get("selected_variant_label"),
         )
         result["product_id"] = product_id or ""
         results.append(result)
@@ -4971,31 +5113,69 @@ def search_product(query: str) -> list[dict]:
         st.session_state["mm_calc_prefill_shipping"] = results[0]["livraison"] or 0.0
     return results
 
-def _finance_fields(base_price: float | None, shipping: float | None) -> dict:
+def _finance_fields(
+    base_price: float | None,
+    shipping: float | None,
+    import_fee: float | None = None,
+    checkout_total: float | None = None,
+) -> dict:
     """Calcule cout_total/prix_conseille/frais_paiement/marge_nette a
-    partir d'un prix et d'une livraison -- factorise pour etre reutilise
-    tel quel par _build_result ET par le selecteur de variante (point 8,
-    voir render_result_dashboard) qui doit recalculer la marge a chaque
-    changement de variante sans dupliquer la formule.
+    partir d'un prix, d'une livraison et de frais d'importation --
+    factorise pour etre reutilise tel quel par _build_result ET par le
+    selecteur de variante (point 8, voir render_result_dashboard) qui doit
+    recalculer la marge a chaque changement de variante sans dupliquer la
+    formule.
 
-    Quand `shipping` est None (livraison non trouvee, jamais estimee --
-    point 4), le calcul traite la livraison comme 0 pour produire un
-    "coût hors livraison" plutot que d'echouer ou d'inventer un forfait ;
-    c'est a l'appelant d'etiqueter clairement ce cas (voir
-    render_result_dashboard, badge "Estimation hors livraison" -- point 6)."""
+    Frais d'importation (point 3/4) : si `import_fee` est une VRAIE valeur
+    trouvee sur la page (jamais devinee), le cout total est une SOMME
+    directe (prix + livraison + import) -- elle reflete deja la taxe
+    reelle, appliquer en plus le taux TVA_RATE la compterait deux fois.
+    Si `import_fee` est absent, un montant estimatif (~20 % prix+livraison,
+    meme convention que l'ancien calcul avant ce point) est utilise a la
+    place et marque `import_fee_est=True` -- l'appelant DOIT distinguer
+    visuellement les deux cas (voir render_result_dashboard, badge
+    "Estimation hors livraison"/"Coût estimé" -- points 4/6/7).
+
+    Livraison/import manquants sont traites comme 0 dans le calcul pour
+    produire un cout "partiel" plutot que d'echouer ou d'inventer un
+    forfait ; c'est a l'appelant d'etiqueter clairement ce cas.
+
+    Validation croisee (point 7) : `cout_verifie` est True uniquement si
+    import_fee est une vraie valeur ET qu'un total checkout a aussi ete
+    trouve ET que les deux correspondent (tolerance d'arrondi 0.05 €) --
+    False dans tous les autres cas (jamais affiche comme "vérifié" sans
+    preuve reelle)."""
     if base_price is None:
-        return {"cout_total": None, "prix_conseille": None, "frais_paiement": None, "marge_nette": None}
-    # La TVA/droits de douane (20 %) sont une taxe française a
-    # l'importation, jamais une donnee renvoyee par AliExpress — elle
-    # reste calculee ici. Coût total = Prix produit + Port (si connu) + Taxes (20 % FR).
-    cout_total = round((base_price + (shipping or 0.0)) * (1 + VAT_RATE), 2)
+        return {
+            "cout_total": None, "prix_conseille": None, "frais_paiement": None, "marge_nette": None,
+            "import_fee_final": None, "import_fee_est": False, "cout_verifie": False,
+            "marge_pct": None, "roi_pct": None,
+        }
+    if import_fee is not None:
+        import_fee_final = import_fee
+        import_fee_est = False
+    else:
+        # Repli (voir point 4/6 de la correction precedente) : ancien
+        # calcul TVA/droits 20 % applique a prix+livraison, desormais
+        # expose comme une ligne "frais d'importation ESTIMES" distincte
+        # plutot que noyee dans le cout total sans etiquette.
+        import_fee_final = round((base_price + (shipping or 0.0)) * VAT_RATE, 2)
+        import_fee_est = True
+    cout_total = round(base_price + (shipping or 0.0) + import_fee_final, 2)
     # Prix de vente conseille = Prix produit x 3 (regle de sourcing MargeMax).
     prix_conseille = round(base_price * 3, 2)
     frais_paiement = round(prix_conseille * PAYMENT_FEE_RATE, 2)
     marge_nette = round(prix_conseille - cout_total - frais_paiement, 2)
+    cout_verifie = (
+        not import_fee_est and checkout_total is not None and abs(cout_total - checkout_total) < 0.05
+    )
+    marge_pct = round(marge_nette / prix_conseille * 100, 1) if prix_conseille else None
+    roi_pct = round(marge_nette / cout_total * 100, 1) if cout_total else None
     return {
         "cout_total": cout_total, "prix_conseille": prix_conseille,
         "frais_paiement": frais_paiement, "marge_nette": marge_nette,
+        "import_fee_final": import_fee_final, "import_fee_est": import_fee_est,
+        "cout_verifie": cout_verifie, "marge_pct": marge_pct, "roi_pct": roi_pct,
     }
 
 
@@ -5016,6 +5196,10 @@ def _build_result(
     variants: list[dict] | None = None,
     price_source: str = "",
     shipping_source: str = "",
+    import_fee: float | None = None,
+    import_fee_source: str = "",
+    checkout_total: float | None = None,
+    selected_variant_label: str | None = None,
 ) -> dict:
     # Prix optionnel (voir point 5/7) : un candidat sans prix exploitable
     # (ScraperAPI/API ont trouve titre+image mais pas de prix) est quand
@@ -5025,7 +5209,7 @@ def _build_result(
     # differents (price_max present, point 3), le calcul de marge se base
     # sur `base_price` (le prix minimum) -- jamais un prix unique invente
     # entre les deux bornes ; l'UI affiche la fourchette complete a cote.
-    finance = _finance_fields(base_price, shipping)
+    finance = _finance_fields(base_price, shipping, import_fee, checkout_total)
 
     fiabilite_score = round(min(99, max(35, vendor_rating * 100 - (0 if orders > 300 else 15))))
     potentiel_score = round(min(99, max(20, 55 + (vendor_rating - 0.85) * 200 + (orders / 500))))
@@ -5056,10 +5240,16 @@ def _build_result(
         # gratuit confirme) -- shipping vaut None sinon, jamais un forfait.
         "livraison_reelle": shipping_is_real,
         "livraison_disponible": shipping is not None,
+        "frais_importation": finance["import_fee_final"],
+        "frais_importation_estime": finance["import_fee_est"],
+        "checkout_total_trouve": checkout_total,
+        "cout_verifie": finance["cout_verifie"],
         "cout_total": finance["cout_total"],
         "prix_conseille": finance["prix_conseille"],
         "frais_paiement": finance["frais_paiement"],
         "marge_nette": finance["marge_nette"],
+        "marge_pct": finance["marge_pct"],
+        "roi_pct": finance["roi_pct"],
         "fiabilite_score": fiabilite_score,
         "note_produit": round(vendor_rating * 5, 1),
         "commandes": orders,
@@ -5070,6 +5260,8 @@ def _build_result(
         "variants": variants or [],
         "price_source": price_source,
         "shipping_source": shipping_source,
+        "import_fee_source": import_fee_source,
+        "selected_variant_label": selected_variant_label,
     }
 
 
@@ -5127,10 +5319,22 @@ def render_result_dashboard(result: dict) -> dict:
         selected = variants[variant_labels.index(choice_label)]
         variant_price = selected.get("price")
         if variant_price is not None:
-            finance = _finance_fields(variant_price, result.get("livraison"))
+            finance = _finance_fields(
+                variant_price, result.get("livraison"),
+                result.get("frais_importation") if not result.get("frais_importation_estime") else None,
+                result.get("checkout_total_trouve"),
+            )
             display["prix_produit"] = variant_price
             display["prix_produit_max"] = None
-            display.update(finance)
+            display["cout_total"] = finance["cout_total"]
+            display["prix_conseille"] = finance["prix_conseille"]
+            display["frais_paiement"] = finance["frais_paiement"]
+            display["marge_nette"] = finance["marge_nette"]
+            display["marge_pct"] = finance["marge_pct"]
+            display["roi_pct"] = finance["roi_pct"]
+            display["frais_importation"] = finance["import_fee_final"]
+            display["frais_importation_estime"] = finance["import_fee_est"]
+            display["cout_verifie"] = finance["cout_verifie"]
         if selected.get("image"):
             display["image_url"] = selected["image"]
         if selected.get("stock") is not None:
@@ -5175,41 +5379,58 @@ def render_result_dashboard(result: dict) -> dict:
             st.caption("ℹ️ Prix non récupéré automatiquement — consulte la fiche AliExpress pour le prix exact.")
         else:
             # Des que le prix est connu, cout/prix conseille/marge le sont
-            # aussi (voir _finance_fields, livraison traitee comme 0 si
-            # inconnue) -- jamais quatre "Non disponible" alors que le prix
-            # est disponible (point 7). Le libelle et un badge distinguent
-            # clairement un calcul "hors livraison" d'un calcul complet.
+            # aussi (voir _finance_fields, livraison/import traites comme 0
+            # si inconnus) -- jamais plusieurs "Non disponible" alors que le
+            # prix est disponible (point 7). Carte Finance a 4 lignes (point
+            # 4) : prix / livraison / frais d'import / cout total.
             price_display = _fmt_price_range(display.get("prix_produit"), display.get("prix_produit_max"))
-            cout_label = "Coût total (TVA 20% incl.)" if livraison_disponible else "Coût hors livraison (TVA 20% incl.)"
-            marge_label = "Marge nette" if livraison_disponible else "Marge estimée hors livraison"
+            import_estime = bool(display.get("frais_importation_estime"))
+            import_label = "Frais d'importation estimés" if import_estime else "Frais d'importation"
+            import_value_html = _fmt_eur(display.get("frais_importation"))
+            cout_verifie = bool(display.get("cout_verifie"))
             badge_html = (
-                "" if livraison_disponible else
+                '<div style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:6px;'
+                'background:rgba(16,185,129,0.15);color:#10B981;font-size:0.75rem;font-weight:600;">'
+                "✅ Coût vérifié</div>"
+                if cout_verifie else
                 '<div style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:6px;'
                 'background:rgba(245,158,11,0.15);color:#F59E0B;font-size:0.75rem;font-weight:600;">'
-                "⚠️ Estimation hors livraison</div>"
+                "⚠️ Coût estimé</div>"
             )
             range_note_html = (
                 '<div style="font-size:0.75rem;color:#94A3B8;margin-top:4px;">'
                 "Marge calculée sur le prix minimum de la fourchette.</div>"
                 if display.get("prix_produit_max") is not None else ""
             )
+            marge_pct_val = display.get("marge_pct")
+            roi_pct_val = display.get("roi_pct")
+            marge_pct_html = f"{marge_pct_val:.1f} %" if marge_pct_val is not None else "—"
+            roi_pct_html = f"{roi_pct_val:.1f} %" if roi_pct_val is not None else "—"
             st.markdown(
                 f"""
                 <div class="mm-card">
                     <h4>💰 Carte Finance</h4>
                     <div class="mm-metric-row"><span class="label">Prix produit</span><span class="value">{price_display}</span></div>
                     <div class="mm-metric-row"><span class="label">Livraison</span><span class="value">{shipping_value_html}</span></div>
-                    <div class="mm-metric-row"><span class="label">{cout_label}</span><span class="value">{display['cout_total']:.2f} €</span></div>
+                    <div class="mm-metric-row"><span class="label">{import_label}</span><span class="value">{import_value_html}</span></div>
+                    <div class="mm-metric-row"><span class="label">Coût total</span><span class="value">{display['cout_total']:.2f} €</span></div>
                     <div class="mm-metric-row"><span class="label">Prix de vente conseillé</span><span class="value">{display['prix_conseille']:.2f} €</span></div>
-                    <div class="mm-margin-highlight">{marge_label} : {display['marge_nette']:.2f} €</div>
+                    <div class="mm-margin-highlight">Marge nette estimée : {display['marge_nette']:.2f} €</div>
+                    <div class="mm-metric-row"><span class="label">Marge %</span><span class="value">{marge_pct_html}</span></div>
+                    <div class="mm-metric-row"><span class="label">ROI %</span><span class="value">{roi_pct_html}</span></div>
                     {badge_html}
                     {range_note_html}
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
+            captions = []
             if not livraison_disponible:
-                st.caption("🚚 Livraison à confirmer sur AliExpress.")
+                captions.append("🚚 Livraison à confirmer sur AliExpress.")
+            if import_estime:
+                captions.append("📦 Frais d'importation non trouvés sur la page — estimation (~20 % prix + livraison).")
+            for caption_text in captions:
+                st.caption(caption_text)
         render_aliexpress_link_button(display, key_suffix="finance")
 
     with col_fiabilite:
@@ -5583,16 +5804,24 @@ def render_search_page() -> None:
                             f"**Source découverte :** {entry.get('source_decouverte') or '—'}  \n"
                             f"**Source prix :** {entry.get('prix_source') or '—'}  \n"
                             f"**Source livraison :** {entry.get('livraison_source') or '—'}  \n"
+                            f"**Source import :** {entry.get('import_source') or '—'}  \n"
                             f"**Prix brut trouvé :** {entry.get('prix_brut') if entry.get('prix_brut') is not None else '—'}  \n"
                             f"**Devise :** {entry.get('devise') or '—'}  \n"
                             f"**Prix normalisé EUR :** {entry.get('prix_normalise_eur') if entry.get('prix_normalise_eur') is not None else '—'}  \n"
                             f"**Frais de livraison bruts :** {entry.get('livraison_brute') if entry.get('livraison_brute') is not None else '—'}  \n"
+                            f"**Frais d'import bruts :** {entry.get('import_brut') if entry.get('import_brut') is not None else '—'}  \n"
+                            f"**Total checkout trouvé :** {entry.get('checkout_total_trouve') if entry.get('checkout_total_trouve') is not None else '—'}  \n"
                             f"**Variante sélectionnée :** {entry.get('variante_selectionnee') or '—'}"
                         )
+                        if entry.get("note_fetch"):
+                            st.info(entry["note_fetch"])
                         if entry.get("erreur_api"):
                             st.error(f"Erreur API produit : {entry['erreur_api']}")
                         if entry.get("erreur_parsing_html"):
                             st.warning(f"Erreur parsing HTML : {entry['erreur_parsing_html']}")
+                        if entry.get("html_recu"):
+                            st.caption("HTML reçu (extrait, voir point 10) :")
+                            st.code(entry["html_recu"], language="html")
                         st.code(entry.get("url", ""), language="text")
 
     # ZONE 2 — résultats, juste sous le formulaire.
