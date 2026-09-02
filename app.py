@@ -7,15 +7,14 @@ Stack : Streamlit + Supabase (DB / Auth) + scraping web direct AliExpress
 """
 
 import base64
-import hashlib
 import html
 import json
 import math
 import os
-import random
 import re
 import time
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 import requests
 import streamlit as st
@@ -57,6 +56,11 @@ SUPABASE_KEY = _require_secret("SUPABASE_KEY").strip()
 
 STRIPE_SECRET_KEY = st.secrets.get("STRIPE_SECRET_KEY", "").strip()
 SUPABASE_SERVICE_ROLE_KEY = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+# Optionnel : sans cle, la recherche par mot-cle bascule sur un repli
+# DuckDuckGo direct (voir duckduckgo_find_aliexpress_url), lui-meme non
+# garanti -- voir search_product. L'analyse par lien direct, elle, ne
+# depend jamais de ScraperAPI.
+SCRAPER_API_KEY = st.secrets.get("SCRAPER_API_KEY", "").strip()
 
 ADMIN_EMAIL = "jimmy.leguennec@gmail.com"
 
@@ -2256,18 +2260,31 @@ def render_favorites_page() -> None:
 
 def render_calculator_page() -> None:
     render_page_header("🧮 Calculateur de Marge")
-    st.caption("Calcule ta marge sans passer par une recherche produit.")
+
+    prefill_notice = st.session_state.pop("mm_calc_prefill_notice", None)
+    if prefill_notice:
+        st.info(prefill_notice)
+        st.caption("Ajuste les champs ci-dessous si besoin, puis lance le calcul.")
+    else:
+        st.caption("Calcule ta marge sans passer par une recherche produit.")
 
     if not has_credits():
         render_no_credits_alert()
         return
 
+    # Repli propre depuis la page Recherche quand l'extraction automatique
+    # echoue (voir render_search_page) : les champs restent toujours
+    # pre-remplis avec des valeurs exploitables (celles du dernier repli,
+    # ou les valeurs par defaut) -- jamais de champ vide ou d'ecran casse.
+    prefill_prix = st.session_state.pop("mm_calc_prefill_price", 10.0)
+    prefill_livraison = st.session_state.pop("mm_calc_prefill_shipping", 2.0)
+
     with st.container():
         with st.form("form_calculateur"):
             col1, col2 = st.columns(2)
             with col1:
-                prix_achat = st.number_input("Prix d'achat produit (€)", min_value=0.0, value=10.0, step=0.5)
-                livraison = st.number_input("Frais de livraison (€)", min_value=0.0, value=2.0, step=0.5)
+                prix_achat = st.number_input("Prix d'achat produit (€)", min_value=0.0, value=prefill_prix, step=0.5)
+                livraison = st.number_input("Frais de livraison (€)", min_value=0.0, value=prefill_livraison, step=0.5)
             with col2:
                 tva = st.number_input("TVA estimée (%)", min_value=0.0, value=20.0, step=1.0)
                 frais_paiement = st.number_input("Frais de paiement (%)", min_value=0.0, value=2.0, step=0.5)
@@ -2825,33 +2842,52 @@ def render_auth_forms() -> None:
 
 
 # ============================================================
-# AliExpress -- PARSER WEB DIRECT (sans API/OAuth)
+# AliExpress -- PARSER WEB DIRECT (sans API/OAuth, sans donnees fictives)
 # ============================================================
-# Aucun acces a l'API Open Platform AliExpress n'est necessaire ici : le
-# titre, le prix, l'image, la note et les frais de port sont extraits
-# directement de la page produit publique (JSON-LD, puis OpenGraph en
-# repli). La recherche par mot-cle passe par la recherche web native
-# d'AliExpress (aliexpress.com/wholesale?SearchText=...), pas une API
-# tierce. Toute defaillance bascule sur une estimation de demonstration :
-# jamais de log technique ni de blocage pour l'utilisateur final (voir
-# search_product).
+# Aucun accès a l'API Open Platform AliExpress, aucune donnee inventee :
+# titre, prix, image et note sont extraits du JSON-LD (schema.org/Product)
+# de la page produit publique, avec un repli OpenGraph (donnees reelles
+# egalement, juste une source moins structuree) pour le titre/l'image
+# quand le JSON-LD est absent. La recherche par mot-cle passe par une
+# recherche Google (site:aliexpress.com/item) via ScraperAPI comme proxy
+# quand SCRAPER_API_KEY est configuree -- le scraping direct de la page
+# /wholesale d'AliExpress est abandonne, son contenu produit etant charge
+# en JS cote client (invisible pour un simple fetch). Sans cle, repli sur
+# un scraping direct de DuckDuckGo HTML (non garanti : bloque en pratique
+# par son challenge anti-bot). Chaque requete de fetch direct utilise une
+# requests.Session() dediee (cookies persistes, en-tetes imitant un vrai
+# navigateur Chrome/Windows) pour reduire le risque de blocage par IP
+# depuis l'infrastructure partagee de Streamlit Cloud. Si aucune donnee
+# reelle n'a pu etre recuperee, search_product retourne None : il n'existe
+# aucun generateur d'estimation aleatoire/fictive.
 
-SCRAPE_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-)
+SCRAPE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Referer": "https://www.google.com/",
+}
 
 
-def _fetch_html(url: str) -> str | None:
+def _new_scrape_session() -> requests.Session:
+    """Nouvelle Session par recherche (pas un objet module-level partage
+    entre utilisateurs concurrents de l'app) : les cookies recus (ex: sur
+    la page de recherche AliExpress) sont donc reutilises pour la requete
+    suivante de la MEME recherche (page produit), ce qui ressemble
+    davantage a une navigation reelle qu'une suite de requetes anonymes
+    independantes."""
+    session = requests.Session()
+    session.headers.update(SCRAPE_HEADERS)
+    return session
+
+
+def _fetch_html(url: str, session: requests.Session | None = None) -> str | None:
+    client = session or _new_scrape_session()
     try:
-        response = requests.get(
-            url,
-            headers={
-                "User-Agent": SCRAPE_USER_AGENT,
-                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-            },
-            timeout=12,
-        )
+        response = client.get(url, timeout=12)
         if response.status_code != 200:
             return None
         return response.text
@@ -2859,19 +2895,25 @@ def _fetch_html(url: str) -> str | None:
         return None
 
 
+def _fix_protocol_relative_url(url: str) -> str:
+    """AliExpress sert souvent ses images en URL relative au protocole
+    (ex: "//ae01.alicdn.com/..."), invalide telle quelle dans <img src>
+    hors contexte HTML -- on prefixe "https:"."""
+    url = (url or "").strip()
+    if url.startswith("//"):
+        return "https:" + url
+    return url
+
+
 def _extract_product_from_html(html_text: str) -> dict | None:
-    """Extrait titre / prix / image / note / frais de port depuis la page
-    produit publique, dans l'ordre de fiabilite decroissante : JSON-LD
-    (schema.org/Product, balises <script type="application/ld+json">),
-    puis balises <meta> OpenGraph, puis en dernier recours le blob JS
-    "window.runParams" que certaines pages AliExpress integrent encore
-    cote serveur. Retourne None si aucune source n'a donne au moins un
-    titre ET un prix exploitables. Fonctionne meme si bs4 n'est pas
-    installe (voir l'import try/except en tete de fichier) : dans ce cas,
-    les blocs JSON-LD et balises <meta> sont retrouves par regex plutot
-    que par un vrai parseur HTML — moins robuste face a du HTML malforme,
-    mais suffisant pour les pages AliExpress bien formees, et ca evite un
-    ModuleNotFoundError qui casserait toute l'app au demarrage."""
+    """Extrait les donnees REELLES du produit depuis le JSON-LD
+    (schema.org/Product) de la page : name, image, offers.price,
+    offers.priceCurrency, aggregateRating.ratingValue, et les frais de
+    port reels s'ils sont presents (offers.shippingDetails.shippingRate).
+    Repli sur les balises <meta> OpenGraph (titre/image uniquement,
+    egalement des donnees reelles) si le JSON-LD est absent ou incomplet.
+    Retourne None si aucune source n'a donne au moins un titre ET un prix
+    exploitables -- jamais de valeur inventee."""
     soup = BeautifulSoup(html_text, "html.parser") if BeautifulSoup is not None else None
 
     if soup is not None:
@@ -2891,7 +2933,7 @@ def _extract_product_from_html(html_text: str) -> dict | None:
         for item in (data if isinstance(data, list) else [data]):
             if not isinstance(item, dict) or item.get("@type") != "Product":
                 continue
-            title = item.get("name")
+            name = item.get("name")
             image = item.get("image")
             if isinstance(image, list):
                 image = image[0] if image else None
@@ -2900,19 +2942,33 @@ def _extract_product_from_html(html_text: str) -> dict | None:
                 offers = offers[0] if offers else {}
             offers = offers or {}
             price = offers.get("price") or offers.get("lowPrice")
+            price_currency = str(offers.get("priceCurrency") or "EUR").upper()
+            if price_currency != "EUR":
+                # Le calculateur de marge MargeMax raisonne en euros (TVA
+                # FR, prix conseille, etc.) : un prix dans une autre devise
+                # utilise tel quel fausserait silencieusement la marge.
+                continue
             rating_block = item.get("aggregateRating") or {}
-            if title and price:
+            shipping_details = offers.get("shippingDetails") or {}
+            shipping_rate = (shipping_details.get("shippingRate") or {}).get("value")
+            if name and price:
                 try:
-                    result = {"title": str(title), "image": str(image or ""), "price": float(price)}
-                    if rating_block.get("ratingValue"):
-                        result["vendor_rating"] = min(1.0, max(0.0, float(rating_block["ratingValue"]) / 5))
-                    if rating_block.get("reviewCount"):
-                        result["orders"] = int(float(rating_block["reviewCount"]))
-                    shipping_details = offers.get("shippingDetails") or {}
-                    shipping_rate = (shipping_details.get("shippingRate") or {}).get("value")
-                    if shipping_rate is not None:
-                        result["shipping"] = float(shipping_rate)
-                    return result
+                    return {
+                        "title": str(name),
+                        "image": _fix_protocol_relative_url(str(image or "")),
+                        "price": float(price),
+                        "vendor_rating": (
+                            min(1.0, max(0.0, float(rating_block["ratingValue"]) / 5))
+                            if rating_block.get("ratingValue")
+                            else None
+                        ),
+                        "orders": (
+                            int(float(rating_block["reviewCount"]))
+                            if rating_block.get("reviewCount")
+                            else None
+                        ),
+                        "shipping": float(shipping_rate) if shipping_rate is not None else None,
+                    }
                 except (TypeError, ValueError):
                     continue
 
@@ -2938,133 +2994,201 @@ def _extract_product_from_html(html_text: str) -> dict | None:
     og_price = meta("product:price:amount") or meta("og:price:amount")
     if og_title and og_price:
         try:
-            return {"title": og_title, "image": meta("og:image") or "", "price": float(og_price)}
+            return {
+                "title": og_title,
+                "image": _fix_protocol_relative_url(meta("og:image") or ""),
+                "price": float(og_price),
+                "vendor_rating": None,
+                "orders": None,
+                "shipping": None,
+            }
         except (TypeError, ValueError):
-            pass
-
-    match = re.search(r"window\.runParams\s*=\s*(\{.*?\});", html_text, re.DOTALL)
-    if match:
-        try:
-            run_params = json.loads(match.group(1))
-            data = run_params.get("data", run_params)
-            title = (data.get("titleModule") or {}).get("subject") or data.get("subject")
-            price_module = data.get("priceModule") or {}
-            price_raw = (
-                (price_module.get("minAmount") or {}).get("value")
-                or price_module.get("formatedActivityPrice")
-                or price_module.get("formatedPrice")
-            )
-            images = (data.get("imageModule") or {}).get("imagePathList") or []
-            if title and price_raw:
-                price_str = re.sub(r"[^\d.,]", "", str(price_raw)).replace(",", ".")
-                return {"title": str(title), "image": images[0] if images else "", "price": float(price_str)}
-        except Exception:
             pass
 
     return None
 
 
-def scrape_aliexpress_product(url: str) -> dict | None:
+def scrape_aliexpress_product(url: str, session: requests.Session | None = None) -> dict | None:
     """Scrape une page produit AliExpress publique. Ne leve jamais
     d'exception : retourne None si la page est inaccessible ou si aucune
-    donnee exploitable n'a pu etre extraite -- l'appelant decide alors du
-    repli (message poli + estimation, ou recherche par mot-cle suivante)."""
+    donnee reelle exploitable n'a pu etre extraite."""
     if not url.lower().startswith("http"):
         url = "https://" + url
-    html_text = _fetch_html(url)
+    html_text = _fetch_html(url, session=session)
     if not html_text:
         return None
     return _extract_product_from_html(html_text)
 
 
-def aliexpress_find_product_url(query: str) -> str | None:
-    """Trouve une URL produit AliExpress reelle correspondant a `query` via
-    la recherche web NATIVE d'AliExpress (aliexpress.com/wholesale?SearchText=...),
-    pas une API tierce. Retourne None sur tout echec (page bloquee, aucun
-    resultat, reseau...)."""
-    search_url = "https://www.aliexpress.com/wholesale?SearchText=" + requests.utils.quote(query)
-    html_text = _fetch_html(search_url)
+def _scraperapi_fetch(target_url: str, render: bool = True) -> str | None:
+    """Recupere `target_url` via ScraperAPI (proxy avec navigateur headless,
+    rendu JS cote serveur quand render=true) -- contourne les blocages par
+    IP que subit un scraping direct depuis l'infrastructure partagee de
+    Streamlit Cloud, et surtout : le rendu JS fait qu'AliExpress (page en
+    rendu cote client) a effectivement le temps de peupler son JSON-LD
+    avant que ScraperAPI ne capture le HTML, ce qu'un fetch direct ne
+    permettait jamais (voir _extract_product_from_html). Retourne None --
+    jamais d'exception -- si SCRAPER_API_KEY est absente des secrets, si
+    ScraperAPI renvoie une erreur (cle invalide, quota depasse) ou en cas
+    d'echec reseau : c'est ce None que search_product utilise pour
+    basculer proprement sur l'analyse par URL directe."""
+    if not SCRAPER_API_KEY:
+        return None
+    try:
+        response = requests.get(
+            "https://api.scraperapi.com",
+            params={"api_key": SCRAPER_API_KEY, "url": target_url, "render": "true" if render else "false"},
+            timeout=70,  # le rendu JS cote ScraperAPI est nettement plus lent qu'un fetch direct
+        )
+        if response.status_code != 200 or not response.text:
+            return None
+        return response.text
+    except Exception:
+        return None
+
+
+def scraperapi_google_find_product_url(keyword: str) -> str | None:
+    """Recherche `keyword` sur Google (site:aliexpress.com/item) via
+    ScraperAPI comme proxy -- Google bloque les requetes scriptees
+    directes, ScraperAPI sert d'intermediaire. Remplace le scraping direct
+    de la page /wholesale d'AliExpress (abandonne : son contenu produit
+    est charge en JS cote client, un simple fetch ne le voit jamais, voir
+    _extract_product_from_html). Retourne la premiere URL produit
+    AliExpress trouvee dans les resultats Google, ou None si la cle API
+    est absente, si ScraperAPI est en erreur/quota depasse, ou si aucun
+    resultat exploitable n'est trouve. Une page de resultats Google
+    n'a pas besoin d'etre rendue en JS pour que ses liens apparaissent
+    (render=false, plus rapide et moins couteux en credits)."""
+    if not SCRAPER_API_KEY:
+        return None
+    google_url = f"https://www.google.com/search?q=site:aliexpress.com/item+{requests.utils.quote(keyword)}"
+    html_text = _scraperapi_fetch(google_url, render=False)
     if not html_text:
         return None
-    match = re.search(r"/item/(\d{6,})\.html", html_text)
-    if not match:
+    direct_match = re.search(r'https?://[a-zA-Z0-9.]*aliexpress\.[a-z.]+/item/[^\s"&<>]+', html_text)
+    if direct_match:
+        return direct_match.group(0)
+    # Repli : certaines mises en page Google encapsulent encore le lien
+    # organique dans une redirection "/url?q=<url encodee>&...".
+    wrapped_match = re.search(r'/url\?q=(https?%3A%2F%2F[^&"]*aliexpress[^&"]*%2Fitem%2F[^&"]*)', html_text)
+    if wrapped_match:
+        return unquote(wrapped_match.group(1))
+    return None
+
+
+def duckduckgo_find_aliexpress_url(keyword: str, session: requests.Session | None = None) -> str | None:
+    """Repli quand SCRAPER_API_KEY est absente des secrets : scraping
+    direct (sans proxy) de DuckDuckGo HTML pour ne jamais bloquer
+    l'utilisateur. DuckDuckGo bloque frequemment ce type de requete
+    scriptee derriere son challenge anti-bot "anomaly-modal" (verifie en
+    direct a plusieurs reprises au fil des tests de cette integration) --
+    ce repli n'est donc pas garanti de fonctionner, mais reste tente
+    plutot que d'abandonner immediatement. Aucune tentative de
+    contournement du challenge anti-bot n'est faite."""
+    client = session or _new_scrape_session()
+    try:
+        response = client.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": f'site:aliexpress.com/item "{keyword}"'},
+            timeout=12,
+        )
+        if response.status_code not in (200, 202):
+            return None
+        for match in re.finditer(r'href="([^"]*aliexpress\.[^"]*?/item/[^"]+)"', response.text):
+            url = match.group(1)
+            if url.startswith("//duckduckgo.com/l/") or "uddg=" in url:
+                continue  # lien de redirection DDG, pas une URL directe -- ignore plutot que decode
+            return url
         return None
-    return f"https://www.aliexpress.com/item/{match.group(1)}.html"
+    except Exception:
+        return None
 
 
-def search_product(query: str) -> dict:
-    """Sourcing produit par parser web direct (aucune dependance a
-    l'API/OAuth AliExpress, desactives).
+def scraperapi_scrape_product(url: str) -> dict | None:
+    """Scrape une page produit AliExpress via ScraperAPI (render=true) et
+    reutilise _extract_product_from_html telle quelle -- seule la methode
+    de recuperation du HTML change par rapport a scrape_aliexpress_product
+    (fetch direct)."""
+    html_text = _scraperapi_fetch(url, render=True)
+    if not html_text:
+        return None
+    return _extract_product_from_html(html_text)
 
-    - Si `query` est deja un lien AliExpress : scrape direct de cette page.
-      En cas d'echec sur ce lien precis, un message poli (pas un log
-      technique) est prepare dans st.session_state["mm_search_notice"]
-      pour inviter l'utilisateur a verifier son URL -- voir
-      render_search_page, qui l'affiche puis montre quand meme une
-      estimation ci-dessous pour ne jamais laisser l'ecran vide.
-    - Sinon : recherche via le moteur de recherche web natif d'AliExpress
-      pour trouver un vrai produit correspondant, puis scrape de sa page.
 
-    Dans tous les cas, un dict exploitable est toujours retourne (jamais
-    None) : l'UI ne doit jamais se bloquer."""
+def search_product(query: str) -> dict | None:
+    """Sourcing produit par parser web direct, uniquement a partir de
+    donnees reelles extraites d'AliExpress -- aucune generation
+    aleatoire/fictive de secours.
+
+    - Analyse par lien direct : si `query` est deja un lien AliExpress, sa
+      page est scrapee directement en fetch simple (titre, prix, image,
+      frais de port reels si presents dans le JSON-LD).
+    - Recherche par mot-cle : recherche Google (site:aliexpress.com/item)
+      via ScraperAPI comme proxy si SCRAPER_API_KEY est configuree --
+      le scraping direct de la page /wholesale d'AliExpress est abandonne
+      (son contenu produit est charge en JS cote client, jamais visible
+      d'un simple fetch). Si aucune cle n'est configuree, repli sur un
+      scraping direct de DuckDuckGo HTML (non garanti : bloque en pratique
+      par son challenge anti-bot, mais tente plutot que d'abandonner
+      immediatement). La premiere URL produit trouvee est scrapee. Si
+      aucune des deux voies n'a produit de donnee reelle : bascule
+      proprement (st.session_state["mm_search_failed"]) sur l'interface
+      d'analyse par URL directe, sans jamais faire planter l'UI.
+
+    Retourne None si aucune donnee reelle n'a pu etre extraite -- charge a
+    l'appelant (render_search_page) de ne pas debiter de credit ni
+    afficher de resultat dans ce cas."""
     query = query.strip()
-    st.session_state["mm_search_notice"] = None
+    st.session_state["mm_search_failed"] = False
     is_direct_link = "aliexpress." in query.lower()
 
-    target_url = query if is_direct_link else aliexpress_find_product_url(query)
-
-    if target_url:
-        scraped = scrape_aliexpress_product(target_url)
-        if scraped:
-            base_price = scraped["price"]
-            shipping = scraped.get("shipping")
-            shipping_is_real = shipping is not None
-            if shipping is None:
-                shipping = round(2.0 + base_price * 0.08, 2)
-            return _build_result(
-                scraped["title"],
-                base_price,
-                shipping,
-                scraped.get("image", ""),
-                scraped.get("vendor_rating", 0.90),
-                scraped.get("orders", 500),
-                query,
-                target_url,
-                shipping_is_real=shipping_is_real,
+    if is_direct_link:
+        scraped = scrape_aliexpress_product(query, session=_new_scrape_session())
+        target_url = query
+        if not scraped:
+            st.session_state["mm_search_failed"] = True
+            st.session_state["mm_search_fail_text"] = (
+                "Impossible d'extraire les données réelles de ce lien. "
+                "Vérifie qu'il s'agit bien d'une URL produit AliExpress valide, ou réessaie."
             )
-        elif is_direct_link:
-            st.session_state["mm_search_notice"] = (
-                "Nous n'avons pas pu récupérer automatiquement les informations de ce lien. "
-                "Vérifie qu'il s'agit bien d'une URL produit AliExpress valide "
-                "(ex : https://www.aliexpress.com/item/....html). "
-                "Voici une estimation à titre indicatif en attendant :"
+            return None
+    else:
+        if SCRAPER_API_KEY:
+            target_url = scraperapi_google_find_product_url(query)
+            scraped = scraperapi_scrape_product(target_url) if target_url else None
+        else:
+            target_url = duckduckgo_find_aliexpress_url(query)
+            scraped = scrape_aliexpress_product(target_url, session=_new_scrape_session()) if target_url else None
+
+        if not scraped:
+            st.session_state["mm_search_failed"] = True
+            st.session_state["mm_search_fail_text"] = (
+                "Aucun produit direct trouvé pour ce mot-clé. "
+                "Collez directement l'URL AliExpress du produit."
             )
+            return None
 
-    return _generate_demo_estimate(query)
-
-
-def _generate_demo_estimate(query: str) -> dict:
-    """Estimation deterministe utilisee quand le parser web echoue (page
-    bloquee, structure HTML changee, aucun resultat de recherche...) --
-    pour ne jamais bloquer l'UI ni afficher d'erreur technique."""
-    seed = int(hashlib.sha256(query.encode("utf-8")).hexdigest(), 16) % (10**6)
-    rng = random.Random(seed)
-    base_price = round(rng.uniform(3.5, 24.0), 2)
-    shipping = round(rng.uniform(0.0, 4.5), 2)
-    vendor_rating = round(rng.uniform(0.80, 0.99), 2)
-    orders = rng.randint(80, 12000)
-    image_url = "https://placehold.co/400x400/0F1117/38BDF8?text=MargeMax"
-    # Si `query` est un lien colle (echec de scraping sur ce lien precis),
-    # un titre derive de l'URL brute ("Https://Www.Aliexpress.Com/...")
-    # serait illisible : on affiche un intitule generique a la place.
-    title = "Produit AliExpress (estimation)" if "aliexpress." in query.lower() else query.title()
-    # En mode demo, aucune vraie fiche produit n'existe : on ne fabrique pas
-    # de fausse URL AliExpress. product_url reste vide, et l'interface bascule
-    # alors vers le lien de recherche generale AliExpress.
-    return _build_result(
-        title, base_price, shipping, image_url, vendor_rating, orders, query, ""
+    base_price = scraped["price"]
+    real_shipping = scraped.get("shipping")
+    shipping = real_shipping if real_shipping is not None else round(2.0 + base_price * 0.08, 2)
+    result = _build_result(
+        scraped["title"],
+        base_price,
+        shipping,
+        scraped.get("image", ""),
+        scraped.get("vendor_rating") if scraped.get("vendor_rating") is not None else 0.90,
+        scraped.get("orders") if scraped.get("orders") is not None else 500,
+        query,
+        target_url,
+        shipping_is_real=real_shipping is not None,
     )
-
+    # Le Calculateur de Marge et la Fiche Produit restent utilisables
+    # independamment de la recherche : on les pre-remplit avec les vraies
+    # valeurs extraites pour que l'utilisateur puisse ajuster TVA/frais
+    # sans ressaisir le prix (voir render_calculator_page).
+    st.session_state["mm_calc_prefill_price"] = base_price
+    st.session_state["mm_calc_prefill_shipping"] = shipping
+    return result
 
 def _build_result(
     title: str,
@@ -3079,10 +3203,11 @@ def _build_result(
     shipping_is_real: bool = False,
 ) -> dict:
     # La TVA/droits de douane (20 %) sont une taxe française à l'importation,
-    # jamais une donnée renvoyée par l'API AliExpress — elle reste calculée
-    # ici, comme le prix conseillé et la marge qui en découlent.
+    # jamais une donnée renvoyée par AliExpress — elle reste calculée ici.
+    # Coût total = Prix produit + Frais de port + Taxes (20 % FR).
     cout_total = round((base_price + shipping) * (1 + VAT_RATE), 2)
-    prix_conseille = math.floor(cout_total / MARGIN_TARGET) + 0.99
+    # Prix de vente conseillé = Prix produit x 3 (règle de sourcing MargeMax).
+    prix_conseille = round(base_price * 3, 2)
     frais_paiement = round(prix_conseille * PAYMENT_FEE_RATE, 2)
     marge_nette = round(prix_conseille - cout_total - frais_paiement, 2)
 
@@ -3212,7 +3337,7 @@ def render_aliexpress_link_button(result: dict, key_suffix: str, full_width: boo
     product_url = (result.get("product_url") or "").strip()
     if product_url:
         st.link_button(
-            "🛒 Voir le produit sur AliExpress",
+            "🔗 Voir le produit sur AliExpress",
             product_url,
             use_container_width=full_width,
         )
@@ -3374,6 +3499,36 @@ def render_dashboard_overview() -> None:
     st.divider()
 
 
+def _run_search_and_update_state(search_query: str) -> None:
+    """Lance search_product et met a jour l'etat partage par
+    render_search_page (credit debite / historique / dernier resultat)
+    -- factorise car deux formulaires distincts (recherche principale et
+    recovery par URL directe) declenchent la meme logique.
+
+    search_product ne devrait normalement jamais lever d'exception (chaque
+    requete reseau est deja protegee individuellement), mais ce garde-fou
+    supplementaire assure qu'un imprevu (page AliExpress totalement
+    malformee, etc.) bascule proprement sur l'etat d'echec plutot que de
+    faire planter la page avec une trace d'erreur Streamlit brute."""
+    try:
+        result = search_product(search_query)
+    except Exception:
+        st.session_state["mm_search_failed"] = True
+        result = None
+    if result is not None:
+        # Un credit n'est debite que sur un vrai resultat : un echec
+        # d'extraction (page bloquee, aucune donnee reelle trouvee) ne
+        # coute rien a l'utilisateur.
+        debit_credit()
+        increment_search_count()
+        user = st.session_state.get("user")
+        if user:
+            log_search_history(search_query, 1, user)
+        st.session_state["last_result"] = result
+    else:
+        st.session_state["last_result"] = None
+
+
 def render_search_page() -> None:
     render_dashboard_overview()
 
@@ -3391,6 +3546,11 @@ def render_search_page() -> None:
     if not has_credits():
         render_no_credits_alert()
         return
+
+    st.caption(
+        "📎 Collez une URL AliExpress pour une analyse instantanée 100 % précise "
+        "ou utilisez la recherche automatique."
+    )
 
     with st.container():
         with st.form("form_recherche"):
@@ -3413,17 +3573,38 @@ def render_search_page() -> None:
         else:
             with st.spinner("Analyse du produit en cours…"):
                 time.sleep(0.4)
-                result = search_product(query.strip())
-            debit_credit()
-            increment_search_count()
-            user = st.session_state.get("user")
-            if user:
-                log_search_history(query.strip(), 1, user)
-            st.session_state["last_result"] = result
+                _run_search_and_update_state(query.strip())
 
-    notice = st.session_state.get("mm_search_notice")
-    if notice:
-        st.info(notice)
+    if st.session_state.get("mm_search_failed"):
+        fail_text = st.session_state.get("mm_search_fail_text") or (
+            "Aucun produit direct trouvé pour ce mot-clé. Collez directement l'URL AliExpress du produit."
+        )
+        st.info(fail_text)
+        st.markdown("##### 🔗 Analyse par lien direct")
+        with st.form("form_url_direct"):
+            direct_url = st.text_input(
+                "Collez l'URL exacte du produit AliExpress à analyser",
+                placeholder="https://www.aliexpress.com/item/....html",
+            )
+            direct_submitted = st.form_submit_button("Analyser l'URL", use_container_width=True)
+        if direct_submitted:
+            if not direct_url.strip():
+                st.warning("Merci de coller une URL produit AliExpress.")
+            elif not has_credits():
+                render_no_credits_alert()
+            else:
+                with st.spinner("Analyse du produit en cours…"):
+                    time.sleep(0.4)
+                    _run_search_and_update_state(direct_url.strip())
+
+        st.caption("Ou calcule ta marge manuellement, sans attendre une extraction automatique :")
+        if st.button("🧮 Utiliser le Calculateur de Marge", use_container_width=True, key="mm_go_to_calculator"):
+            st.session_state["mm_calc_prefill_notice"] = (
+                "L'extraction automatique n'a pas trouvé de données réelles pour ta recherche — "
+                "renseigne le prix et les frais toi-même ci-dessous pour calculer ta marge."
+            )
+            st.session_state["page"] = "calculateur"
+            st.rerun()
 
     if st.session_state.get("last_result"):
         st.divider()
