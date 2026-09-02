@@ -2,20 +2,26 @@
 MargeMax — Outil de sourcing et de recherche de produits AliExpress
 pour e-commerçants et dropshippers.
 
-Stack : Streamlit + Supabase (DB / Auth) + scraping web direct AliExpress
-(aucune dépendance à l'API Open Platform / OAuth AliExpress)
+Stack : Streamlit + Supabase (DB / Auth) + AliExpress Open Platform (OAuth
++ Gateway TOP aliexpress.ds.product.get quand un token est disponible,
+avec repli sur le parser web direct sinon)
 """
 
 import base64
+import hashlib
+import hmac
 import html
 import json
 import math
 import os
 import re
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
+import pandas as pd
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -62,6 +68,27 @@ SUPABASE_SERVICE_ROLE_KEY = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY", "").stri
 # depend jamais de ScraperAPI.
 SCRAPER_API_KEY = st.secrets.get("SCRAPER_API_KEY", "").strip()
 
+# App AliExpress Open Platform 544130 (AppKey actif, App Status Online,
+# AliExpress-dropship + System Tool actifs cote console). L'App Secret
+# n'est jamais ecrit en dur dans le code, meme s'il a deja circule en
+# clair dans une conversation -- il doit vivre uniquement dans
+# .streamlit/secrets.toml, cote serveur.
+ALIEXPRESS_APP_KEY = st.secrets.get("ALIEXPRESS_APP_KEY", "544130") or "544130"
+ALIEXPRESS_APP_SECRET = st.secrets.get("ALIEXPRESS_APP_SECRET", "").strip()
+ALIEXPRESS_REST_GATEWAY = "https://api-sg.aliexpress.com/rest"  # Gateway REST (paths /auth/token/...)
+# Gateway REST/IOP (methode aliexpress.ds.*) -- MEME famille que
+# ALIEXPRESS_REST_GATEWAY (meme host api-sg.aliexpress.com, meme
+# signature HMAC-SHA256). L'ancien Gateway TOP historique
+# (eco.taobao.com/router/rest) a ete abandonne : confirme en production
+# qu'il renvoie "isv.appkey-not-exists" pour cette AppKey.
+ALIEXPRESS_SYNC_GATEWAY = "https://api-sg.aliexpress.com/sync"
+ALIEXPRESS_OAUTH_AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+
+# URL publique de l'app, callback OAuth strictement identique a celle
+# configuree dans la console AliExpress. L'ancienne valeur
+# "https://margemax.fr/callback" ne doit plus apparaitre nulle part.
+APP_BASE_URL = "https://margemax-app.streamlit.app/"
+
 ADMIN_EMAIL = "jimmy.leguennec@gmail.com"
 
 # Logos encodés en base64 : intégrés directement dans le code pour ne
@@ -79,8 +106,8 @@ MARGIN_TARGET = 0.45  # prix conseillé = coût réel / 0.45
 CREDIT_BENEFITS = [
     "Accès direct au lien produit AliExpress",
     "Déclinaisons & options complètes (couleurs, tailles, modèles)",
-    "Calculateur de marge nette automatique",
-    "Générateur de fiche produit optimisée",
+    "Analyse de sourcing avec calcul de marge automatique",
+    "Générateur de fiche produit IA",
 ]
 
 # Grille officielle des packs de crédits prépayés (achat unique, sans
@@ -182,17 +209,18 @@ def inject_custom_css() -> None:
            fond, y compris les pages fonctionnelles après connexion). */
         .mm-landing-marker { display: none; }
 
+        /* Anime lentement et en boucle continue (pas d'aller-retour "alternate",
+           qui produisait un a-coup visible a chaque inversion de sens — ca
+           pouvait se lire comme un clignotement). Le deplacement de fond
+           (50px -> exactement une taille de tuile) et la rotation de teinte
+           (0 -> 360deg) bouclent donc sans coupure visible. */
         @keyframes rgbGridShift {
             0% {
                 background-position: 0px 0px, 0px 0px, 0% 50%, 100% 50%;
                 filter: hue-rotate(0deg);
             }
-            50% {
-                background-position: 40px 40px, 40px 40px, 100% 50%, 0% 50%;
-                filter: hue-rotate(180deg);
-            }
             100% {
-                background-position: 80px 80px, 80px 80px, 0% 50%, 100% 50%;
+                background-position: 50px 50px, 50px 50px, 100% 50%, 0% 50%;
                 filter: hue-rotate(360deg);
             }
         }
@@ -200,12 +228,12 @@ def inject_custom_css() -> None:
         .stApp:has(.mm-landing-marker) {
             background-color: #0B0F17 !important;
             background-image:
-                linear-gradient(rgba(168, 85, 247, 0.12) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(6, 182, 212, 0.12) 1px, transparent 1px),
-                radial-gradient(circle at 20% 30%, rgba(168, 85, 247, 0.25) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.25) 0%, transparent 50%) !important;
+                linear-gradient(rgba(168, 85, 247, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.08) 1px, transparent 1px),
+                radial-gradient(circle at 20% 30%, rgba(168, 85, 247, 0.16) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.16) 0%, transparent 50%) !important;
             background-size: 50px 50px, 50px 50px, 140% 140%, 140% 140% !important;
-            animation: rgbGridShift 12s ease-in-out infinite alternate !important;
+            animation: rgbGridShift 40s linear infinite !important;
         }
 
         header[data-testid="stHeader"] { background: transparent; }
@@ -1747,6 +1775,142 @@ def handle_stripe_return() -> None:
     st.query_params.clear()
 
 
+# ============================================================
+# ALIEXPRESS OPEN PLATFORM -- OAUTH + STOCKAGE TOKEN (Supabase app_config)
+# ============================================================
+# Flux : bouton d'autorisation (Mon Compte, admin) -> AliExpress redirige
+# vers APP_BASE_URL avec ?code=... -> handle_aliexpress_oauth_return()
+# echange ce code via /auth/token/create sur le Gateway REST. Tous les
+# chemins essayes precedemment (/oauth2/access/token, /oauth2/token,
+# system.oauth2.token, aliexpress.open.account.token.get) renvoyaient
+# "InvalidApiPath" : ce ne sont pas les bons chemins, ils ne sont plus
+# utilises. access_token / refresh_token sont stockes dans Supabase
+# (table app_config, lecture/ecriture via service_role uniquement) --
+# jamais affiches au client.
+
+def get_app_config(key: str) -> str | None:
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+    try:
+        response = requests.get(
+            f"{REST_URL}/app_config",
+            headers=_service_role_headers(),
+            params={"key": f"eq.{key}", "select": "value"},
+            timeout=10,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0]["value"] if rows else None
+    except Exception:
+        return None
+
+
+def set_app_config(key: str, value: str) -> bool:
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        return False
+    try:
+        headers = _service_role_headers()
+        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+        response = requests.post(
+            f"{REST_URL}/app_config",
+            headers=headers,
+            json={"key": key, "value": value, "updated_at": datetime.now(timezone.utc).isoformat()},
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def get_aliexpress_authorize_url() -> str:
+    """URL d'autorisation OAuth AliExpress -- format exact demande :
+    response_type=code&force_auth=true&client_id=<AppKey>&redirect_uri=<callback encodee>."""
+    encoded_redirect_uri = requests.utils.quote(APP_BASE_URL, safe="")
+    return (
+        f"{ALIEXPRESS_OAUTH_AUTHORIZE_URL}?response_type=code&force_auth=true"
+        f"&client_id={ALIEXPRESS_APP_KEY}&redirect_uri={encoded_redirect_uri}"
+    )
+
+
+def _sign_top_rest(api_path: str, params: dict, app_secret: str) -> str:
+    """Signature HMAC-SHA256 du Gateway REST/IOP AliExpress (paths
+    /auth/token/create, /auth/token/refresh, et methode /sync -- voir
+    _call_aliexpress_sync_api) : HMAC-SHA256(cle=app_secret, message =
+    api_path + parametres tries par cle et concatenes 'clevaleur'), en
+    hexadecimal majuscule. Le Gateway TOP historique (eco.taobao.com,
+    HMAC-MD5, sans le chemin dans la signature) a ete abandonne : il ne
+    reconnait pas cette AppKey (isv.appkey-not-exists, confirme en
+    production)."""
+    sorted_items = sorted(params.items())
+    base_string = api_path + "".join(f"{k}{v}" for k, v in sorted_items)
+    return hmac.new(
+        app_secret.encode("utf-8"), base_string.encode("utf-8"), hashlib.sha256
+    ).hexdigest().upper()
+
+
+def _exchange_or_refresh_aliexpress_token(api_path: str, extra_params: dict) -> dict | None:
+    """Appel commun a /auth/token/create (echange du code d'autorisation)
+    et /auth/token/refresh (renouvellement), sur ALIEXPRESS_REST_GATEWAY."""
+    if not ALIEXPRESS_APP_SECRET:
+        st.session_state["last_aliexpress_oauth_error"] = "ALIEXPRESS_APP_SECRET vide."
+        return None
+    params = {
+        "app_key": ALIEXPRESS_APP_KEY,
+        "sign_method": "sha256",
+        "timestamp": str(int(time.time() * 1000)),
+        **extra_params,
+    }
+    params["sign"] = _sign_top_rest(api_path, params, ALIEXPRESS_APP_SECRET)
+    try:
+        response = requests.post(f"{ALIEXPRESS_REST_GATEWAY}{api_path}", data=params, timeout=15)
+        data = response.json()
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+        st.session_state["last_aliexpress_oauth_error"] = error_text
+        set_app_config("aliexpress_last_error", error_text)
+        return None
+    if response.status_code >= 400 or "access_token" not in data:
+        st.session_state["last_aliexpress_oauth_error"] = data
+        set_app_config("aliexpress_last_error", str(data))
+        return None
+    return data
+
+
+def exchange_aliexpress_code_for_token(code: str) -> dict | None:
+    return _exchange_or_refresh_aliexpress_token("/auth/token/create", {"code": code})
+
+
+def refresh_aliexpress_token(refresh_token: str) -> dict | None:
+    """Renouvelle le token via /auth/token/refresh. Si AliExpress renvoie
+    un nouveau refresh_token, l'appelant doit remplacer l'ancien (voir
+    handle_aliexpress_oauth_return)."""
+    return _exchange_or_refresh_aliexpress_token("/auth/token/refresh", {"refresh_token": refresh_token})
+
+
+def handle_aliexpress_oauth_return() -> None:
+    """A appeler tot dans main(). Si AliExpress vient de rediriger avec un
+    code d'autorisation (?code=... dans l'URL Streamlit), l'echange contre
+    un jeton d'acces via /auth/token/create et le stocke dans Supabase."""
+    code = st.query_params.get("code")
+    if not code:
+        return
+    token_data = exchange_aliexpress_code_for_token(code)
+    if token_data:
+        set_app_config("aliexpress_access_token", token_data.get("access_token", ""))
+        set_app_config("aliexpress_refresh_token", token_data.get("refresh_token", ""))
+        set_app_config("aliexpress_last_error", "")
+        current_user = st.session_state.get("user") or {}
+        set_app_config("aliexpress_authorized_by", current_user.get("email", ""))
+        st.session_state["last_aliexpress_oauth_error"] = None
+        st.session_state["last_aliexpress_error"] = None
+        st.success("✅ Connexion AliExpress réussie ! Token enregistré.")
+    else:
+        st.error(
+            "Échec de l'autorisation AliExpress — vérifie le diagnostic admin "
+            "pour le détail de l'erreur."
+        )
+    st.query_params.clear()
+
+
 def supabase_sign_in(email: str, password: str) -> dict:
     """Retourne le JSON de réponse GoTrue, ou lève une exception avec le
     message d'erreur renvoyé par Supabase."""
@@ -1924,8 +2088,11 @@ def render_page_header(title_html: str) -> None:
 
 
 def debit_credit() -> None:
-    """Débite 1 crédit après une action réussie (recherche, calcul de
-    marge, génération de fiche produit). Aucun effet pour l'admin."""
+    """Débite 1 crédit après une analyse de sourcing réussie ou une
+    génération de fiche produit à partir d'une recherche réelle. Le
+    calculateur manuel et la fiche produit en mode "Création manuelle"
+    sont gratuits et illimités, et n'appellent jamais cette fonction.
+    Aucun effet pour l'admin."""
     if is_admin():
         return
     profile = st.session_state.get("profile") or {}
@@ -2157,14 +2324,176 @@ def delete_favorite(favorite_id, user: dict) -> None:
         pass
 
 
-def log_search_history(query: str, result_count: int, user: dict) -> None:
+# ============================================================
+# CARNET DE SOURCING -- produits a suivre (par utilisateur)
+# ============================================================
+
+def fetch_notebook_entries(user: dict) -> list[dict]:
+    try:
+        response = requests.get(
+            f"{REST_URL}/sourcing_notebook",
+            headers=_auth_headers(user.get("access_token")),
+            params={"user_id": f"eq.{user['id']}", "select": "*", "order": "created_at.desc"},
+            timeout=10,
+        )
+        return response.json() if response.status_code < 400 else []
+    except Exception:
+        return []
+
+
+def find_notebook_entry_by_product_id(user: dict, product_id: str) -> dict | None:
+    """Cherche une ligne existante meme user_id + meme product_id (voir
+    point 54) : evite les doublons silencieux quand l'utilisateur clique
+    "Ajouter au carnet" plusieurs fois sur le meme produit."""
+    if not product_id:
+        return None
+    try:
+        response = requests.get(
+            f"{REST_URL}/sourcing_notebook",
+            headers=_auth_headers(user.get("access_token")),
+            params={
+                "user_id": f"eq.{user['id']}", "product_id": f"eq.{product_id}",
+                "select": "*", "limit": "1",
+            },
+            timeout=10,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def add_notebook_entry(user: dict, entry: dict) -> bool:
+    try:
+        headers = _auth_headers(user.get("access_token"))
+        headers["Prefer"] = "return=minimal"
+        response = requests.post(
+            f"{REST_URL}/sourcing_notebook",
+            headers=headers,
+            json={**entry, "user_id": user["id"]},
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def update_notebook_entry(entry_id, user: dict, patch: dict) -> bool:
+    try:
+        headers = _auth_headers(user.get("access_token"))
+        headers["Prefer"] = "return=minimal"
+        response = requests.patch(
+            f"{REST_URL}/sourcing_notebook",
+            headers=headers,
+            params={"id": f"eq.{entry_id}", "user_id": f"eq.{user['id']}"},
+            json={**patch, "updated_at": datetime.now(timezone.utc).isoformat()},
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def delete_notebook_entry(entry_id, user: dict) -> bool:
+    try:
+        response = requests.delete(
+            f"{REST_URL}/sourcing_notebook",
+            headers=_auth_headers(user.get("access_token")),
+            params={"id": f"eq.{entry_id}", "user_id": f"eq.{user['id']}"},
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+# ---- Notes libres (Carnet de Sourcing + Calculateur de Marge) ----
+
+def fetch_user_note(user: dict, kind: str = "carnet") -> str:
+    try:
+        response = requests.get(
+            f"{REST_URL}/user_notes",
+            headers=_auth_headers(user.get("access_token")),
+            params={"user_id": f"eq.{user['id']}", "kind": f"eq.{kind}", "select": "content", "limit": "1"},
+            timeout=10,
+        )
+        rows = response.json() if response.status_code < 400 else []
+        return (rows[0].get("content") or "") if rows else ""
+    except Exception:
+        return ""
+
+
+def save_user_note(user: dict, content: str, kind: str = "carnet") -> bool:
+    try:
+        headers = _auth_headers(user.get("access_token"))
+        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+        response = requests.post(
+            f"{REST_URL}/user_notes",
+            headers=headers,
+            params={"on_conflict": "user_id,kind"},
+            json={
+                "user_id": user["id"], "kind": kind, "content": content,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            timeout=10,
+        )
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+# ---- Comparateur de produits (Carnet de Sourcing + Calculateur de Marge) ----
+
+def fetch_comparisons(user: dict, context: str) -> list[dict]:
+    try:
+        response = requests.get(
+            f"{REST_URL}/product_comparisons",
+            headers=_auth_headers(user.get("access_token")),
+            params={
+                "user_id": f"eq.{user['id']}", "source_context": f"eq.{context}",
+                "select": "*", "order": "created_at.asc",
+            },
+            timeout=10,
+        )
+        return response.json() if response.status_code < 400 else []
+    except Exception:
+        return []
+
+
+def save_comparisons(user: dict, context: str, rows: list[dict]) -> bool:
+    """Remplace l'integralite du comparatif enregistre pour ce `context`
+    (delete puis insert) -- plus simple et robuste qu'un diff ligne a
+    ligne pour un tableau edite en bloc. Ne touche jamais aux lignes de
+    l'AUTRE contexte (carnet vs calculateur, voir source_context)."""
+    try:
+        headers = _auth_headers(user.get("access_token"))
+        requests.delete(
+            f"{REST_URL}/product_comparisons",
+            headers=headers,
+            params={"user_id": f"eq.{user['id']}", "source_context": f"eq.{context}"},
+            timeout=10,
+        )
+        if not rows:
+            return True
+        headers = _auth_headers(user.get("access_token"))
+        headers["Prefer"] = "return=minimal"
+        payload = [{**row, "user_id": user["id"], "source_context": context} for row in rows]
+        response = requests.post(f"{REST_URL}/product_comparisons", headers=headers, json=payload, timeout=10)
+        return response.status_code < 400
+    except Exception:
+        return False
+
+
+def log_search_history(query: str, result_count: int, user: dict, status: str = "succes") -> None:
+    """status : 'succes', 'aucun_resultat' ou 'erreur' -- affiche dans
+    l'historique (voir render_favorites_page)."""
     try:
         headers = _auth_headers(user.get("access_token"))
         headers["Prefer"] = "return=minimal"
         requests.post(
             f"{REST_URL}/search_history",
             headers=headers,
-            json={"user_id": user["id"], "query": query, "result_count": result_count},
+            json={"user_id": user["id"], "query": query, "result_count": result_count, "status": status},
             timeout=10,
         )
     except Exception:
@@ -2250,8 +2579,406 @@ def render_favorites_page() -> None:
         history = fetch_search_history(user)
         if not history:
             st.caption("Aucune recherche enregistrée pour l'instant.")
-        for h in history:
-            st.markdown(f"🔍 **{h.get('query', '')}** — {h.get('created_at', '')[:10]}")
+        else:
+            # Regroupe les recherches identiques (meme requete, insensible
+            # a la casse) avec un compteur -- history est deja trie par
+            # created_at desc, donc la premiere occurrence rencontree pour
+            # une requete donnee est la plus recente.
+            grouped: dict[str, dict] = {}
+            order: list[str] = []
+            for h in history:
+                key = (h.get("query") or "").strip().lower()
+                if key not in grouped:
+                    grouped[key] = {**h, "count": 1}
+                    order.append(key)
+                else:
+                    grouped[key]["count"] += 1
+
+            status_labels = {
+                "succes": "✅ Succès",
+                "aucun_resultat": "⚠️ Aucun résultat",
+                "erreur": "❌ Erreur",
+            }
+            for key in order:
+                h = grouped[key]
+                created_at = str(h.get("created_at", ""))
+                date_part, _, time_part = created_at.partition("T")
+                time_part = time_part[:5]
+                status_label = status_labels.get(h.get("status", "succes"), "✅ Succès")
+                count_suffix = f" · ×{h['count']}" if h["count"] > 1 else ""
+                st.markdown(f"🔍 **{h.get('query', '')}**{count_suffix}")
+                st.caption(f"{date_part} {time_part} · {status_label} · {h.get('result_count', 0)} résultat(s)")
+                st.divider()
+
+
+# ============================================================
+# CARNET DE SOURCING (espace de travail personnel, par utilisateur)
+# ============================================================
+
+NOTEBOOK_STATUSES = ["a_etudier", "a_tester", "echantillon_commande", "valide", "en_vente", "abandonne"]
+NOTEBOOK_STATUS_LABELS = {
+    "a_etudier": "🔎 À étudier",
+    "a_tester": "🧪 À tester",
+    "echantillon_commande": "📦 Échantillon commandé",
+    "valide": "✅ Validé",
+    "en_vente": "💰 En vente",
+    "abandonne": "🗑️ Abandonné",
+}
+NOTEBOOK_STATUS_COLORS = {
+    "a_etudier": "#64748B",
+    "a_tester": "#A855F7",
+    "echantillon_commande": "#F59E0B",
+    "valide": "#10B981",
+    "en_vente": "#06B6D4",
+    "abandonne": "#EF4444",
+}
+
+
+def _notebook_margin_fields(
+    purchase: float | None, shipping: float | None, sale: float | None
+) -> tuple[float | None, float | None]:
+    """Cout total = achat + livraison (livraison traitee comme 0 si non
+    disponible -- jamais estimee arbitrairement, voir point 4) ; marge =
+    vente - cout total ; marge % = marge / vente x 100. Ne jamais inventer :
+    si le prix d'achat ou le prix de vente est absent/nul (ex: recherche
+    n'ayant pas trouve de prix exploitable, voir point 5/7), retourne
+    (None, None) plutot qu'une TypeError ou une valeur fictive (voir point 37)."""
+    if not sale or purchase is None:
+        return None, None
+    cout_total = purchase + (shipping or 0)
+    margin_value = round(sale - cout_total, 2)
+    margin_percent = round(margin_value / sale * 100, 1)
+    return margin_value, margin_percent
+
+
+def _render_notebook_entry_card(entry: dict, user: dict) -> None:
+    entry_id = entry["id"]
+    status = entry.get("status") or "a_etudier"
+    status_label = NOTEBOOK_STATUS_LABELS.get(status, status)
+    status_color = NOTEBOOK_STATUS_COLORS.get(status, "#64748B")
+    margin_value = entry.get("margin_value")
+    margin_color = "#10B981" if (margin_value or 0) >= 0 else "#EF4444"
+    margin_text = f"{margin_value:.2f} €" if margin_value is not None else "—"
+
+    with st.container(border=True):
+        col_main, col_actions = st.columns([3, 1])
+        with col_main:
+            st.markdown(
+                f'<span style="background:{status_color}22;color:{status_color};'
+                f'padding:2px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;">'
+                f'{status_label}</span>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(f"**{entry.get('product_name') or 'Produit sans nom'}**")
+            st.markdown(
+                f"<span style='color:var(--text-muted);font-size:0.85rem;'>"
+                f"Achat {entry.get('purchase_price') or 0:.2f} € · "
+                f"Livraison {entry.get('shipping_price') or 0:.2f} € · "
+                f"Vente {entry.get('sale_price') or 0:.2f} € · "
+                f"Marge : <span style='color:{margin_color};font-weight:700;'>{margin_text}</span></span>",
+                unsafe_allow_html=True,
+            )
+            if entry.get("notes"):
+                st.caption(f"📝 {entry['notes']}")
+        with col_actions:
+            product_url = (entry.get("product_url") or "").strip()
+            if product_url and _is_valid_aliexpress_url(product_url):
+                st.link_button("🔗 Voir sur AliExpress", product_url, use_container_width=True)
+            else:
+                st.caption("🔒 Lien indisponible")
+            if entry.get("product_id"):
+                if st.button("🔄 Analyser à nouveau", key=f"nb_reanalyze_{entry_id}", use_container_width=True):
+                    st.session_state["mm_reanalyze_query"] = entry["product_id"]
+                    st.session_state["page"] = "recherche"
+                    st.rerun()
+            if st.button("✏️ Modifier", key=f"nb_edit_{entry_id}", use_container_width=True):
+                flag = f"mm_nb_editing_{entry_id}"
+                st.session_state[flag] = not st.session_state.get(flag, False)
+                st.rerun()
+            if st.button("🗑️ Supprimer", key=f"nb_del_{entry_id}", use_container_width=True):
+                delete_notebook_entry(entry_id, user)
+                st.rerun()
+
+        if st.session_state.get(f"mm_nb_editing_{entry_id}"):
+            with st.form(f"form_nb_edit_{entry_id}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    e_name = st.text_input("Nom", value=entry.get("product_name") or "")
+                    e_purchase = st.number_input(
+                        "Prix d'achat (€)", min_value=0.0, value=float(entry.get("purchase_price") or 0), step=0.5
+                    )
+                    e_sale = st.number_input(
+                        "Prix de vente (€)", min_value=0.0, value=float(entry.get("sale_price") or 0), step=0.5
+                    )
+                with col2:
+                    e_shipping = st.number_input(
+                        "Livraison (€)", min_value=0.0, value=float(entry.get("shipping_price") or 0), step=0.5
+                    )
+                    status_index = NOTEBOOK_STATUSES.index(status) if status in NOTEBOOK_STATUSES else 0
+                    e_status = st.selectbox(
+                        "Statut", NOTEBOOK_STATUSES, index=status_index,
+                        format_func=lambda s: NOTEBOOK_STATUS_LABELS[s],
+                    )
+                e_notes = st.text_area("Notes", value=entry.get("notes") or "")
+                save_edit = st.form_submit_button("💾 Enregistrer les modifications")
+            if save_edit:
+                margin_value, margin_percent = _notebook_margin_fields(e_purchase, e_shipping, e_sale)
+                update_notebook_entry(entry_id, user, {
+                    "product_name": e_name.strip(),
+                    "purchase_price": e_purchase or None,
+                    "shipping_price": e_shipping or None,
+                    "sale_price": e_sale or None,
+                    "margin_value": margin_value,
+                    "margin_percent": margin_percent,
+                    "status": e_status,
+                    "notes": e_notes.strip() or None,
+                })
+                st.session_state[f"mm_nb_editing_{entry_id}"] = False
+                st.rerun()
+
+
+def _comparison_row_template(with_vat: bool) -> dict:
+    row = {
+        "Nom": "", "Prix d'achat (€)": 0.0, "Livraison (€)": 0.0, "Autres frais (€)": 0.0,
+        "Prix de vente (€)": 0.0, "Notes": "",
+    }
+    if with_vat:
+        row["TVA (%)"] = 20.0
+        row["Frais paiement (%)"] = 2.0
+    return row
+
+
+def _empty_comparison_df(with_vat: bool, n: int = 3) -> pd.DataFrame:
+    rows = []
+    for i in range(n):
+        row = _comparison_row_template(with_vat)
+        row["Nom"] = f"Produit {i + 1}"
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def render_comparison_table(context: str, with_vat: bool = False) -> None:
+    """Tableau de comparaison de plusieurs produits, reutilise a la fois
+    par le Carnet de Sourcing (`context="carnet"`, sans TVA/frais de
+    paiement, voir points 43-45) et le Calculateur de Marge
+    (`context="calculateur"`, avec TVA/frais de paiement, voir points
+    46-49). Chaque contexte garde son propre comparatif enregistre
+    (colonne source_context, voir save_comparisons/fetch_comparisons) :
+    enregistrer depuis l'un n'ecrase jamais l'autre."""
+    user = st.session_state.get("user")
+    title = "📊 Comparateur de Produits" if context == "carnet" else "📊 Comparer plusieurs produits"
+    st.markdown(f"#### {title}")
+    st.caption(
+        "Compare plusieurs produits côte à côte — gratuit, illimité, aucun crédit débité. "
+        "Coût total, marge et ROI se recalculent automatiquement."
+    )
+
+    state_key = f"mm_comparison_df_{context}"
+    if state_key not in st.session_state:
+        saved = fetch_comparisons(user, context) if user else []
+        if saved:
+            rows = []
+            for row in saved:
+                r = {
+                    "Nom": row.get("product_name") or "",
+                    "Prix d'achat (€)": float(row.get("purchase_price") or 0),
+                    "Livraison (€)": float(row.get("shipping_price") or 0),
+                    "Autres frais (€)": float(row.get("other_costs") or 0),
+                    "Prix de vente (€)": float(row.get("sale_price") or 0),
+                    "Notes": row.get("notes") or "",
+                }
+                if with_vat:
+                    r["TVA (%)"] = float(row.get("vat_percent") if row.get("vat_percent") is not None else 20.0)
+                    r["Frais paiement (%)"] = float(
+                        row.get("payment_fee_percent") if row.get("payment_fee_percent") is not None else 2.0
+                    )
+                rows.append(r)
+            st.session_state[state_key] = pd.DataFrame(rows)
+        else:
+            st.session_state[state_key] = _empty_comparison_df(with_vat)
+
+    edited = st.data_editor(
+        st.session_state[state_key],
+        num_rows="dynamic",
+        use_container_width=True,
+        key=f"mm_comparison_editor_{context}",
+    )
+    st.session_state[state_key] = edited
+
+    # Colonnes calculees : jamais de division par zero (voir point 43) --
+    # prix de vente = 0 => "—" plutot qu'une erreur ou une valeur inventee.
+    display_rows = []
+    for _, row in edited.iterrows():
+        purchase = float(row.get("Prix d'achat (€)") or 0)
+        shipping = float(row.get("Livraison (€)") or 0)
+        other = float(row.get("Autres frais (€)") or 0)
+        sale = float(row.get("Prix de vente (€)") or 0)
+        if with_vat:
+            vat = float(row.get("TVA (%)") or 0)
+            cout_total = round((purchase + shipping + other) * (1 + vat / 100), 2)
+        else:
+            cout_total = round(purchase + shipping + other, 2)
+        if sale > 0:
+            marge = round(sale - cout_total, 2)
+            marge_pct = round(marge / sale * 100, 1)
+            roi_pct = round(marge / cout_total * 100, 1) if cout_total > 0 else None
+        else:
+            marge = marge_pct = roi_pct = None
+        display_rows.append({
+            "Produit": row.get("Nom") or "—",
+            "Coût total": f"{cout_total:.2f} €",
+            "Marge €": f"{marge:.2f} €" if marge is not None else "—",
+            "Marge %": f"{marge_pct:.1f} %" if marge_pct is not None else "—",
+            "ROI %": f"{roi_pct:.1f} %" if roi_pct is not None else "—",
+        })
+
+    if display_rows:
+        summary_df = pd.DataFrame(display_rows)
+
+        def _style_value(val: str) -> str:
+            if val == "—":
+                return ""
+            try:
+                num = float(val.replace(" €", "").replace(" %", ""))
+            except ValueError:
+                return ""
+            return f"color: {'#10B981' if num >= 0 else '#EF4444'}; font-weight:700;"
+
+        styled = summary_df.style.map(_style_value, subset=["Marge €", "Marge %", "ROI %"])
+        st.dataframe(styled, use_container_width=True, hide_index=True)
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        add_label = "+ Ajouter un produit à comparer" if context == "carnet" else "+ Ajouter une ligne"
+        if st.button(add_label, key=f"mm_comp_add_{context}", use_container_width=True):
+            new_row = _comparison_row_template(with_vat)
+            new_row["Nom"] = f"Produit {len(edited) + 1}"
+            st.session_state[state_key] = pd.concat([edited, pd.DataFrame([new_row])], ignore_index=True)
+            st.rerun()
+    with col_b:
+        if st.button("Réinitialiser le tableau" if context == "carnet" else "Réinitialiser",
+                      key=f"mm_comp_reset_{context}", use_container_width=True):
+            st.session_state[state_key] = _empty_comparison_df(with_vat)
+            st.rerun()
+    with col_c:
+        save_label = "💾 Enregistrer mon comparatif" if context == "carnet" else "💾 Enregistrer le comparatif"
+        if st.button(save_label, key=f"mm_comp_save_{context}", use_container_width=True):
+            if not user:
+                st.warning("Connecte-toi pour enregistrer ton comparatif.")
+            else:
+                rows_to_save = []
+                for _, row in edited.iterrows():
+                    r = {
+                        "product_name": row.get("Nom") or "",
+                        "purchase_price": float(row.get("Prix d'achat (€)") or 0),
+                        "shipping_price": float(row.get("Livraison (€)") or 0),
+                        "other_costs": float(row.get("Autres frais (€)") or 0),
+                        "sale_price": float(row.get("Prix de vente (€)") or 0),
+                        "notes": row.get("Notes") or "",
+                    }
+                    if with_vat:
+                        r["vat_percent"] = float(row.get("TVA (%)") or 0)
+                        r["payment_fee_percent"] = float(row.get("Frais paiement (%)") or 0)
+                    rows_to_save.append(r)
+                if save_comparisons(user, context, rows_to_save):
+                    st.success("Comparatif enregistré.")
+                else:
+                    st.error("Impossible d'enregistrer le comparatif pour le moment.")
+
+
+def render_sourcing_notebook_section() -> None:
+    """ZONE permanente sous le dashboard secondaire (voir render_search_page) :
+    espace de travail personnel — notes libres, produits a suivre, et
+    comparateur — qui occupe l'espace precedemment vide en bas de la page
+    Recherche."""
+    user = st.session_state.get("user")
+    if not user:
+        return
+
+    # Ancre pour le bouton "📂 Voir mon carnet" (voir render_search_page,
+    # affiche apres un ajout reussi au carnet depuis un resultat) : scroll
+    # direct ici plutot que d'obliger l'utilisateur a descendre a la main.
+    st.markdown('<div id="carnet-sourcing"></div>', unsafe_allow_html=True)
+    st.markdown("## 📝 Carnet de Sourcing")
+    st.caption(
+        "Ton espace de travail personnel : garde les produits que tu envisages de vendre, "
+        "même sans les mettre encore en favoris."
+    )
+
+    # PARTIE A — Mes notes
+    st.markdown("#### Mes notes")
+    if "mm_notebook_notes_value" not in st.session_state:
+        st.session_state["mm_notebook_notes_value"] = fetch_user_note(user, kind="carnet")
+    notes_value = st.text_area(
+        "Mes notes",
+        value=st.session_state["mm_notebook_notes_value"],
+        height=140,
+        label_visibility="collapsed",
+        placeholder=(
+            "Ex : Tester ce produit sur TikTok\nVoir si fournisseur accepte branding\n"
+            "Comparer avec Temu\nCommander échantillon"
+        ),
+        key="mm_notebook_notes_input",
+    )
+    if st.button("💾 Enregistrer mes notes", key="mm_save_notebook_notes"):
+        if save_user_note(user, notes_value, kind="carnet"):
+            st.session_state["mm_notebook_notes_value"] = notes_value
+            st.success("Notes enregistrées.")
+        else:
+            st.error("Impossible d'enregistrer les notes pour le moment.")
+
+    st.divider()
+
+    # PARTIE B — Produits à suivre
+    st.markdown("#### 📋 Produits à suivre")
+    with st.expander("+ Ajouter un produit", expanded=False):
+        with st.form("form_notebook_add", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                nb_name = st.text_input("Nom du produit")
+                nb_url = st.text_input("URL produit")
+                nb_purchase = st.number_input("Prix d'achat (€)", min_value=0.0, value=0.0, step=0.5)
+            with col2:
+                nb_shipping = st.number_input("Livraison (€)", min_value=0.0, value=0.0, step=0.5)
+                nb_sale = st.number_input("Prix de vente prévu (€)", min_value=0.0, value=0.0, step=0.5)
+                nb_status = st.selectbox(
+                    "Statut", NOTEBOOK_STATUSES, format_func=lambda s: NOTEBOOK_STATUS_LABELS[s]
+                )
+            nb_notes = st.text_area("Notes", height=80)
+            nb_submit = st.form_submit_button("+ Ajouter un produit", use_container_width=True)
+        if nb_submit:
+            if not nb_name.strip():
+                st.warning("Merci de renseigner au moins le nom du produit.")
+            else:
+                margin_value, margin_percent = _notebook_margin_fields(nb_purchase, nb_shipping, nb_sale)
+                ok = add_notebook_entry(user, {
+                    "product_name": nb_name.strip(),
+                    "product_url": nb_url.strip() or None,
+                    "purchase_price": nb_purchase or None,
+                    "shipping_price": nb_shipping or None,
+                    "sale_price": nb_sale or None,
+                    "margin_value": margin_value,
+                    "margin_percent": margin_percent,
+                    "status": nb_status,
+                    "notes": nb_notes.strip() or None,
+                })
+                if ok:
+                    st.success("Produit ajouté au carnet.")
+                    st.rerun()
+                else:
+                    st.error("Impossible d'ajouter ce produit pour le moment.")
+
+    entries = fetch_notebook_entries(user)
+    if not entries:
+        st.caption("Aucun produit dans ton carnet pour l'instant.")
+    else:
+        for entry in entries:
+            _render_notebook_entry_card(entry, user)
+
+    st.divider()
+
+    # PARTIE C — Comparateur de produits (points 43-45)
+    render_comparison_table(context="carnet", with_vat=False)
 
 
 # ============================================================
@@ -2266,19 +2993,22 @@ def render_calculator_page() -> None:
         st.info(prefill_notice)
         st.caption("Ajuste les champs ci-dessous si besoin, puis lance le calcul.")
     else:
-        st.caption("Calcule ta marge sans passer par une recherche produit.")
-
-    if not has_credits():
-        render_no_credits_alert()
-        return
+        st.caption("Calcule ta marge sans passer par une recherche produit — gratuit et illimité.")
 
     # Repli propre depuis la page Recherche quand l'extraction automatique
     # echoue (voir render_search_page) : les champs restent toujours
     # pre-remplis avec des valeurs exploitables (celles du dernier repli,
     # ou les valeurs par defaut) -- jamais de champ vide ou d'ecran casse.
+    # Idem depuis le bouton "🧮 Calculer ma marge" d'un resultat reel
+    # (point 48) : nom/URL du produit affiches en contexte au-dessus.
     prefill_prix = st.session_state.pop("mm_calc_prefill_price", 10.0)
     prefill_livraison = st.session_state.pop("mm_calc_prefill_shipping", 2.0)
+    prefill_name = st.session_state.pop("mm_calc_prefill_name", None)
+    prefill_url = st.session_state.pop("mm_calc_prefill_url", None)
+    if prefill_name:
+        st.caption(f"📦 Calcul pré-rempli depuis : **{prefill_name}**" + (f" · [voir le produit]({prefill_url})" if prefill_url else ""))
 
+    # ---- 1. Calcul rapide d'un produit + 2. resultats (point 49) ----
     with st.container():
         with st.form("form_calculateur"):
             col1, col2 = st.columns(2)
@@ -2288,15 +3018,17 @@ def render_calculator_page() -> None:
             with col2:
                 tva = st.number_input("TVA estimée (%)", min_value=0.0, value=20.0, step=1.0)
                 frais_paiement = st.number_input("Frais de paiement (%)", min_value=0.0, value=2.0, step=0.5)
-            calculer = st.form_submit_button("Calculer la marge (1 crédit)", use_container_width=True)
-        st.caption("1 calcul = 1 crédit.")
+            calculer = st.form_submit_button("Calculer la marge — gratuit", use_container_width=True)
+        st.caption("Calcul manuel gratuit et illimité, sans débit de crédit.")
 
     if calculer:
-        debit_credit()
         cout_total = round((prix_achat + livraison) * (1 + tva / 100), 2)
         prix_conseille = math.floor(cout_total / MARGIN_TARGET) + 0.99
         frais = round(prix_conseille * (frais_paiement / 100), 2)
         marge = round(prix_conseille - cout_total - frais, 2)
+        marge_pct = round((marge / prix_conseille) * 100, 1) if prix_conseille else 0.0
+        roi_pct = round((marge / cout_total) * 100, 1) if cout_total else 0.0
+        seuil_rentabilite = round(cout_total / (1 - frais_paiement / 100), 2) if frais_paiement < 100 else cout_total
 
         st.markdown(
             f"""
@@ -2305,16 +3037,98 @@ def render_calculator_page() -> None:
                 <div class="mm-metric-row"><span class="label">Coût total</span><span class="value">{cout_total:.2f} €</span></div>
                 <div class="mm-metric-row"><span class="label">Prix de vente conseillé</span><span class="value">{prix_conseille:.2f} €</span></div>
                 <div class="mm-metric-row"><span class="label">Frais de paiement</span><span class="value">{frais:.2f} €</span></div>
+                <div class="mm-metric-row"><span class="label">Marge %</span><span class="value">{marge_pct:.1f} %</span></div>
+                <div class="mm-metric-row"><span class="label">ROI</span><span class="value">{roi_pct:.1f} %</span></div>
+                <div class="mm-metric-row"><span class="label">Seuil de rentabilité (prix de vente minimum)</span><span class="value">{seuil_rentabilite:.2f} €</span></div>
                 <div class="mm-margin-highlight">Marge nette : {marge:.2f} €</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+        st.caption("ℹ️ Estimation commerciale — adaptez la TVA à votre régime.")
+
+    # ---- 3. Tableau multi-produits (points 46, 49) ----
+    st.divider()
+    render_comparison_table(context="calculateur", with_vat=True)
+
+    # ---- 4. Notes personnelles (point 47, 49) ----
+    st.divider()
+    st.markdown("#### 📝 Mes notes de marge")
+    user = st.session_state.get("user")
+    if user:
+        if "mm_calc_notes_value" not in st.session_state:
+            st.session_state["mm_calc_notes_value"] = fetch_user_note(user, kind="calculateur")
+        calc_notes_value = st.text_area(
+            "Mes notes de marge",
+            value=st.session_state["mm_calc_notes_value"],
+            height=120,
+            label_visibility="collapsed",
+            placeholder=(
+                "Ex : Produit intéressant à 24,99 €\nTester prix 29,99 €\n"
+                "Marge trop faible avec livraison actuelle\nComparer avec fournisseur B"
+            ),
+            key="mm_calc_notes_input",
+        )
+        if st.button("💾 Enregistrer mes notes", key="mm_save_calc_notes"):
+            if save_user_note(user, calc_notes_value, kind="calculateur"):
+                st.session_state["mm_calc_notes_value"] = calc_notes_value
+                st.success("Notes enregistrées.")
+            else:
+                st.error("Impossible d'enregistrer les notes pour le moment.")
+    else:
+        st.caption("Connecte-toi pour enregistrer tes notes de marge.")
 
 
 # ============================================================
 # GÉNÉRATEUR DE FICHE PRODUIT (GABARIT TEXTE, PAS D'IA)
 # ============================================================
+
+def generate_manual_product_sheet(nom: str, caracteristiques: str, benefice: str, prix: float, cible: str, ton: str) -> dict:
+    """Genere une fiche produit a partir de champs saisis manuellement
+    (mode 'Création manuelle', sans recherche produit prealable). A la
+    difference de generate_product_sheet (donnees reelles de sourcing),
+    tout le contenu vient de ce que l'utilisateur a lui-meme saisi --
+    aucune donnee de fiabilite/volume/etc. n'est inventee, ces champs
+    n'existent simplement pas dans ce mode."""
+    specs_list = [s.strip() for s in caracteristiques.split("\n") if s.strip()]
+    cible = cible.strip() or "vos clients"
+
+    tone_presets = {
+        "Professionnel": {
+            "hook": f"{nom} répond aux attentes de {cible} : {benefice}.",
+            "cta": "Commandez dès maintenant — stock disponible.",
+        },
+        "Percutant": {
+            "hook": f"{nom} change la donne pour {cible} : {benefice} !",
+            "cta": "⚡ Ne passez pas à côté — commandez maintenant !",
+        },
+        "Chaleureux": {
+            "hook": f"Vous cherchez {benefice} ? {nom} est fait pour {cible}.",
+            "cta": f"💛 Offrez-vous {nom} dès aujourd'hui.",
+        },
+        "Premium": {
+            "hook": f"{nom} — l'exigence au service de {cible}. {benefice}.",
+            "cta": f"✨ Découvrez l'excellence {nom}.",
+        },
+    }
+    preset = tone_presets.get(ton, tone_presets["Professionnel"])
+
+    description = [
+        ("Pourquoi ce produit :", f"{nom} a été pensé pour {cible}. {benefice}."),
+    ]
+    if specs_list:
+        description.append(("Ce qu'il faut savoir :", ", ".join(specs_list) + "."))
+    description.append(("Prix :", f"Proposé à {prix:.2f} €, {nom} offre un excellent rapport qualité-prix."))
+
+    return {
+        "seo_title": f"{nom} — {benefice}" if benefice else nom,
+        "hook": preset["hook"],
+        "description": description,
+        "tech_specs": specs_list or ["Caractéristiques non renseignées"],
+        "advantages": [benefice] if benefice else [],
+        "cta": preset["cta"],
+    }
+
 
 def generate_product_sheet(result: dict) -> dict:
     """Construit une fiche produit haute conversion structurée à partir des
@@ -2537,30 +3351,81 @@ def render_generated_sheet(sheet: dict) -> None:
 
 def render_product_sheet_page() -> None:
     render_page_header("✨ Générateur de Fiche Produit")
-    st.caption(
-        "Génère une fiche produit haute conversion, prête à publier, à partir de ta dernière recherche."
-    )
-    result = st.session_state.get("last_result")
-    if not result:
-        st.info("Lance d'abord une recherche pour générer une fiche produit.")
-        return
+    st.caption("Génère une fiche produit haute conversion, prête à publier.")
 
     sheet = st.session_state.get("product_sheet_data")
-    if sheet and st.session_state.get("product_sheet_for") == result.get("titre"):
+    if sheet and st.session_state.get("product_sheet_source") == "manual":
         render_generated_sheet(sheet)
+        if st.button("← Générer une nouvelle fiche", key="mm_sheet_reset_manual"):
+            st.session_state["product_sheet_data"] = None
+            st.rerun()
         return
 
-    if not has_credits():
-        render_no_credits_alert()
+    result = st.session_state.get("last_result")
+
+    mode = st.radio(
+        "Mode de génération",
+        ["Depuis le dernier produit analysé", "Création manuelle"],
+        horizontal=True,
+        key="mm_sheet_mode",
+    )
+
+    if mode == "Depuis le dernier produit analysé":
+        if not result:
+            st.info(
+                "Aucune recherche récente à utiliser. Lance d'abord une recherche, "
+                "ou passe en mode « Création manuelle » ci-dessus."
+            )
+            return
+
+        sheet = st.session_state.get("product_sheet_data")
+        if (
+            sheet
+            and st.session_state.get("product_sheet_source") != "manual"
+            and st.session_state.get("product_sheet_for") == result.get("titre")
+        ):
+            render_generated_sheet(sheet)
+            return
+
+        if not has_credits():
+            render_no_credits_alert()
+            return
+
+        st.caption("✨ Générer une fiche produit à partir d'une recherche réelle = 1 crédit.")
+        if st.button("✨ Générer la fiche produit (1 crédit)", use_container_width=True):
+            sheet = generate_product_sheet(result)
+            debit_credit()
+            st.session_state["product_sheet_data"] = sheet
+            st.session_state["product_sheet_for"] = result.get("titre")
+            st.session_state["product_sheet_source"] = "analyse"
+            st.rerun()
         return
 
-    st.caption("✨ Générer une fiche produit = 1 crédit.")
-    if st.button("✨ Générer la fiche produit (1 crédit)", use_container_width=True):
-        sheet = generate_product_sheet(result)
-        debit_credit()
-        st.session_state["product_sheet_data"] = sheet
-        st.session_state["product_sheet_for"] = result.get("titre")
-        st.rerun()
+    # Mode "Création manuelle" : gratuit, aucune donnée de sourcing requise.
+    st.caption("✍️ Création manuelle — gratuite, sans recherche produit ni débit de crédit.")
+    with st.form("form_sheet_manual"):
+        nom = st.text_input("Nom du produit")
+        caracteristiques = st.text_area(
+            "Caractéristiques (une par ligne)",
+            placeholder="Ex :\nMatière : silicone alimentaire\nCouleur : noir\nPoids : 120 g",
+        )
+        benefice = st.text_input("Bénéfice principal", placeholder="Ex : soulage les tensions en 5 minutes")
+        col1, col2 = st.columns(2)
+        with col1:
+            prix = st.number_input("Prix de vente (€)", min_value=0.0, value=19.99, step=0.5)
+        with col2:
+            cible = st.text_input("Cible", placeholder="Ex : sportifs amateurs")
+        ton = st.selectbox("Ton", ["Professionnel", "Percutant", "Chaleureux", "Premium"])
+        manual_submitted = st.form_submit_button("✨ Générer la fiche (gratuit)", use_container_width=True)
+
+    if manual_submitted:
+        if not nom.strip() or not benefice.strip():
+            st.warning("Merci de renseigner au moins le nom du produit et le bénéfice principal.")
+        else:
+            sheet = generate_manual_product_sheet(nom.strip(), caracteristiques, benefice.strip(), prix, cible, ton)
+            st.session_state["product_sheet_data"] = sheet
+            st.session_state["product_sheet_source"] = "manual"
+            st.rerun()
 
 
 # ============================================================
@@ -2604,6 +3469,71 @@ def render_account_page() -> None:
             """
         )
 
+    if is_admin():
+        st.divider()
+        with st.expander("🔧 Diagnostic AliExpress (admin)", expanded=False):
+            if ALIEXPRESS_APP_SECRET:
+                st.success(f"App Secret chargé — {len(ALIEXPRESS_APP_SECRET)} caractères détectés.")
+            else:
+                st.error(
+                    "App Secret VIDE côté app — ajoute ALIEXPRESS_APP_SECRET dans "
+                    ".streamlit/secrets.toml (jamais dans le code)."
+                )
+
+            oauth_token = get_app_config("aliexpress_access_token")
+            if oauth_token:
+                authorized_by = get_app_config("aliexpress_authorized_by")
+                st.success(
+                    "Autorisation OAuth AliExpress active (jeton présent, jamais affiché ici)"
+                    + (f" — connecté par {authorized_by}." if authorized_by else ".")
+                )
+            else:
+                st.warning("Aucune autorisation OAuth AliExpress enregistrée pour l'instant.")
+
+            oauth_error = st.session_state.get("last_aliexpress_oauth_error")
+            if oauth_error:
+                st.error(f"Dernière erreur d'autorisation OAuth : {oauth_error}")
+            persisted_error = get_app_config("aliexpress_last_error")
+            if persisted_error and not oauth_token:
+                st.warning(f"Dernière erreur persistée (Supabase) : {persisted_error}")
+
+            authorize_url = get_aliexpress_authorize_url()
+            st.link_button("🔗 Autoriser / réautoriser AliExpress", authorize_url)
+            st.code(authorize_url, language="text")
+
+            last_ds_error = st.session_state.get("last_aliexpress_error")
+            if last_ds_error:
+                st.error(f"Dernière erreur aliexpress.ds.product.get : {last_ds_error}")
+
+            st.divider()
+            st.markdown("**Test API isolé** — sans ScraperAPI ni Google, juste l'appel officiel.")
+            test_product_id = st.text_input(
+                "product_id à tester", value="1005009947135409", key="mm_api_test_pid",
+            )
+            if st.button("🧪 Tester API produit AliExpress", key="mm_test_api_product"):
+                with st.spinner("Appel de aliexpress.ds.product.get…"):
+                    payload, api_diag = aliexpress_ds_product_get(test_product_id.strip())
+                st.markdown(
+                    f"**Gateway :** `{api_diag.get('gateway')}`  \n"
+                    f"**Méthode :** `{api_diag.get('method')}`  \n"
+                    f"**HTTP status :** {api_diag.get('http_status')}  \n"
+                    f"**Code AliExpress :** {api_diag.get('code') or '—'}  \n"
+                    f"**Sub-code :** {api_diag.get('sub_code') or '—'}  \n"
+                    f"**Message :** {api_diag.get('msg') or '—'}  \n"
+                    f"**Durée :** {api_diag.get('duree_secondes')} s"
+                )
+                if payload:
+                    st.success("Réponse API reçue avec succès.")
+                    parsed = _parse_ds_product_get(payload)
+                    if parsed:
+                        st.json(parsed)
+                    else:
+                        st.warning("Réponse reçue mais aucun champ titre/prix reconnu — voir le JSON brut ci-dessous.")
+                    with st.expander("JSON brut de la réponse"):
+                        st.json(payload)
+                else:
+                    st.error("Échec de l'appel — voir le diagnostic ci-dessus.")
+
 
 def render_landing_topbar() -> None:
     render_header()
@@ -2645,9 +3575,9 @@ def render_landing_page() -> None:
         <div class="mm-hero">
             <span class="mm-hero-badge">⚡ ANALYSE ET SOURCING ALIEXPRESS AUTOMATISÉS</span>
             <h1><span class="accent">BOT MARGEMAX</span> — Détectez la vraie marge<br/>de vos produits <span class="accent">e-commerce</span></h1>
-            <p>Notre algorithme scanne AliExpress en continu, calcule votre coût réel
-            (produit + livraison + TVA) et trouve les fournisseurs les plus rentables
-            avant vos concurrents.</p>
+            <p>Comparez les offres AliExpress disponibles et identifiez les opportunités les plus
+            rentables : coût réel (produit + livraison + TVA), fiabilité vendeur et marge nette,
+            à partir des données disponibles.</p>
         </div>
         <div class="mm-trust-row">
             <span class="mm-trust-badge">🔒 Connexion sécurisée par Supabase Auth</span>
@@ -2656,17 +3586,17 @@ def render_landing_page() -> None:
         </div>
         <div class="mm-metrics-row">
             <div class="mm-metric-block"><div class="value">5 s</div><div class="label">Temps de recherche moyen</div></div>
-            <div class="mm-metric-block"><div class="value">100 %</div><div class="label">Calcul des frais cachés</div></div>
+            <div class="mm-metric-block"><div class="value">Détaillée</div><div class="label">Estimation du coût réel</div></div>
             <div class="mm-metric-block"><div class="value">24/7</div><div class="label">Accès à l'algorithme</div></div>
         </div>
 
         <div class="mm-demo-card">
-            <div class="mm-demo-label">APERÇU — MODE SCANVALUE</div>
+            <div class="mm-demo-label">EXEMPLE D'ANALYSE MARGEMAX</div>
             <div class="mm-demo-product">
                 <div class="mm-demo-product-thumb">⌚</div>
                 <div>
                     <div class="mm-demo-product-name">Montre Connectée Sport Pro - Écran AMOLED</div>
-                    <div class="mm-demo-product-tag">Produit scanné il y a 2 min</div>
+                    <div class="mm-demo-product-tag">Exemple de résultat — données illustratives</div>
                 </div>
             </div>
             <div class="mm-scanner-grid">
@@ -2788,6 +3718,9 @@ def render_auth_forms() -> None:
                     "Confirmer le mot de passe", type="password", key="signup_confirm",
                     icon=":material/lock:", placeholder="••••••••",
                 )
+                accept_tos = st.checkbox(
+                    "J'accepte les CGU et la Politique de confidentialité", key="signup_accept_tos"
+                )
                 submitted_signup = st.form_submit_button("Créer mon compte", use_container_width=True)
             if submitted_signup:
                 if not new_email or not new_password:
@@ -2796,6 +3729,10 @@ def render_auth_forms() -> None:
                     st.session_state["auth_error"] = "Les mots de passe ne correspondent pas."
                 elif len(new_password) < 8:
                     st.session_state["auth_error"] = "Le mot de passe doit contenir au moins 8 caractères."
+                elif not accept_tos:
+                    st.session_state["auth_error"] = (
+                        "Merci d'accepter les CGU et la Politique de confidentialité pour continuer."
+                    )
                 else:
                     sign_up(new_email, new_password)
 
@@ -2825,11 +3762,12 @@ def render_auth_forms() -> None:
                     if is_logged_in():
                         st.rerun()
 
-            col_spacer, col_forgot = st.columns([2, 1])
-            with col_forgot:
-                if st.button("Mot de passe oublié ?", key="forgot_password_link", use_container_width=True):
-                    st.session_state["show_forgot_password"] = True
-                    st.rerun()
+            # Bouton pleine largeur (plus de colonne étroite qui tronquait
+            # visuellement le texte) : voir .st-key-forgot_password_link
+            # dans le CSS pour son style "lien discret".
+            if st.button("Mot de passe oublié ?", key="forgot_password_link", use_container_width=True):
+                st.session_state["show_forgot_password"] = True
+                st.rerun()
 
             st.markdown('<div class="mm-auth-divider">ou</div>', unsafe_allow_html=True)
             if st.button("Créer un compte", key="switch_to_signup", use_container_width=True):
@@ -2905,17 +3843,134 @@ def _fix_protocol_relative_url(url: str) -> str:
     return url
 
 
-def _extract_product_from_html(html_text: str) -> dict | None:
-    """Extrait les donnees REELLES du produit depuis le JSON-LD
-    (schema.org/Product) de la page : name, image, offers.price,
-    offers.priceCurrency, aggregateRating.ratingValue, et les frais de
-    port reels s'ils sont presents (offers.shippingDetails.shippingRate).
-    Repli sur les balises <meta> OpenGraph (titre/image uniquement,
-    egalement des donnees reelles) si le JSON-LD est absent ou incomplet.
-    Retourne None si aucune source n'a donne au moins un titre ET un prix
-    exploitables -- jamais de valeur inventee."""
-    soup = BeautifulSoup(html_text, "html.parser") if BeautifulSoup is not None else None
+def _is_valid_aliexpress_url(url: str) -> bool:
+    """Verifie que l'URL pointe bien vers un domaine aliexpress.* --
+    jamais un domaine externe inattendu (tracking, redirection tierce,
+    etc.). Utilise avant d'afficher tout bouton "Voir sur AliExpress" :
+    un lien qui echoue ce test n'est jamais affiche (voir
+    render_aliexpress_link_button), plutot que de risquer d'envoyer
+    l'utilisateur ailleurs que sur le produit reel."""
+    if not url:
+        return False
+    try:
+        host = urlparse(url).netloc.lower()
+    except Exception:
+        return False
+    if not host:
+        return False
+    return host == "aliexpress.com" or host.endswith(".aliexpress.com")
 
+
+def _resolve_product_url(product_id: str | None, source_url: str, api_url: str | None = None) -> str:
+    """Construit l'URL produit EXACTE a afficher, dans l'ordre de
+    priorite demande :
+    1. Une URL produit exacte deja renvoyee par l'API (si presente et
+       valide).
+    2. Une URL canonique construite a partir du product_id connu
+       (https://www.aliexpress.com/item/<id>.html) -- la plus fiable
+       puisqu'elle ne depend d'aucun contenu de page tiers.
+    3. L'URL source (celle du scraper/de la recherche), si elle est deja
+       une URL produit AliExpress valide.
+    Retourne "" (chaine vide) si aucune des trois n'est exploitable --
+    l'appelant doit alors afficher "Lien produit indisponible" plutot que
+    d'inventer un lien (voir render_aliexpress_link_button)."""
+    if api_url and _is_valid_aliexpress_url(api_url):
+        return api_url
+    if product_id:
+        return f"https://www.aliexpress.com/item/{product_id}.html"
+    if source_url and _is_valid_aliexpress_url(source_url):
+        return source_url
+    return ""
+
+
+def _extract_balanced_json_after(html_text: str, marker: str) -> dict | None:
+    """Trouve `marker` dans le HTML puis extrait l'objet JSON qui suit
+    (ex: "window.runParams = {...};") en comptant les accolades pour
+    trouver la fin exacte -- une simple regex non-greedy echoue des que le
+    JSON contient lui-meme des accolades imbriquees (quasi systematique
+    pour ce type de blob cote client). Ignore les accolades a l'interieur
+    de chaines (guillemets simples/doubles, echappement gere). Retourne
+    None si le marqueur est absent, le JSON mal forme, ou non trouvable --
+    jamais d'exception."""
+    idx = html_text.find(marker)
+    if idx == -1:
+        return None
+    start = html_text.find("{", idx)
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    quote_char = ""
+    for i in range(start, len(html_text)):
+        ch = html_text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == quote_char:
+                in_string = False
+        else:
+            if ch in ('"', "'"):
+                in_string = True
+                quote_char = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(html_text[start:i + 1])
+                    except Exception:
+                        return None
+    return None
+
+
+def _first_number(*values) -> float | None:
+    """Retourne la premiere valeur convertible en float parmi `values`
+    (ordre de priorite), None si aucune ne l'est -- jamais d'exception."""
+    for value in values:
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _detect_free_shipping_text(html_text: str) -> bool:
+    """Repli texte visible (source E, voir point 2) : detecte une mention
+    explicite de livraison gratuite quand aucune structure JSON n'a permis
+    de le confirmer. Ne detecte QUE la gratuite -- jamais un montant
+    (trop peu fiable en texte libre, voir _extract_price_from_visible_text
+    qui reste volontairement limite au prix)."""
+    return bool(re.search(r"livraison\s+gratuite|free\s+shipping", html_text, re.IGNORECASE))
+
+
+def _extract_price_from_visible_text(html_text: str) -> float | None:
+    """Dernier repli (source E) : cherche un montant en euros dans le HTML
+    visible quand JSON embarque, JSON-LD et OpenGraph ont tous echoue.
+    Volontairement fragile-mais-honnete : ne retourne que le premier
+    montant plausible trouve, jamais une fourchette (le texte libre ne
+    permet pas de distinguer fiablement min/max de variantes)."""
+    match = re.search(r"(\d{1,4}(?:[.,]\d{2}))\s*€", html_text)
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _parse_json_ld_product(html_text: str, soup) -> dict | None:
+    """Source B (JSON-LD schema.org/Product) : name, image, offers.price,
+    offers.priceCurrency, aggregateRating, et les frais de port reels
+    s'ils sont presents (offers.shippingDetails.shippingRate). Un prix
+    dans une devise non-EUR est ignore comme valeur de calcul (jamais de
+    taux de change invente) mais reste consultable via `currency`/`price`
+    -- voir _extract_product_from_html qui gere ce cas en aval."""
     if soup is not None:
         ld_json_blocks = [script.string or "" for script in soup.find_all("script", type="application/ld+json")]
     else:
@@ -2924,7 +3979,6 @@ def _extract_product_from_html(html_text: str) -> dict | None:
             html_text,
             re.DOTALL | re.IGNORECASE,
         )
-
     for raw_block in ld_json_blocks:
         try:
             data = json.loads(raw_block or "")
@@ -2941,37 +3995,47 @@ def _extract_product_from_html(html_text: str) -> dict | None:
             if isinstance(offers, list):
                 offers = offers[0] if offers else {}
             offers = offers or {}
-            price = offers.get("price") or offers.get("lowPrice")
+            price_raw = offers.get("price") or offers.get("lowPrice")
             price_currency = str(offers.get("priceCurrency") or "EUR").upper()
-            if price_currency != "EUR":
-                # Le calculateur de marge MargeMax raisonne en euros (TVA
-                # FR, prix conseille, etc.) : un prix dans une autre devise
-                # utilise tel quel fausserait silencieusement la marge.
-                continue
             rating_block = item.get("aggregateRating") or {}
             shipping_details = offers.get("shippingDetails") or {}
             shipping_rate = (shipping_details.get("shippingRate") or {}).get("value")
-            if name and price:
+            if not name:
+                continue
+            result: dict = {"title": str(name), "image": _fix_protocol_relative_url(str(image or ""))}
+            if price_raw:
                 try:
-                    return {
-                        "title": str(name),
-                        "image": _fix_protocol_relative_url(str(image or "")),
-                        "price": float(price),
-                        "vendor_rating": (
-                            min(1.0, max(0.0, float(rating_block["ratingValue"]) / 5))
-                            if rating_block.get("ratingValue")
-                            else None
-                        ),
-                        "orders": (
-                            int(float(rating_block["reviewCount"]))
-                            if rating_block.get("reviewCount")
-                            else None
-                        ),
-                        "shipping": float(shipping_rate) if shipping_rate is not None else None,
-                    }
+                    result["price_raw"] = float(price_raw)
+                    result["currency"] = price_currency
+                    if price_currency == "EUR":
+                        result["price"] = float(price_raw)
                 except (TypeError, ValueError):
-                    continue
+                    pass
+            if rating_block.get("ratingValue"):
+                try:
+                    result["vendor_rating"] = min(1.0, max(0.0, float(rating_block["ratingValue"]) / 5))
+                except (TypeError, ValueError):
+                    pass
+            if rating_block.get("reviewCount"):
+                try:
+                    result["orders"] = int(float(rating_block["reviewCount"]))
+                except (TypeError, ValueError):
+                    pass
+            if shipping_rate is not None:
+                try:
+                    result["shipping"] = float(shipping_rate)
+                    result["shipping_free"] = float(shipping_rate) == 0
+                except (TypeError, ValueError):
+                    pass
+            return result
+    return None
 
+
+def _parse_og_meta(html_text: str, soup) -> dict | None:
+    """Source D (meta / OpenGraph) : titre, image, prix si expose via
+    product:price:amount / og:price:amount. Pas d'hypothese de devise
+    (og:price:currency absent la plupart du temps sur AliExpress) --
+    utilise tel quel comme les versions precedentes de ce parseur."""
     def meta(prop: str) -> str | None:
         if soup is not None:
             tag = soup.find("meta", property=prop) or soup.find("meta", attrs={"name": prop})
@@ -2991,33 +4055,453 @@ def _extract_product_from_html(html_text: str) -> dict | None:
         return match.group(1) if match else None
 
     og_title = meta("og:title")
+    if not og_title:
+        return None
+    result: dict = {"title": og_title, "image": _fix_protocol_relative_url(meta("og:image") or "")}
     og_price = meta("product:price:amount") or meta("og:price:amount")
-    if og_title and og_price:
+    if og_price:
         try:
-            return {
-                "title": og_title,
-                "image": _fix_protocol_relative_url(meta("og:image") or ""),
-                "price": float(og_price),
-                "vendor_rating": None,
-                "orders": None,
-                "shipping": None,
-            }
+            result["price"] = float(og_price)
         except (TypeError, ValueError):
             pass
+    return result
 
+
+def _parse_aliexpress_embedded_json(embedded: dict) -> dict:
+    """Source A/C (JSON embarque cote client, ex: window.runParams) :
+    priceModule (prix courant/promo + devise), skuModule (variantes avec
+    prix/stock par SKU), imageModule, titleModule, shippingModule
+    (livraison si presente), feedbackModule (note/commandes).
+
+    Le schema exact de ce JSON n'est pas documente publiquement par
+    AliExpress et varie selon les versions de page -- CE PARSEUR EST UNE
+    IMPLEMENTATION DEFENSIVE BASEE SUR LA STRUCTURE PUBLIQUEMENT OBSERVEE
+    (plusieurs integrations tierces documentent ces noms de module), non
+    verifiee en direct dans cette session (aucun appel reseau reel vers
+    AliExpress n'y est fait ici). Chaque section est independante : un
+    module absent ou renomme n'empeche jamais l'extraction des autres
+    (voir le diagnostic admin qui expose la source reelle utilisee par
+    champ -- point 1)."""
+    out: dict = {}
+    data = embedded.get("data", embedded) if isinstance(embedded, dict) else {}
+    if not isinstance(data, dict):
+        return out
+
+    title_module = data.get("titleModule") or {}
+    if isinstance(title_module, dict) and title_module.get("subject"):
+        out["title"] = str(title_module["subject"])
+
+    image_module = data.get("imageModule") or {}
+    if isinstance(image_module, dict):
+        images = image_module.get("imagePathList") or []
+        if images:
+            out["image"] = _fix_protocol_relative_url(str(images[0]))
+            out["image_gallery"] = [_fix_protocol_relative_url(str(u)) for u in images[1:5]]
+
+    price_module = data.get("priceModule") or {}
+    if isinstance(price_module, dict):
+        currency = (
+            (price_module.get("minAmount") or {}).get("currency")
+            or (price_module.get("maxAmount") or {}).get("currency")
+            or price_module.get("currencyCode")
+        )
+        min_amount = _first_number(
+            (price_module.get("minActivityAmount") or {}).get("value"),
+            (price_module.get("minAmount") or {}).get("value"),
+        )
+        max_amount = _first_number(
+            (price_module.get("maxActivityAmount") or {}).get("value"),
+            (price_module.get("maxAmount") or {}).get("value"),
+        )
+        if currency:
+            out["currency"] = str(currency).upper()
+        if min_amount is not None:
+            out["price_raw"] = min_amount
+            if not currency or str(currency).upper() == "EUR":
+                out["price"] = min_amount
+                if max_amount is not None and max_amount != min_amount:
+                    out["price_max"] = max_amount
+
+    sku_module = data.get("skuModule") or {}
+    variants: list[dict] = []
+    if isinstance(sku_module, dict):
+        label_by_value_id: dict[str, str] = {}
+        for prop in (sku_module.get("productSKUPropertyList") or []):
+            for val in (prop.get("skuPropertyValues") or prop.get("values") or []):
+                value_id = str(val.get("propertyValueId") or val.get("valueId") or "")
+                display = val.get("propertyValueDisplayName") or val.get("valueName") or val.get("name")
+                if value_id and display:
+                    label_by_value_id[value_id] = str(display)
+        for sku_entry in (sku_module.get("skuPriceList") or []):
+            sku_val = sku_entry.get("skuVal") or {}
+            amount = _first_number(
+                (sku_val.get("skuActivityAmount") or {}).get("value"),
+                (sku_val.get("skuAmount") or {}).get("value"),
+            )
+            attr = str(sku_entry.get("skuAttr") or sku_entry.get("skuPropIds") or "")
+            value_ids = re.findall(r":(\d+)(?:;|$)", attr) if attr else []
+            label_parts = [label_by_value_id[v] for v in value_ids if v in label_by_value_id]
+            variants.append({
+                "id": str(sku_entry.get("skuId") or attr or len(variants)),
+                "label": " / ".join(label_parts) if label_parts else (attr or f"Variante {len(variants) + 1}"),
+                "price": amount,
+                "stock": sku_val.get("availQuantity"),
+                "image": None,
+            })
+    if variants:
+        out["variants"] = variants
+
+    shipping_module = data.get("shippingModule") or {}
+    if isinstance(shipping_module, dict):
+        general = shipping_module.get("generalFreightInfo") or {}
+        shipping_amount = None
+        for entry in (general.get("originalLayoutResultList") or []):
+            biz = entry.get("bizData") or entry
+            amount = _first_number((biz.get("freightAmount") or {}).get("value"))
+            if amount is not None:
+                shipping_amount = amount
+                break
+        if shipping_amount is not None:
+            out["shipping"] = shipping_amount
+            out["shipping_free"] = shipping_amount == 0
+        elif shipping_module.get("freeShipping") or shipping_module.get("isFreeShipping"):
+            out["shipping"] = 0.0
+            out["shipping_free"] = True
+
+    feedback_module = data.get("feedbackModule") or {}
+    if isinstance(feedback_module, dict):
+        rating_raw = feedback_module.get("averageStar") or feedback_module.get("evarageStar")
+        if rating_raw is not None:
+            try:
+                out["vendor_rating"] = min(1.0, max(0.0, float(rating_raw) / 5))
+            except (TypeError, ValueError):
+                pass
+        orders_raw = feedback_module.get("totalValidNum")
+        if orders_raw is not None:
+            try:
+                out["orders"] = int(re.sub(r"[^\d]", "", str(orders_raw)) or 0)
+            except (TypeError, ValueError):
+                pass
+
+    return out
+
+
+ALIEXPRESS_EMBEDDED_JSON_MARKERS = ("window.runParams", "window.__INIT_DATA__", "window._dida_config_")
+
+
+def _extract_product_from_html(html_text: str) -> dict | None:
+    """Extrait les donnees REELLES d'une page produit AliExpress en
+    combinant PLUSIEURS sources, dans cet ordre de priorite (voir point 2) :
+    A/C. JSON embarque cote client (window.runParams ou equivalent) --
+         prix courant/promo, devise, variantes/SKU, livraison, note,
+         commandes -- voir _parse_aliexpress_embedded_json.
+    B. JSON-LD (schema.org/Product) -- voir _parse_json_ld_product.
+    D. meta / OpenGraph -- voir _parse_og_meta.
+    E. HTML visible -- livraison gratuite textuelle + prix en dernier
+       recours seulement.
+
+    Chaque champ est rempli par la PREMIERE source (dans cet ordre) qui le
+    fournit reellement -- une source qui echoue sur un champ ne bloque
+    jamais les suivantes. `_field_sources` trace la source retenue par
+    champ, utilise par le diagnostic admin (point 1). Retourne None si
+    aucune source n'a donne au moins un titre exploitable -- jamais de
+    valeur inventee pour un champ absent partout (prix/livraison restent
+    None, voir _build_result)."""
+    soup = BeautifulSoup(html_text, "html.parser") if BeautifulSoup is not None else None
+
+    result: dict = {}
+    field_sources: dict[str, str] = {}
+    mergeable_fields = (
+        "title", "image", "image_gallery", "price", "price_max", "price_raw", "currency",
+        "shipping", "shipping_free", "variants", "vendor_rating", "orders",
+    )
+
+    def _fill(candidate: dict | None, source_label: str) -> None:
+        if not candidate:
+            return
+        for field in mergeable_fields:
+            value = candidate.get(field)
+            if value in (None, "", []):
+                continue
+            if result.get(field) in (None, "", []):
+                result[field] = value
+                field_sources[field] = source_label
+
+    for marker in ALIEXPRESS_EMBEDDED_JSON_MARKERS:
+        embedded = _extract_balanced_json_after(html_text, marker)
+        if embedded:
+            _fill(_parse_aliexpress_embedded_json(embedded), "JSON embarqué (window.runParams)")
+            break
+
+    _fill(_parse_json_ld_product(html_text, soup), "JSON-LD (schema.org)")
+    _fill(_parse_og_meta(html_text, soup), "OpenGraph / meta")
+
+    if result.get("shipping") is None and _detect_free_shipping_text(html_text):
+        result["shipping"] = 0.0
+        result["shipping_free"] = True
+        field_sources["shipping"] = "HTML visible (texte)"
+
+    if result.get("price") is None:
+        text_price = _extract_price_from_visible_text(html_text)
+        if text_price is not None:
+            result["price"] = text_price
+            field_sources["price"] = "HTML visible (texte)"
+
+    if not result.get("title"):
+        return None
+
+    result.setdefault("image", "")
+    result.setdefault("image_gallery", [])
+    result.setdefault("price", None)
+    result.setdefault("price_max", None)
+    result.setdefault("price_raw", None)
+    result.setdefault("currency", None)
+    result.setdefault("shipping", None)
+    result.setdefault("shipping_free", False)
+    result.setdefault("variants", [])
+    result.setdefault("vendor_rating", None)
+    result.setdefault("orders", None)
+    result["_field_sources"] = field_sources
+    return result
+
+
+ALIEXPRESS_URL_ID_PATTERNS = (
+    re.compile(r"/item/(?:.*-)?(\d{6,})\.html", re.IGNORECASE),
+    re.compile(r"[?&]product_id=(\d{6,})", re.IGNORECASE),
+    re.compile(r"[?&]productI[dD]s?=(\d{6,})", re.IGNORECASE),  # productId=, productIds=, productID=
+    re.compile(r"aliexpress\.[a-z.]+/(?:.*/)?(\d{9,})(?:[/.?]|$)", re.IGNORECASE),
+)
+
+
+def extract_aliexpress_product_id(text: str) -> str | None:
+    """Detecte un ID produit dans un lien AliExpress colle, quel que soit
+    son format : /item/123456.html, ?productId=123456, ?productIds=123456
+    (y compris sur des pages /ssr/.../BundleDealsDutyCovered?...), ou
+    ?product_id=123456 -- ou un ID numerique AliExpress colle brut (ex:
+    "1005012233337210"), traite directement comme product_id, jamais comme
+    un mot-cle. Si un ID est trouve, l'appelant peut interroger directement
+    aliexpress.ds.product.get plutot que de scraper toute la page (voir
+    search_product)."""
+    text = text.strip()
+    if text.isdigit() and len(text) >= 6:
+        return text
+    if "aliexpress." not in text.lower():
+        return None
+    for pattern in ALIEXPRESS_URL_ID_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(1)
     return None
 
 
-def scrape_aliexpress_product(url: str, session: requests.Session | None = None) -> dict | None:
-    """Scrape une page produit AliExpress publique. Ne leve jamais
-    d'exception : retourne None si la page est inaccessible ou si aucune
-    donnee reelle exploitable n'a pu etre extraite."""
-    if not url.lower().startswith("http"):
-        url = "https://" + url
-    html_text = _fetch_html(url, session=session)
-    if not html_text:
+def _extract_top_response_root(payload: dict) -> dict:
+    """Certaines reponses AliExpress enveloppent le resultat dans une cle
+    '<methode>_response' (convention heritee du Gateway TOP historique) --
+    on la deballe si presente, sinon on retourne le payload tel quel (le
+    Gateway REST/IOP /sync ne l'utilise pas forcement)."""
+    return next((v for k, v in payload.items() if k.endswith("_response")), payload)
+
+
+def _call_aliexpress_sync_api(method: str, extra_params: dict) -> tuple[dict | None, dict]:
+    """Appelle le Gateway REST/IOP AliExpress (api-sg.aliexpress.com/sync)
+    -- la MEME famille de gateway que /auth/token/create, confirmee
+    fonctionnelle en direct avec l'AppKey 544130 (echange de token OAuth
+    reussi). Le Gateway TOP historique (eco.taobao.com/router/rest, ancien
+    ALIEXPRESS_GATEWAY) a ete abandonne : teste en production, il renvoie
+    "isv.appkey-not-exists" (code 29) pour cette AppKey -- preuve concrete
+    qu'elle n'existe pas sur cette plateforme-la (differente famille
+    d'App Key qu'AliExpress ne fait pas interoperer). Signature HMAC-SHA256
+    (voir _sign_top_rest), pas HMAC-MD5.
+
+    Retourne TOUJOURS (data_ou_None, diagnostic) : diagnostic contient
+    gateway/method/http_status/code/sub_code/msg/duree_secondes, meme en
+    cas d'echec -- utilise par le bouton de test isole admin (voir
+    render_account_page) et par le diagnostic de recherche."""
+    started = time.time()
+    diagnostic: dict = {
+        "gateway": ALIEXPRESS_SYNC_GATEWAY,
+        "method": method,
+        "http_status": None,
+        "code": None,
+        "sub_code": None,
+        "msg": None,
+        "duree_secondes": None,
+    }
+    if not ALIEXPRESS_APP_SECRET:
+        diagnostic["msg"] = "ALIEXPRESS_APP_SECRET vide."
+        return None, diagnostic
+    access_token = get_app_config("aliexpress_access_token")
+    if not access_token:
+        diagnostic["msg"] = "Aucun token OAuth AliExpress enregistré — autorise l'app dans Mon Compte (admin)."
+        return None, diagnostic
+
+    params = {
+        "app_key": ALIEXPRESS_APP_KEY,
+        "method": method,
+        "access_token": access_token,
+        "sign_method": "sha256",
+        "timestamp": str(int(time.time() * 1000)),
+        **extra_params,
+    }
+    params["sign"] = _sign_top_rest("/sync", params, ALIEXPRESS_APP_SECRET)
+
+    try:
+        # Timeout court et delibere (voir point 6) : un echec d'API doit
+        # echouer vite, jamais retenter plusieurs fois par candidat.
+        response = requests.post(ALIEXPRESS_SYNC_GATEWAY, data=params, timeout=10)
+        diagnostic["http_status"] = response.status_code
+        data = response.json()
+    except Exception as exc:
+        diagnostic["msg"] = f"{type(exc).__name__}: {exc}"
+        diagnostic["duree_secondes"] = round(time.time() - started, 2)
+        return None, diagnostic
+
+    diagnostic["duree_secondes"] = round(time.time() - started, 2)
+    error_block = data.get("error_response") or ({"code": data.get("code"), "sub_code": data.get("sub_code"), "msg": data.get("msg")} if data.get("code") else None)
+    if error_block:
+        diagnostic["code"] = error_block.get("code")
+        diagnostic["sub_code"] = error_block.get("sub_code")
+        diagnostic["msg"] = error_block.get("msg") or error_block.get("message")
+        return None, diagnostic
+
+    return data, diagnostic
+
+
+def aliexpress_ds_product_get(product_id: str) -> tuple[dict | None, dict]:
+    """aliexpress.ds.product.get via le Gateway REST/IOP -- fiche produit
+    via l'API officielle (necessite un access_token OAuth valide). A
+    tenter en priorite avant tout scraping des qu'un token est disponible
+    et qu'un product_id a pu etre extrait de l'URL (voir
+    extract_aliexpress_product_id). aliexpress.affiliate.product.query
+    n'est PAS utilisee tant que la permission Affiliate n'est pas activee
+    sur l'app cote console AliExpress."""
+    return _call_aliexpress_sync_api(
+        "aliexpress.ds.product.get",
+        {
+            "product_id": product_id,
+            "ship_to_country": "FR",
+            "target_currency": "EUR",
+            "target_language": "FR",
+        },
+    )
+
+
+def _parse_ds_product_get(payload: dict) -> dict | None:
+    """Extraction defensive de la reponse aliexpress.ds.product.get --
+    les noms de champs exacts ne sont pas garantis sans avoir observe une
+    vraie reponse en production (voir le diagnostic admin dans Mon
+    Compte, qui affiche le JSON brut du dernier appel). Plusieurs noms de
+    champs candidats sont tentes ; tout echec retourne None plutot que de
+    fabriquer une donnee.
+
+    Meme forme de champs que _extract_product_from_html (title, image,
+    price, price_max, currency, shipping, variants, vendor_rating,
+    orders) pour permettre une fusion uniforme des deux sources (voir
+    _merge_product_sources -- point 5). aliexpress.ds.product.get ne
+    renvoie generalement PAS les frais de port reels (necessite un appel
+    de fret separe, hors perimetre ici) : `shipping` reste None depuis
+    cette source, comble le cas echeant par le scraper (point 5)."""
+    try:
+        root = _extract_top_response_root(payload)
+        data = root.get("result", root)
+        item = data.get("ae_item_base_info_dto", data)
+
+        def first_of(*keys, default=None):
+            for key in keys:
+                value = item.get(key)
+                if value not in (None, ""):
+                    return value
+                value = data.get(key)
+                if value not in (None, ""):
+                    return value
+            return default
+
+        title = first_of("subject", "product_title", "title")
+        price_raw = first_of("sale_price", "target_sale_price", "app_sale_price", "min_price")
+        price_max_raw = first_of("max_price")
+        currency = first_of("currency_code", "sale_price_currency")
+        image = first_of("product_main_image_url", "image_url", "main_image")
+        if not title:
+            return None
+        # Prix optionnel (voir point 5/7) : un candidat avec titre+image
+        # mais sans prix exploitable est quand meme retourne -- price=None,
+        # affiche "Non disponible" plutot que d'etre abandonne.
+        try:
+            price = float(price_raw) if price_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            price = None
+        try:
+            price_max = float(price_max_raw) if price_max_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            price_max = None
+
+        result = {
+            "title": str(title),
+            "image": _fix_protocol_relative_url(str(image or "")),
+            "price": price,
+        }
+        if currency:
+            result["currency"] = str(currency).upper()
+        if price_max is not None and price_max != price:
+            result["price_max"] = price_max
+        api_url = first_of("product_detail_url", "product_url", "detail_url")
+        if api_url:
+            result["product_url"] = str(api_url)
+        rating_raw = first_of("evaluate_rate", "avg_evaluation_rating")
+        if rating_raw is not None:
+            rating_str = str(rating_raw).replace("%", "")
+            try:
+                rating_val = float(rating_str)
+                result["vendor_rating"] = min(1.0, max(0.0, rating_val / (100 if rating_val > 5 else 1)))
+            except ValueError:
+                pass
+        orders_raw = first_of("volume", "lastest_volume", "sales_count")
+        if orders_raw is not None:
+            try:
+                result["orders"] = int(float(orders_raw))
+            except ValueError:
+                pass
+
+        # Variantes/SKU (point 8) : schema le plus couramment documente
+        # pour aliexpress.ds.product.get. Une entree sans prix/attributs
+        # exploitables est simplement ignoree plutot que de faire echouer
+        # tout le parsing.
+        variants: list[dict] = []
+        sku_list = data.get("ae_item_sku_info_dtos") or item.get("ae_item_sku_info_dtos") or []
+        if isinstance(sku_list, dict):
+            sku_list = sku_list.get("ae_item_sku_info_d_t_o") or []
+        for sku in sku_list if isinstance(sku_list, list) else []:
+            if not isinstance(sku, dict):
+                continue
+            try:
+                sku_price = float(sku.get("offer_sale_price") or sku.get("sku_price") or 0) or None
+            except (TypeError, ValueError):
+                sku_price = None
+            attrs = sku.get("ae_sku_property_dtos") or {}
+            attr_list = attrs.get("ae_sku_property_d_t_o") if isinstance(attrs, dict) else attrs
+            label_parts = [
+                str(a.get("property_value_definition_name") or a.get("sku_property_value") or "")
+                for a in (attr_list or []) if isinstance(a, dict)
+            ]
+            label_parts = [p for p in label_parts if p]
+            stock_raw = sku.get("sku_available_stock")
+            try:
+                stock = int(stock_raw) if stock_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                stock = None
+            variants.append({
+                "id": str(sku.get("sku_id") or len(variants)),
+                "label": " / ".join(label_parts) if label_parts else f"Variante {len(variants) + 1}",
+                "price": sku_price,
+                "stock": stock,
+                "image": None,
+            })
+        if variants:
+            result["variants"] = variants
+
+        return result
+    except Exception:
         return None
-    return _extract_product_from_html(html_text)
 
 
 def _scraperapi_fetch(target_url: str, render: bool = True) -> str | None:
@@ -3033,50 +4517,67 @@ def _scraperapi_fetch(target_url: str, render: bool = True) -> str | None:
     d'echec reseau : c'est ce None que search_product utilise pour
     basculer proprement sur l'analyse par URL directe."""
     if not SCRAPER_API_KEY:
+        st.session_state["mm_last_scraperapi_error"] = "SCRAPER_API_KEY absente des secrets."
         return None
     try:
         response = requests.get(
             "https://api.scraperapi.com",
             params={"api_key": SCRAPER_API_KEY, "url": target_url, "render": "true" if render else "false"},
-            timeout=70,  # le rendu JS cote ScraperAPI est nettement plus lent qu'un fetch direct
+            # Timeout borne pour eviter les attentes de 20-60s+ sur une
+            # recherche : render=true (page produit, JS execute) reste plus
+            # lent qu'un fetch simple mais est plafonne ; render=false (page
+            # de resultats Google, pas de JS necessaire) est nettement plus rapide.
+            timeout=35 if render else 20,
         )
         if response.status_code != 200 or not response.text:
+            st.session_state["mm_last_scraperapi_error"] = (
+                f"HTTP {response.status_code} sur {target_url[:120]}"
+            )
             return None
+        st.session_state["mm_last_scraperapi_error"] = None
         return response.text
-    except Exception:
+    except Exception as exc:
+        st.session_state["mm_last_scraperapi_error"] = f"{type(exc).__name__}: {exc}"
         return None
 
 
-def scraperapi_google_find_product_url(keyword: str) -> str | None:
+def scraperapi_google_find_product_urls(keyword: str, limit: int = 3) -> list[str]:
     """Recherche `keyword` sur Google (site:aliexpress.com/item) via
     ScraperAPI comme proxy -- Google bloque les requetes scriptees
     directes, ScraperAPI sert d'intermediaire. Remplace le scraping direct
     de la page /wholesale d'AliExpress (abandonne : son contenu produit
     est charge en JS cote client, un simple fetch ne le voit jamais, voir
-    _extract_product_from_html). Retourne la premiere URL produit
-    AliExpress trouvee dans les resultats Google, ou None si la cle API
-    est absente, si ScraperAPI est en erreur/quota depasse, ou si aucun
-    resultat exploitable n'est trouve. Une page de resultats Google
-    n'a pas besoin d'etre rendue en JS pour que ses liens apparaissent
-    (render=false, plus rapide et moins couteux en credits)."""
+    _extract_product_from_html). Retourne jusqu'a `limit` URLs produit
+    AliExpress distinctes trouvees dans les resultats Google -- liste vide
+    si la cle API est absente, si ScraperAPI est en erreur/quota depasse,
+    ou si aucun resultat exploitable n'est trouve. Une page de resultats
+    Google n'a pas besoin d'etre rendue en JS pour que ses liens
+    apparaissent (render=false, plus rapide et moins couteux en credits)."""
     if not SCRAPER_API_KEY:
-        return None
+        return []
     google_url = f"https://www.google.com/search?q=site:aliexpress.com/item+{requests.utils.quote(keyword)}"
     html_text = _scraperapi_fetch(google_url, render=False)
     if not html_text:
-        return None
-    direct_match = re.search(r'https?://[a-zA-Z0-9.]*aliexpress\.[a-z.]+/item/[^\s"&<>]+', html_text)
-    if direct_match:
-        return direct_match.group(0)
+        return []
+    urls: list[str] = []
+    for match in re.finditer(r'https?://[a-zA-Z0-9.]*aliexpress\.[a-z.]+/item/[^\s"&<>]+', html_text):
+        url = match.group(0)
+        if url not in urls:
+            urls.append(url)
+        if len(urls) >= limit:
+            return urls
     # Repli : certaines mises en page Google encapsulent encore le lien
     # organique dans une redirection "/url?q=<url encodee>&...".
-    wrapped_match = re.search(r'/url\?q=(https?%3A%2F%2F[^&"]*aliexpress[^&"]*%2Fitem%2F[^&"]*)', html_text)
-    if wrapped_match:
-        return unquote(wrapped_match.group(1))
-    return None
+    for match in re.finditer(r'/url\?q=(https?%3A%2F%2F[^&"]*aliexpress[^&"]*%2Fitem%2F[^&"]*)', html_text):
+        url = unquote(match.group(1))
+        if url not in urls:
+            urls.append(url)
+        if len(urls) >= limit:
+            break
+    return urls
 
 
-def duckduckgo_find_aliexpress_url(keyword: str, session: requests.Session | None = None) -> str | None:
+def duckduckgo_find_aliexpress_urls(keyword: str, limit: int = 3, session: requests.Session | None = None) -> list[str]:
     """Repli quand SCRAPER_API_KEY est absente des secrets : scraping
     direct (sans proxy) de DuckDuckGo HTML pour ne jamais bloquer
     l'utilisateur. DuckDuckGo bloque frequemment ce type de requete
@@ -3093,107 +4594,415 @@ def duckduckgo_find_aliexpress_url(keyword: str, session: requests.Session | Non
             timeout=12,
         )
         if response.status_code not in (200, 202):
-            return None
+            st.session_state["mm_last_duckduckgo_error"] = f"HTTP {response.status_code}"
+            return []
+        urls: list[str] = []
         for match in re.finditer(r'href="([^"]*aliexpress\.[^"]*?/item/[^"]+)"', response.text):
             url = match.group(1)
             if url.startswith("//duckduckgo.com/l/") or "uddg=" in url:
                 continue  # lien de redirection DDG, pas une URL directe -- ignore plutot que decode
-            return url
-        return None
-    except Exception:
-        return None
+            if url not in urls:
+                urls.append(url)
+            if len(urls) >= limit:
+                break
+        if not urls:
+            st.session_state["mm_last_duckduckgo_error"] = (
+                "Aucun lien produit dans la réponse (probablement bloqué par le "
+                "challenge anti-bot 'anomaly-modal')."
+            )
+        else:
+            st.session_state["mm_last_duckduckgo_error"] = None
+        return urls
+    except Exception as exc:
+        st.session_state["mm_last_duckduckgo_error"] = f"{type(exc).__name__}: {exc}"
+        return []
 
 
-def scraperapi_scrape_product(url: str) -> dict | None:
-    """Scrape une page produit AliExpress via ScraperAPI (render=true) et
-    reutilise _extract_product_from_html telle quelle -- seule la methode
-    de recuperation du HTML change par rapport a scrape_aliexpress_product
-    (fetch direct)."""
-    html_text = _scraperapi_fetch(url, render=True)
-    if not html_text:
-        return None
-    return _extract_product_from_html(html_text)
+def _merge_product_sources(api_data: dict | None, scraped_data: dict | None) -> tuple[dict | None, dict]:
+    """Fusionne les donnees API officielle + scraper pour UN candidat
+    (point 5) : l'API est prioritaire champ par champ quand elle a une
+    valeur exploitable, le scraper comble le reste (typiquement la
+    livraison, l'API ds.product.get ne la fournissant generalement pas --
+    voir _parse_ds_product_get). Aucune des deux n'est jetee entierement
+    si l'autre echoue partiellement. Retourne (donnees_fusionnees,
+    source_par_champ) ; (None, {}) si ni l'une ni l'autre n'a de titre."""
+    fields = (
+        "title", "image", "image_gallery", "price", "price_max", "price_raw", "currency",
+        "shipping", "shipping_free", "variants", "vendor_rating", "orders", "product_url",
+    )
+    merged: dict = {}
+    field_sources: dict[str, str] = {}
+    scraped_field_sources = (scraped_data or {}).get("_field_sources", {})
+    for field in fields:
+        api_val = (api_data or {}).get(field)
+        if api_val not in (None, "", []):
+            merged[field] = api_val
+            field_sources[field] = "API AliExpress officielle"
+            continue
+        scraped_val = (scraped_data or {}).get(field)
+        if scraped_val not in (None, "", []):
+            merged[field] = scraped_val
+            field_sources[field] = scraped_field_sources.get(field, "ScraperAPI / scraping")
+    if not merged.get("title"):
+        return None, {}
+    return merged, field_sources
 
 
-def search_product(query: str) -> dict | None:
-    """Sourcing produit par parser web direct, uniquement a partir de
-    donnees reelles extraites d'AliExpress -- aucune generation
-    aleatoire/fictive de secours.
+def _scrape_one_candidate(url: str, prefer_scraperapi: bool, try_api: bool) -> dict:
+    """Recupere les donnees d'un candidat produit en combinant DEUX
+    sources quand c'est utile (point 5) :
+    1. L'API officielle aliexpress.ds.product.get si `try_api` (product_id
+       reconnaissable ET token OAuth disponible) -- prioritaire pour
+       prix/SKU/variantes.
+    2. Le scraping web (ScraperAPI si une cle est configuree, fetch direct
+       sinon) -- toujours tente en complement si l'API a echoue OU si elle
+       a reussi mais n'a pas fourni la livraison/les variantes (l'API
+       ds.product.get ne les expose pas toujours) : une SEULE recuperation
+       HTML par candidat (point 9), jamais une nouvelle recherche web.
 
-    - Analyse par lien direct : si `query` est deja un lien AliExpress, sa
-      page est scrapee directement en fetch simple (titre, prix, image,
-      frais de port reels si presents dans le JSON-LD).
-    - Recherche par mot-cle : recherche Google (site:aliexpress.com/item)
-      via ScraperAPI comme proxy si SCRAPER_API_KEY est configuree --
-      le scraping direct de la page /wholesale d'AliExpress est abandonne
-      (son contenu produit est charge en JS cote client, jamais visible
-      d'un simple fetch). Si aucune cle n'est configuree, repli sur un
-      scraping direct de DuckDuckGo HTML (non garanti : bloque en pratique
-      par son challenge anti-bot, mais tente plutot que d'abandonner
-      immediatement). La premiere URL produit trouvee est scrapee. Si
-      aucune des deux voies n'a produit de donnee reelle : bascule
-      proprement (st.session_state["mm_search_failed"]) sur l'interface
-      d'analyse par URL directe, sans jamais faire planter l'UI.
+    `try_api=False` permet de sauter l'appel API pour ce candidat --
+    utilise des qu'un echec definitif de l'API a deja ete observe dans
+    CETTE recherche (voir search_product : un appel qui echoue avec
+    isv.appkey-not-exists echouera identiquement pour tous les autres
+    candidats, inutile de le retenter 6 fois -- point 6).
 
-    Retourne None si aucune donnee reelle n'a pu etre extraite -- charge a
-    l'appelant (render_search_page) de ne pas debiter de credit ni
-    afficher de resultat dans ce cas."""
+    Retourne toujours un dict {"source": str|None, "data": dict|None,
+    "api_failed": bool, "api_diagnostic": dict|None, "diag": dict} -- ne
+    leve jamais d'exception (execute dans un thread via
+    ThreadPoolExecutor, voir search_product). `diag` porte le diagnostic
+    PAR PRODUIT demande au point 1 (source prix/livraison, prix brut,
+    devise, variante, erreurs API/HTML separees)."""
+    api_failed = False
+    api_diagnostic = None
+    api_data: dict | None = None
+    diag: dict = {
+        "product_id": extract_aliexpress_product_id(url),
+        "url": url,
+        "erreur_api": None,
+        "erreur_parsing_html": None,
+    }
+
+    if try_api:
+        product_id = diag["product_id"]
+        if product_id and get_app_config("aliexpress_access_token"):
+            try:
+                api_payload, api_diagnostic = aliexpress_ds_product_get(product_id)
+            except Exception as exc:
+                api_payload = None
+                api_diagnostic = {"msg": f"{type(exc).__name__}: {exc}"}
+            if api_payload:
+                api_data = _parse_ds_product_get(api_payload)
+            if not api_data:
+                api_failed = True
+                diag["erreur_api"] = (
+                    f"{(api_diagnostic or {}).get('code', '?')}/{(api_diagnostic or {}).get('sub_code', '?')} : "
+                    f"{(api_diagnostic or {}).get('msg', 'échec inconnu')}"
+                )
+
+    # Complement scraper : toujours tente si l'API n'a rien donne, ou si
+    # elle n'a pas fourni livraison/variantes (voir docstring). Reste UNE
+    # seule requete HTML pour ce candidat, jamais une re-recherche (point 9).
+    scraped: dict | None = None
+    needs_scraper = (
+        api_data is None
+        or api_data.get("shipping") is None
+        or not api_data.get("variants")
+    )
+    if needs_scraper:
+        try:
+            html_text = (
+                _scraperapi_fetch(url, render=True)
+                if prefer_scraperapi
+                else _fetch_html(url, session=_new_scrape_session())
+            )
+            if html_text:
+                scraped = _extract_product_from_html(html_text)
+                if scraped is None:
+                    diag["erreur_parsing_html"] = (
+                        "Aucune donnée exploitable trouvée dans le HTML (JSON embarqué, "
+                        "JSON-LD, OpenGraph et texte visible tous vides ou illisibles)."
+                    )
+            else:
+                diag["erreur_parsing_html"] = "Page produit inaccessible (récupération HTML échouée)."
+        except Exception as exc:
+            scraped = None
+            diag["erreur_parsing_html"] = f"{type(exc).__name__}: {exc}"
+
+    merged, field_sources = _merge_product_sources(api_data, scraped)
+    if merged:
+        merged["_price_source"] = field_sources.get("price")
+        merged["_shipping_source"] = field_sources.get("shipping")
+    diag["prix_source"] = field_sources.get("price")
+    diag["livraison_source"] = field_sources.get("shipping")
+    diag["prix_brut"] = (merged or {}).get("price_raw") or (merged or {}).get("price")
+    diag["devise"] = (merged or {}).get("currency")
+    diag["prix_normalise_eur"] = (merged or {}).get("price")
+    diag["livraison_brute"] = (merged or {}).get("shipping")
+    diag["variante_selectionnee"] = (
+        (merged or {}).get("variants", [{}])[0].get("label") if (merged or {}).get("variants") else None
+    )
+
+    if merged and api_data and scraped:
+        source_label = "API + ScraperAPI (fusion)"
+    elif merged and api_data:
+        source_label = "API AliExpress officielle"
+    elif merged and scraped:
+        source_label = "ScraperAPI (page produit)" if prefer_scraperapi else "Scraping direct"
+    else:
+        source_label = None
+
+    return {
+        "source": source_label, "data": merged, "api_failed": api_failed,
+        "api_diagnostic": api_diagnostic, "diag": diag,
+    }
+
+
+def search_product(query: str) -> list[dict]:
+    """Sourcing produit, uniquement a partir de donnees reelles -- aucune
+    generation aleatoire/fictive de secours. Retourne une liste de
+    resultats reels (triee par cout total croissant, marge potentielle
+    maximale en tete) ; liste vide si rien de reel n'a pu etre trouve.
+
+    - Analyse par lien direct OU par ID numerique brut ("1005012233337210") :
+      un seul candidat, jamais de passage par Google/DuckDuckGo/ScraperAPI
+      (voir extract_aliexpress_product_id -- gere /item/xxx.html,
+      productId=, productIds=, product_id=, y compris sur des pages
+      /ssr/.../BundleDealsDutyCovered, et les ID numeriques colles bruts).
+      Si un product_id est reconnaissable ET qu'un token OAuth AliExpress
+      est disponible, l'API officielle aliexpress.ds.product.get est
+      interrogee directement plutot que de scraper toute la page --
+      rapide, pas de recherche web inutile pour une cible deja connue.
+    - Recherche par mot-cle (le mode principal pour un utilisateur qui ne
+      connait pas les ID AliExpress) : jusqu'a 3 URLs produit candidates
+      via Google (site:aliexpress.com/item) par ScraperAPI si
+      SCRAPER_API_KEY est configuree (le scraping direct de la page
+      /wholesale d'AliExpress est abandonne : son contenu est charge en
+      JS cote client, invisible pour un simple fetch), avec repli sur
+      DuckDuckGo HTML direct sinon (non garanti : bloque en pratique par
+      son challenge anti-bot). Chaque candidat retente si possible l'API
+      officielle en priorite, comme pour l'analyse par lien direct.
+
+    Si rien de reel n'a pu etre recupere : st.session_state
+    ["mm_search_failed"] = True et ["mm_search_fail_text"] contient un
+    message adapte au contexte, sans jamais faire planter l'UI.
+
+    Un diagnostic complet (source utilisee, candidats, product_ids,
+    erreurs API/ScraperAPI/DuckDuckGo, duree) est toujours ecrit dans
+    st.session_state["mm_search_diagnostic"], affiche uniquement en mode
+    admin (voir render_search_page) -- jamais visible des clients."""
+    started_at = time.time()
     query = query.strip()
     st.session_state["mm_search_failed"] = False
     is_direct_link = "aliexpress." in query.lower()
+    is_numeric_id = query.isdigit() and len(query) >= 6
+    is_specific_target = is_direct_link or is_numeric_id
 
     if is_direct_link:
-        scraped = scrape_aliexpress_product(query, session=_new_scrape_session())
-        target_url = query
-        if not scraped:
-            st.session_state["mm_search_failed"] = True
-            st.session_state["mm_search_fail_text"] = (
-                "Impossible d'extraire les données réelles de ce lien. "
-                "Vérifie qu'il s'agit bien d'une URL produit AliExpress valide, ou réessaie."
-            )
-            return None
+        source = "Lien direct"
+        candidate_urls = [query]
+    elif is_numeric_id:
+        # ID AliExpress colle brut : jamais traite comme un mot-cle --
+        # URL produit canonique construite directement (voir search_product
+        # et le point 26 sur la construction du lien produit exact).
+        source = "ID direct"
+        candidate_urls = [f"https://www.aliexpress.com/item/{query}.html"]
+    elif SCRAPER_API_KEY:
+        source = "ScraperAPI (Google)"
+        candidate_urls = scraperapi_google_find_product_urls(query, limit=6)
     else:
-        if SCRAPER_API_KEY:
-            target_url = scraperapi_google_find_product_url(query)
-            scraped = scraperapi_scrape_product(target_url) if target_url else None
-        else:
-            target_url = duckduckgo_find_aliexpress_url(query)
-            scraped = scrape_aliexpress_product(target_url, session=_new_scrape_session()) if target_url else None
+        source = "DuckDuckGo"
+        candidate_urls = duckduckgo_find_aliexpress_urls(query, limit=6)
 
-        if not scraped:
-            st.session_state["mm_search_failed"] = True
-            st.session_state["mm_search_fail_text"] = (
-                "Aucun produit direct trouvé pour ce mot-clé. "
-                "Collez directement l'URL AliExpress du produit."
-            )
-            return None
+    # Dedoublonnage par product_id AVANT enrichissement (pas apres) pour ne
+    # jamais gaspiller un worker parallele sur un doublon connu. Puis
+    # plafonne le nombre de candidats reellement enrichis (point 6 --
+    # "limiter a 3-5 candidats lourds") : la decouverte peut en trouver
+    # jusqu'a 6, mais enrichir au-dela de 5 en parallele n'apporte rien et
+    # coute des credits ScraperAPI pour rien.
+    candidate_product_ids: list[str | None] = [extract_aliexpress_product_id(u) for u in candidate_urls]
+    dedup_urls: list[str] = []
+    seen_product_ids: set[str] = set()
+    for url, pid in zip(candidate_urls, candidate_product_ids):
+        if pid and pid in seen_product_ids:
+            continue
+        dedup_urls.append(url)
+        if pid:
+            seen_product_ids.add(pid)
+    MAX_CANDIDATES_TO_ENRICH = 5
+    urls_to_enrich = dedup_urls[:MAX_CANDIDATES_TO_ENRICH]
 
-    base_price = scraped["price"]
-    real_shipping = scraped.get("shipping")
-    shipping = real_shipping if real_shipping is not None else round(2.0 + base_price * 0.08, 2)
-    result = _build_result(
-        scraped["title"],
-        base_price,
-        shipping,
-        scraped.get("image", ""),
-        scraped.get("vendor_rating") if scraped.get("vendor_rating") is not None else 0.90,
-        scraped.get("orders") if scraped.get("orders") is not None else 500,
-        query,
-        target_url,
-        shipping_is_real=real_shipping is not None,
-    )
+    # Un candidat en echec ne doit jamais interrompre les suivants (voir
+    # point 34), et l'enrichissement de candidats independants est
+    # parallelise (point 6 -- 207s sequentiel etait inacceptable). Un
+    # threading.Event partage evite de retenter l'API officielle sur
+    # chaque candidat des qu'un echec definitif (isv.appkey-not-exists,
+    # etc.) a deja ete observe dans CETTE recherche : elle echouerait de
+    # la meme facon a chaque fois.
+    api_broken_event = threading.Event()
+    prefer_scraperapi = bool(SCRAPER_API_KEY)
+    scraped_pairs: list[tuple[dict, str]] = []
+    source_labels: list[str] = []
+    api_success_count = 0
+    api_attempted_count = 0
+    # Diagnostic PAR PRODUIT (point 1) : une entree par candidat enrichi,
+    # avec source prix/livraison, prix brut/devise, variante, erreurs API
+    # et HTML separees -- affiche uniquement dans l'expander admin.
+    per_product_diagnostics: list[dict] = []
+
+    def _worker(candidate_url: str) -> tuple[dict, str]:
+        return _scrape_one_candidate(
+            candidate_url, prefer_scraperapi=prefer_scraperapi, try_api=not api_broken_event.is_set()
+        ), candidate_url
+
+    if urls_to_enrich:
+        with ThreadPoolExecutor(max_workers=min(5, len(urls_to_enrich))) as executor:
+            futures = [executor.submit(_worker, u) for u in urls_to_enrich]
+            for future in as_completed(futures):
+                try:
+                    outcome, url = future.result()
+                except Exception:
+                    continue
+                candidate_diag = dict(outcome.get("diag") or {})
+                candidate_diag["source_decouverte"] = source
+                candidate_diag["resultat"] = "OK" if outcome.get("data") else "KO"
+                per_product_diagnostics.append(candidate_diag)
+                if outcome.get("api_failed"):
+                    api_attempted_count += 1
+                    api_broken_event.set()
+                    # Ecrit sur le thread principal (apres future.result()),
+                    # jamais depuis un thread worker : le diagnostic de la
+                    # DERNIERE tentative API echouee gagne.
+                    api_diag = outcome.get("api_diagnostic") or {}
+                    st.session_state["last_aliexpress_error"] = (
+                        f"{api_diag.get('code', '?')} / {api_diag.get('sub_code', '?')} : "
+                        f"{api_diag.get('msg', 'Erreur inconnue')} "
+                        f"(gateway {api_diag.get('gateway', '?')}, {api_diag.get('duree_secondes', '?')}s)"
+                    )
+                if outcome.get("data"):
+                    if outcome["source"] in ("API AliExpress officielle", "API + ScraperAPI (fusion)"):
+                        api_success_count += 1
+                        api_attempted_count += 1
+                    result_dict = outcome["data"]
+                    result_dict["_source_label"] = outcome["source"]
+                    scraped_pairs.append((result_dict, url))
+                    source_labels.append(outcome["source"])
+
+    diagnostic = {
+        "par_produit": per_product_diagnostics,
+        "source": source,
+        "candidats_trouves": len(candidate_urls),
+        "candidats_enrichis": len(urls_to_enrich),
+        "candidate_urls": candidate_urls,
+        "product_ids": candidate_product_ids,
+        "resultats_reels": len(scraped_pairs),
+        "erreur_api_aliexpress": st.session_state.get("last_aliexpress_error"),
+        "erreur_scraperapi": st.session_state.get("mm_last_scraperapi_error"),
+        "erreur_duckduckgo": st.session_state.get("mm_last_duckduckgo_error"),
+        "duree_secondes": round(time.time() - started_at, 2),
+        # Diagnostic separe par etape (point 8) : une panne d'enrichissement
+        # API ne doit plus etre confondue avec une panne de decouverte.
+        "decouverte_produits": "OK" if candidate_urls else "KO",
+        "scraperapi_status": "OK" if (source != "ScraperAPI (Google)" or candidate_urls) else "KO",
+        "aliexpress_oauth_status": "OK" if get_app_config("aliexpress_access_token") else "KO",
+        "aliexpress_api_produit_status": (
+            "OK" if api_success_count > 0 else ("KO" if api_attempted_count > 0 else "Non tentée")
+        ),
+    }
+    st.session_state["mm_search_diagnostic"] = diagnostic
+
+    if not scraped_pairs:
+        st.session_state["mm_search_failed"] = True
+        st.session_state["mm_search_fail_text"] = (
+            "Impossible d'extraire les données réelles de ce lien ou de cet ID produit. "
+            "Vérifie qu'il s'agit bien d'une URL ou d'un ID produit AliExpress valide, ou réessaie."
+            if is_specific_target
+            else "Aucun produit direct trouvé pour ce mot-clé. "
+            "Collez directement l'URL AliExpress du produit."
+        )
+        return []
+
+    results: list[dict] = []
+    for scraped, url in scraped_pairs:
+        base_price = scraped.get("price")
+        # Livraison JAMAIS estimee arbitrairement (point 4) : soit une
+        # valeur reelle a ete trouvee (frais reels ou 0,00 pour "livraison
+        # gratuite" confirmee), soit elle reste None -> "Non disponible"
+        # affiche en aval (voir _build_result / render_result_dashboard),
+        # jamais un forfait invente comme l'ancien "2 + 8% du prix".
+        shipping = scraped.get("shipping")
+        # URL produit EXACTE : priorite a une URL renvoyee par l'API,
+        # sinon reconstruite depuis le product_id (la plus fiable), sinon
+        # l'URL source si c'est deja une URL produit AliExpress valide.
+        # Chaine vide si aucune n'est exploitable -- jamais de lien
+        # invente (voir render_aliexpress_link_button).
+        product_id = extract_aliexpress_product_id(url)
+        product_url = _resolve_product_url(product_id, url, api_url=scraped.get("product_url"))
+        result = _build_result(
+            scraped["title"],
+            base_price,
+            shipping,
+            scraped.get("image", ""),
+            scraped.get("vendor_rating") if scraped.get("vendor_rating") is not None else 0.90,
+            scraped.get("orders") if scraped.get("orders") is not None else 500,
+            query,
+            product_url,
+            shipping_is_real=shipping is not None,
+            source_label=scraped.get("_source_label", ""),
+            price_max=scraped.get("price_max"),
+            currency=scraped.get("currency"),
+            variants=scraped.get("variants") or [],
+            price_source=scraped.get("_price_source") or "",
+            shipping_source=scraped.get("_shipping_source") or "",
+        )
+        result["product_id"] = product_id or ""
+        results.append(result)
+    # Cout total croissant en tete ; les candidats sans prix exploitable
+    # (cout_total=None, voir point 5/7) passent en dernier plutot que de
+    # faire planter le tri (None non comparable a un float).
+    results.sort(key=lambda r: (r["cout_total"] is None, r["cout_total"] or 0))
+
     # Le Calculateur de Marge et la Fiche Produit restent utilisables
     # independamment de la recherche : on les pre-remplit avec les vraies
-    # valeurs extraites pour que l'utilisateur puisse ajuster TVA/frais
-    # sans ressaisir le prix (voir render_calculator_page).
-    st.session_state["mm_calc_prefill_price"] = base_price
-    st.session_state["mm_calc_prefill_shipping"] = shipping
-    return result
+    # valeurs du meilleur candidat pour que l'utilisateur puisse ajuster
+    # TVA/frais sans ressaisir le prix (voir render_calculator_page) --
+    # seulement si ce candidat a un prix reel, jamais None.
+    if results[0]["prix_produit"] is not None:
+        st.session_state["mm_calc_prefill_price"] = results[0]["prix_produit"]
+        st.session_state["mm_calc_prefill_shipping"] = results[0]["livraison"] or 0.0
+    return results
+
+def _finance_fields(base_price: float | None, shipping: float | None) -> dict:
+    """Calcule cout_total/prix_conseille/frais_paiement/marge_nette a
+    partir d'un prix et d'une livraison -- factorise pour etre reutilise
+    tel quel par _build_result ET par le selecteur de variante (point 8,
+    voir render_result_dashboard) qui doit recalculer la marge a chaque
+    changement de variante sans dupliquer la formule.
+
+    Quand `shipping` est None (livraison non trouvee, jamais estimee --
+    point 4), le calcul traite la livraison comme 0 pour produire un
+    "coût hors livraison" plutot que d'echouer ou d'inventer un forfait ;
+    c'est a l'appelant d'etiqueter clairement ce cas (voir
+    render_result_dashboard, badge "Estimation hors livraison" -- point 6)."""
+    if base_price is None:
+        return {"cout_total": None, "prix_conseille": None, "frais_paiement": None, "marge_nette": None}
+    # La TVA/droits de douane (20 %) sont une taxe française a
+    # l'importation, jamais une donnee renvoyee par AliExpress — elle
+    # reste calculee ici. Coût total = Prix produit + Port (si connu) + Taxes (20 % FR).
+    cout_total = round((base_price + (shipping or 0.0)) * (1 + VAT_RATE), 2)
+    # Prix de vente conseille = Prix produit x 3 (regle de sourcing MargeMax).
+    prix_conseille = round(base_price * 3, 2)
+    frais_paiement = round(prix_conseille * PAYMENT_FEE_RATE, 2)
+    marge_nette = round(prix_conseille - cout_total - frais_paiement, 2)
+    return {
+        "cout_total": cout_total, "prix_conseille": prix_conseille,
+        "frais_paiement": frais_paiement, "marge_nette": marge_nette,
+    }
+
 
 def _build_result(
     title: str,
-    base_price: float,
-    shipping: float,
+    base_price: float | None,
+    shipping: float | None,
     image_url: str,
     vendor_rating: float,
     orders: int,
@@ -3201,15 +5010,22 @@ def _build_result(
     product_url: str = "",
     image_gallery: list[str] | None = None,
     shipping_is_real: bool = False,
+    source_label: str = "",
+    price_max: float | None = None,
+    currency: str | None = None,
+    variants: list[dict] | None = None,
+    price_source: str = "",
+    shipping_source: str = "",
 ) -> dict:
-    # La TVA/droits de douane (20 %) sont une taxe française à l'importation,
-    # jamais une donnée renvoyée par AliExpress — elle reste calculée ici.
-    # Coût total = Prix produit + Frais de port + Taxes (20 % FR).
-    cout_total = round((base_price + shipping) * (1 + VAT_RATE), 2)
-    # Prix de vente conseillé = Prix produit x 3 (règle de sourcing MargeMax).
-    prix_conseille = round(base_price * 3, 2)
-    frais_paiement = round(prix_conseille * PAYMENT_FEE_RATE, 2)
-    marge_nette = round(prix_conseille - cout_total - frais_paiement, 2)
+    # Prix optionnel (voir point 5/7) : un candidat sans prix exploitable
+    # (ScraperAPI/API ont trouve titre+image mais pas de prix) est quand
+    # meme construit ici -- tous les champs derives du prix restent None,
+    # affiches "Non disponible" plutot que d'inventer une valeur ou de
+    # faire disparaitre le produit. Si plusieurs variantes ont des prix
+    # differents (price_max present, point 3), le calcul de marge se base
+    # sur `base_price` (le prix minimum) -- jamais un prix unique invente
+    # entre les deux bornes ; l'UI affiche la fourchette complete a cote.
+    finance = _finance_fields(base_price, shipping)
 
     fiabilite_score = round(min(99, max(35, vendor_rating * 100 - (0 if orders > 300 else 15))))
     potentiel_score = round(min(99, max(20, 55 + (vendor_rating - 0.85) * 200 + (orders / 500))))
@@ -3217,9 +5033,9 @@ def _build_result(
     canaux = []
     if potentiel_score >= 70:
         canaux.append("TikTok Ads")
-    if base_price <= 15:
+    if base_price is not None and base_price <= 15:
         canaux.append("Shopify")
-    if base_price <= 8:
+    if base_price is not None and base_price <= 8:
         canaux.append("Vinted")
     if not canaux:
         canaux.append("Shopify")
@@ -3230,20 +5046,30 @@ def _build_result(
         "image_url": image_url,
         "image_gallery": image_gallery or [],
         "product_url": product_url,
+        "source_label": source_label,
         "prix_produit": base_price,
+        "prix_produit_max": price_max,
+        "devise": currency,
         "livraison": shipping,
+        # Livraison JAMAIS estimee (point 4) : "reelle" signifie ici
+        # simplement "une valeur fiable a ete trouvee" (frais reels ou
+        # gratuit confirme) -- shipping vaut None sinon, jamais un forfait.
         "livraison_reelle": shipping_is_real,
-        "cout_total": cout_total,
-        "prix_conseille": round(prix_conseille, 2),
-        "frais_paiement": frais_paiement,
-        "marge_nette": marge_nette,
+        "livraison_disponible": shipping is not None,
+        "cout_total": finance["cout_total"],
+        "prix_conseille": finance["prix_conseille"],
+        "frais_paiement": finance["frais_paiement"],
+        "marge_nette": finance["marge_nette"],
         "fiabilite_score": fiabilite_score,
         "note_produit": round(vendor_rating * 5, 1),
         "commandes": orders,
         "note_vendeur": round(vendor_rating * 5, 1),
         "potentiel_score": potentiel_score,
-        "delai_livraison": "12-20 jours" if shipping < 3 else "7-15 jours",
+        "delai_livraison": "12-20 jours" if (shipping or 0) < 3 else "7-15 jours",
         "canaux": canaux,
+        "variants": variants or [],
+        "price_source": price_source,
+        "shipping_source": shipping_source,
     }
 
 
@@ -3259,19 +5085,68 @@ def score_class(score: float) -> str:
     return "mm-score-low"
 
 
-def render_result_dashboard(result: dict) -> None:
+def _fmt_eur(value: float | None) -> str:
+    """N'invente jamais de valeur (voir point 5/7) : "Non disponible"
+    plutot qu'un 0,00 € trompeur quand la donnee est reellement absente."""
+    return f"{value:.2f} €" if value is not None else "Non disponible"
+
+
+def _fmt_price_range(price: float | None, price_max: float | None) -> str:
+    """Affiche une fourchette de prix (point 3) plutot qu'un prix unique
+    invente quand plusieurs variantes ont des prix differents et qu'aucune
+    variante par defaut n'est identifiable (price_max present)."""
+    if price is None:
+        return "Non disponible"
+    if price_max is not None and price_max > price:
+        return f"{price:.2f} € – {price_max:.2f} €"
+    return f"{price:.2f} €"
+
+
+def render_result_dashboard(result: dict) -> dict:
+    """Affiche le tableau de bord d'un resultat. Retourne le dict
+    EFFECTIF affiche (`display`) : identique a `result` sauf si
+    l'utilisateur a choisi une variante (point 8), auquel cas prix/marge
+    sont recalcules pour cette variante -- l'appelant (render_search_page)
+    doit reassigner st.session_state["last_result"] avec cette valeur de
+    retour pour que "Ajouter au carnet"/"Ajouter au comparateur" utilisent
+    bien la variante actuellement affichee."""
     st.markdown(f"#### Résultats pour : *{result['titre']}*")
+    if result.get("source_label"):
+        st.caption(f"Source : {result['source_label']}")
+
+    # Selecteur de variante (point 8) : recalcule prix/image/stock/marge a
+    # la volee sans jamais toucher a la logique de decouverte (search_product,
+    # non modifiee) ni au `result` original stocke ailleurs tant que
+    # l'appelant n'a pas explicitement adopte le retour de cette fonction.
+    display = dict(result)
+    variants = result.get("variants") or []
+    if len(variants) > 1:
+        variant_labels = [v.get("label") or f"Variante {i + 1}" for i, v in enumerate(variants)]
+        variant_key = f"mm_variant_select_{result.get('product_id') or result.get('titre')}"
+        choice_label = st.selectbox("🎨 Variante", variant_labels, key=variant_key)
+        selected = variants[variant_labels.index(choice_label)]
+        variant_price = selected.get("price")
+        if variant_price is not None:
+            finance = _finance_fields(variant_price, result.get("livraison"))
+            display["prix_produit"] = variant_price
+            display["prix_produit_max"] = None
+            display.update(finance)
+        if selected.get("image"):
+            display["image_url"] = selected["image"]
+        if selected.get("stock") is not None:
+            st.caption(f"📦 Stock disponible : {selected['stock']}")
+
     col_finance, col_fiabilite, col_potentiel = st.columns(3)
 
     with col_finance:
         try:
-            st.image(result["image_url"], use_container_width=True)
+            st.image(display["image_url"], use_container_width=True)
         except Exception:
             st.image(
                 "https://placehold.co/400x400/0F1117/38BDF8?text=MargeMax",
                 use_container_width=True,
             )
-        gallery = result.get("image_gallery") or []
+        gallery = display.get("image_gallery") or []
         if gallery:
             thumb_cols = st.columns(min(len(gallery), 4))
             for col, thumb_url in zip(thumb_cols, gallery[:4]):
@@ -3280,46 +5155,87 @@ def render_result_dashboard(result: dict) -> None:
                         st.image(thumb_url, use_container_width=True)
                     except Exception:
                         pass
-        shipping_label = "Livraison (frais réel FR)" if result.get("livraison_reelle") else "Livraison (estimée)"
-        st.markdown(
-            f"""
-            <div class="mm-card">
-                <h4>💰 Carte Finance</h4>
-                <div class="mm-metric-row"><span class="label">Prix produit</span><span class="value">{result['prix_produit']:.2f} €</span></div>
-                <div class="mm-metric-row"><span class="label">{shipping_label}</span><span class="value">{result['livraison']:.2f} €</span></div>
-                <div class="mm-metric-row"><span class="label">Coût total (TVA 20% incl.)</span><span class="value">{result['cout_total']:.2f} €</span></div>
-                <div class="mm-metric-row"><span class="label">Prix de vente conseillé</span><span class="value">{result['prix_conseille']:.2f} €</span></div>
-                <div class="mm-margin-highlight">Marge nette : {result['marge_nette']:.2f} €</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        render_aliexpress_link_button(result, key_suffix="finance")
+
+        livraison_disponible = display.get("livraison") is not None
+        shipping_value_html = _fmt_eur(display.get("livraison"))
+        if display.get("prix_produit") is None:
+            # Prix non disponible (voir point 5/7) : jamais de valeur
+            # inventee. On n'affiche PAS un cout/une marge "Non disponible"
+            # en plus (point 7) : sans prix, aucun des deux n'est calculable.
+            st.markdown(
+                f"""
+                <div class="mm-card">
+                    <h4>💰 Carte Finance</h4>
+                    <div class="mm-metric-row"><span class="label">Prix produit</span><span class="value">Non disponible</span></div>
+                    <div class="mm-metric-row"><span class="label">Livraison</span><span class="value">{shipping_value_html}</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.caption("ℹ️ Prix non récupéré automatiquement — consulte la fiche AliExpress pour le prix exact.")
+        else:
+            # Des que le prix est connu, cout/prix conseille/marge le sont
+            # aussi (voir _finance_fields, livraison traitee comme 0 si
+            # inconnue) -- jamais quatre "Non disponible" alors que le prix
+            # est disponible (point 7). Le libelle et un badge distinguent
+            # clairement un calcul "hors livraison" d'un calcul complet.
+            price_display = _fmt_price_range(display.get("prix_produit"), display.get("prix_produit_max"))
+            cout_label = "Coût total (TVA 20% incl.)" if livraison_disponible else "Coût hors livraison (TVA 20% incl.)"
+            marge_label = "Marge nette" if livraison_disponible else "Marge estimée hors livraison"
+            badge_html = (
+                "" if livraison_disponible else
+                '<div style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:6px;'
+                'background:rgba(245,158,11,0.15);color:#F59E0B;font-size:0.75rem;font-weight:600;">'
+                "⚠️ Estimation hors livraison</div>"
+            )
+            range_note_html = (
+                '<div style="font-size:0.75rem;color:#94A3B8;margin-top:4px;">'
+                "Marge calculée sur le prix minimum de la fourchette.</div>"
+                if display.get("prix_produit_max") is not None else ""
+            )
+            st.markdown(
+                f"""
+                <div class="mm-card">
+                    <h4>💰 Carte Finance</h4>
+                    <div class="mm-metric-row"><span class="label">Prix produit</span><span class="value">{price_display}</span></div>
+                    <div class="mm-metric-row"><span class="label">Livraison</span><span class="value">{shipping_value_html}</span></div>
+                    <div class="mm-metric-row"><span class="label">{cout_label}</span><span class="value">{display['cout_total']:.2f} €</span></div>
+                    <div class="mm-metric-row"><span class="label">Prix de vente conseillé</span><span class="value">{display['prix_conseille']:.2f} €</span></div>
+                    <div class="mm-margin-highlight">{marge_label} : {display['marge_nette']:.2f} €</div>
+                    {badge_html}
+                    {range_note_html}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if not livraison_disponible:
+                st.caption("🚚 Livraison à confirmer sur AliExpress.")
+        render_aliexpress_link_button(display, key_suffix="finance")
 
     with col_fiabilite:
-        cls = score_class(result["fiabilite_score"])
+        cls = score_class(display["fiabilite_score"])
         st.markdown(
             f"""
             <div class="mm-card">
                 <h4>🛡️ Fiabilité Sourcing</h4>
-                <span class="mm-score-badge {cls}">{result['fiabilite_score']} %</span>
-                <div class="mm-metric-row" style="margin-top:16px;"><span class="label">Note produit</span><span class="value">{result['note_produit']} / 5</span></div>
-                <div class="mm-metric-row"><span class="label">Commandes</span><span class="value">{f"{result['commandes']:,}".replace(",", " ")}</span></div>
-                <div class="mm-metric-row"><span class="label">Note vendeur</span><span class="value">{result['note_vendeur']} / 5</span></div>
+                <span class="mm-score-badge {cls}">{display['fiabilite_score']} %</span>
+                <div class="mm-metric-row" style="margin-top:16px;"><span class="label">Note produit</span><span class="value">{display['note_produit']} / 5</span></div>
+                <div class="mm-metric-row"><span class="label">Commandes</span><span class="value">{f"{display['commandes']:,}".replace(",", " ")}</span></div>
+                <div class="mm-metric-row"><span class="label">Note vendeur</span><span class="value">{display['note_vendeur']} / 5</span></div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col_potentiel:
-        cls_p = score_class(result["potentiel_score"])
-        badges = "".join(f'<span class="mm-channel-badge">{c}</span>' for c in result["canaux"])
+        cls_p = score_class(display["potentiel_score"])
+        badges = "".join(f'<span class="mm-channel-badge">{c}</span>' for c in display["canaux"])
         st.markdown(
             f"""
             <div class="mm-card">
                 <h4>📈 Potentiel Marché</h4>
-                <span class="mm-score-badge {cls_p}">{result['potentiel_score']} / 100</span>
-                <div class="mm-metric-row" style="margin-top:16px;"><span class="label">Délai de livraison</span><span class="value">{result['delai_livraison']}</span></div>
+                <span class="mm-score-badge {cls_p}">{display['potentiel_score']} / 100</span>
+                <div class="mm-metric-row" style="margin-top:16px;"><span class="label">Délai de livraison</span><span class="value">{display['delai_livraison']}</span></div>
                 <div style="margin-top:10px;">{badges}</div>
             </div>
             """,
@@ -3327,30 +5243,27 @@ def render_result_dashboard(result: dict) -> None:
         )
 
     st.markdown("")
-    render_aliexpress_link_button(result, key_suffix="bottom", full_width=True)
+    render_aliexpress_link_button(display, key_suffix="bottom", full_width=True)
+    return display
 
 
 def render_aliexpress_link_button(result: dict, key_suffix: str, full_width: bool = False) -> None:
-    """Bouton vers la fiche produit AliExpress d'origine. En mode démo
-    (aucune vraie fiche produit derrière), on bascule vers un lien de
-    recherche générale AliExpress plutôt que d'inventer une fausse URL."""
+    """Bouton vers la fiche produit AliExpress EXACTE analysée. N'affiche
+    jamais de lien de recherche générique ou de catégorie en repli : si
+    aucune URL produit exacte et valide (domaine aliexpress.*, voir
+    _is_valid_aliexpress_url) n'est disponible, affiche "Lien produit
+    indisponible" plutôt qu'un faux bouton qui enverrait ailleurs que sur
+    le produit réellement affiché dans cette carte."""
     product_url = (result.get("product_url") or "").strip()
-    if product_url:
+    if product_url and _is_valid_aliexpress_url(product_url):
         st.link_button(
-            "🔗 Voir le produit sur AliExpress",
+            "🔗 Voir sur AliExpress →",
             product_url,
             use_container_width=full_width,
+            type="primary",
         )
     else:
-        fallback_url = (
-            "https://www.aliexpress.com/wholesale?SearchText="
-            + requests.utils.quote(result.get("requete", ""))
-        )
-        st.link_button(
-            "🛒 Rechercher ce produit sur AliExpress",
-            fallback_url,
-            use_container_width=full_width,
-        )
+        st.caption("🔒 Lien produit indisponible")
 
 
 # ============================================================
@@ -3365,7 +5278,12 @@ QUICK_TOOLS = [
 ]
 
 
-def render_dashboard_overview() -> None:
+def render_dashboard_header() -> None:
+    """ZONE 1 — en-tete utilisateur compact (juste le message de bienvenue
+    et les credits) : volontairement separe du reste du dashboard
+    (render_dashboard_secondary) pour pouvoir passer directement de "Bonjour"
+    au formulaire de recherche, sans le gros bloc statistiques entre les
+    deux (voir render_search_page)."""
     user = st.session_state.get("user") or {}
     greeting_name = "Admin" if is_admin() else display_name(user)
     st.markdown(
@@ -3381,6 +5299,14 @@ def render_dashboard_overview() -> None:
         unsafe_allow_html=True,
     )
 
+
+def render_dashboard_secondary() -> None:
+    """ZONE 4 — dashboard secondaire (statistiques, activite recente,
+    outils rapides, teaser packs) : affiche APRES le formulaire de
+    recherche et ses resultats (voir render_search_page). Contenu
+    identique a l'ancien render_dashboard_overview, seul l'en-tete
+    "Bonjour" en a ete extrait (voir render_dashboard_header)."""
+    user = st.session_state.get("user") or {}
     stats = get_dashboard_stats(user)
     st.markdown(
         f"""
@@ -3501,102 +5427,180 @@ def render_dashboard_overview() -> None:
 
 def _run_search_and_update_state(search_query: str) -> None:
     """Lance search_product et met a jour l'etat partage par
-    render_search_page (credit debite / historique / dernier resultat)
-    -- factorise car deux formulaires distincts (recherche principale et
-    recovery par URL directe) declenchent la meme logique.
+    render_search_page (credit debite / historique / derniers resultats).
 
     search_product ne devrait normalement jamais lever d'exception (chaque
     requete reseau est deja protegee individuellement), mais ce garde-fou
     supplementaire assure qu'un imprevu (page AliExpress totalement
     malformee, etc.) bascule proprement sur l'etat d'echec plutot que de
-    faire planter la page avec une trace d'erreur Streamlit brute."""
+    faire planter la page avec une trace d'erreur Streamlit brute.
+
+    Le credit n'est debite QUE si au moins un resultat exploitable est
+    trouve : ni un resultat vide, ni une erreur API/reseau/timeout, ni un
+    lien invalide ne coutent quoi que ce soit a l'utilisateur -- l'echec
+    est quand meme journalise dans l'historique (statut "aucun_resultat"
+    ou "erreur") pour rester visible."""
     try:
-        result = search_product(search_query)
+        results = search_product(search_query)
     except Exception:
         st.session_state["mm_search_failed"] = True
-        result = None
-    if result is not None:
+        st.session_state["mm_search_fail_text"] = (
+            "Une erreur inattendue est survenue pendant l'analyse. Réessaie, "
+            "ou colle directement l'URL du produit AliExpress."
+        )
+        results = []
+
+    user = st.session_state.get("user")
+    if results:
         # Un credit n'est debite que sur un vrai resultat : un echec
         # d'extraction (page bloquee, aucune donnee reelle trouvee) ne
         # coute rien a l'utilisateur.
         debit_credit()
         increment_search_count()
-        user = st.session_state.get("user")
         if user:
-            log_search_history(search_query, 1, user)
-        st.session_state["last_result"] = result
+            log_search_history(search_query, len(results), user, status="succes")
+        st.session_state["last_results"] = results
+        st.session_state["last_result"] = results[0]
+        # Nouveau resultat affiche : les bannieres "ajoute au carnet" /
+        # "deja dans le carnet" du resultat precedent n'ont plus de sens ici.
+        st.session_state["mm_notebook_add_result"] = None
+        st.session_state["mm_notebook_duplicate"] = None
     else:
+        if user:
+            status = "erreur" if "erreur inattendue" in (st.session_state.get("mm_search_fail_text") or "") else "aucun_resultat"
+            log_search_history(search_query, 0, user, status=status)
+        st.session_state["last_results"] = []
         st.session_state["last_result"] = None
 
 
 def render_search_page() -> None:
-    render_dashboard_overview()
+    # ZONE 1 — en-tete utilisateur compact (Bonjour + credits). Volontairement
+    # PAS le dashboard complet ici : juste ce bloc, pour que la recherche
+    # (ZONE 2) reste visible sans scroll juste en dessous.
+    render_dashboard_header()
 
+    # ZONE 2 — recherche principale, juste sous l'en-tete. L'ancre reste
+    # utile pour le lien "Lancer une recherche" du dashboard secondaire
+    # (maintenant tout en bas de page) qui y renvoie.
     st.markdown('<div id="recherche-form"></div>', unsafe_allow_html=True)
-    st.markdown("## 🔎 Recherche & Sourcing Produit")
-    st.markdown(
-        '<div class="mm-trust-row">'
-        '<span class="mm-trust-badge">🔒 Connexion SSL 256-bit</span>'
-        '<span class="mm-trust-badge">⚡ Données chiffrées</span>'
-        '<span class="mm-trust-badge">💳 Paiements sécurisés par Stripe</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("## 🔎 Recherche & Source Produit")
+    st.caption("Recherchez un produit par mot-clé ou collez une URL AliExpress pour lancer une analyse.")
 
     if not has_credits():
         render_no_credits_alert()
+        render_dashboard_secondary()
         return
 
-    st.caption(
-        "📎 Collez une URL AliExpress pour une analyse instantanée 100 % précise "
-        "ou utilisez la recherche automatique."
-    )
+    # Relance auto depuis "🔄 Analyser à nouveau" (Carnet de Sourcing) ou
+    # "Ajouter au carnet"/"Calculer ma marge" sur un resultat -- une seule
+    # fois (pop), pour ne pas re-declencher a chaque interaction suivante.
+    reanalyze_query = st.session_state.pop("mm_reanalyze_query", None)
+    if reanalyze_query and has_credits():
+        with st.spinner("Analyse du produit en cours…"):
+            _run_search_and_update_state(reanalyze_query)
 
     with st.container():
         with st.form("form_recherche"):
             query = st.text_input(
-                "Nom du produit à sourcer, ou lien produit AliExpress",
+                "Rechercher un produit ou coller une URL AliExpress",
                 placeholder="Ex : correcteur de posture — ou colle un lien aliexpress.com/item/...",
             )
             submitted = st.form_submit_button(
                 "Lancer l'analyse MargeMax", use_container_width=True
             )
         st.caption(
-            "1 recherche = 1 crédit (Accès produit, déclinaisons, marges et fiche produit inclus)."
+            "1 analyse réussie = 1 crédit. Aucun crédit débité en cas d'échec, "
+            "de timeout ou d'absence de résultat."
         )
 
     if submitted:
         if not query.strip():
-            st.warning("Merci de saisir un nom de produit.")
+            st.warning("Merci de saisir un mot-clé ou de coller une URL AliExpress.")
         elif not has_credits():
             render_no_credits_alert()
         else:
-            with st.spinner("Analyse du produit en cours…"):
-                time.sleep(0.4)
-                _run_search_and_update_state(query.strip())
+            stripped_query = query.strip()
+            # Texte de patience adapte : un ID/URL directe interroge l'API
+            # officielle (rapide), un mot-clé compare plusieurs offres.
+            is_direct = "aliexpress." in stripped_query.lower() or stripped_query.isdigit()
+            spinner_text = (
+                "Analyse du produit en cours…"
+                if is_direct
+                else "Recherche des meilleures offres AliExpress…"
+            )
+            with st.spinner(spinner_text):
+                _run_search_and_update_state(stripped_query)
 
+    # Diagnostic recherche : admin uniquement, jamais visible des clients
+    # (voir search_product, qui alimente st.session_state["mm_search_diagnostic"]).
+    diag = st.session_state.get("mm_search_diagnostic")
+    if diag and is_admin():
+        with st.expander("🔧 Diagnostic recherche (admin)", expanded=False):
+            def _ok_ko_badge(label: str, status: str) -> str:
+                color = {"OK": "#10B981", "KO": "#EF4444"}.get(status, "#F59E0B")
+                return f"**{label} :** <span style='color:{color};font-weight:700;'>{status}</span>"
+
+            st.markdown(
+                _ok_ko_badge("Découverte produits", diag["decouverte_produits"]) + "  \n"
+                + _ok_ko_badge("ScraperAPI", diag["scraperapi_status"]) + "  \n"
+                + _ok_ko_badge("AliExpress OAuth", diag["aliexpress_oauth_status"]) + "  \n"
+                + _ok_ko_badge("AliExpress API produit", diag["aliexpress_api_produit_status"]),
+                unsafe_allow_html=True,
+            )
+            st.divider()
+            st.markdown(
+                f"**Source utilisée :** {diag['source']}  \n"
+                f"**Candidats trouvés :** {diag['candidats_trouves']} "
+                f"(dont {diag['candidats_enrichis']} enrichis, limite volontaire — voir point 6)  \n"
+                f"**Résultats réels exploitables :** {diag['resultats_reels']}  \n"
+                f"**Durée totale :** {diag['duree_secondes']} s"
+            )
+            if diag["candidate_urls"]:
+                st.caption("URLs candidates et product_id extrait :")
+                for url, pid in zip(diag["candidate_urls"], diag["product_ids"]):
+                    st.code(f"{pid or '—'} · {url}", language="text")
+            else:
+                st.caption("Aucune URL candidate trouvée.")
+            if diag["erreur_api_aliexpress"]:
+                st.error(f"Erreur API AliExpress : {diag['erreur_api_aliexpress']}")
+            if diag["erreur_scraperapi"]:
+                st.warning(f"Erreur ScraperAPI : {diag['erreur_scraperapi']}")
+            if diag["erreur_duckduckgo"]:
+                st.warning(f"Erreur DuckDuckGo : {diag['erreur_duckduckgo']}")
+
+            # Diagnostic PAR PRODUIT (point 1) : pourquoi "Prix produit"
+            # ou "Livraison" deviennent "Non disponible" pour CE candidat
+            # precis, separement de tous les autres.
+            par_produit = diag.get("par_produit") or []
+            if par_produit:
+                st.divider()
+                st.caption("Diagnostic par produit :")
+                for entry in par_produit:
+                    label = f"{entry.get('resultat', '?')} · {entry.get('product_id') or '—'}"
+                    with st.expander(label, expanded=False):
+                        st.markdown(
+                            f"**product_id :** {entry.get('product_id') or '—'}  \n"
+                            f"**Source découverte :** {entry.get('source_decouverte') or '—'}  \n"
+                            f"**Source prix :** {entry.get('prix_source') or '—'}  \n"
+                            f"**Source livraison :** {entry.get('livraison_source') or '—'}  \n"
+                            f"**Prix brut trouvé :** {entry.get('prix_brut') if entry.get('prix_brut') is not None else '—'}  \n"
+                            f"**Devise :** {entry.get('devise') or '—'}  \n"
+                            f"**Prix normalisé EUR :** {entry.get('prix_normalise_eur') if entry.get('prix_normalise_eur') is not None else '—'}  \n"
+                            f"**Frais de livraison bruts :** {entry.get('livraison_brute') if entry.get('livraison_brute') is not None else '—'}  \n"
+                            f"**Variante sélectionnée :** {entry.get('variante_selectionnee') or '—'}"
+                        )
+                        if entry.get("erreur_api"):
+                            st.error(f"Erreur API produit : {entry['erreur_api']}")
+                        if entry.get("erreur_parsing_html"):
+                            st.warning(f"Erreur parsing HTML : {entry['erreur_parsing_html']}")
+                        st.code(entry.get("url", ""), language="text")
+
+    # ZONE 2 — résultats, juste sous le formulaire.
     if st.session_state.get("mm_search_failed"):
         fail_text = st.session_state.get("mm_search_fail_text") or (
             "Aucun produit direct trouvé pour ce mot-clé. Collez directement l'URL AliExpress du produit."
         )
         st.info(fail_text)
-        st.markdown("##### 🔗 Analyse par lien direct")
-        with st.form("form_url_direct"):
-            direct_url = st.text_input(
-                "Collez l'URL exacte du produit AliExpress à analyser",
-                placeholder="https://www.aliexpress.com/item/....html",
-            )
-            direct_submitted = st.form_submit_button("Analyser l'URL", use_container_width=True)
-        if direct_submitted:
-            if not direct_url.strip():
-                st.warning("Merci de coller une URL produit AliExpress.")
-            elif not has_credits():
-                render_no_credits_alert()
-            else:
-                with st.spinner("Analyse du produit en cours…"):
-                    time.sleep(0.4)
-                    _run_search_and_update_state(direct_url.strip())
-
         st.caption("Ou calcule ta marge manuellement, sans attendre une extraction automatique :")
         if st.button("🧮 Utiliser le Calculateur de Marge", use_container_width=True, key="mm_go_to_calculator"):
             st.session_state["mm_calc_prefill_notice"] = (
@@ -3608,9 +5612,135 @@ def render_search_page() -> None:
 
     if st.session_state.get("last_result"):
         st.divider()
-        render_result_dashboard(st.session_state["last_result"])
-        if st.button("⭐ Sauvegarder ce produit dans mes favoris"):
-            save_current_result_to_favorites()
+        result = st.session_state["last_result"]
+        # render_result_dashboard peut retourner un `result` ajuste si une
+        # variante a ete choisie (point 8) -- on l'adopte pour que
+        # "Ajouter au carnet"/"Ajouter au comparateur"/"Calculer ma marge"
+        # ci-dessous utilisent bien le prix/la marge de la variante affichee.
+        result = render_result_dashboard(result)
+        st.session_state["last_result"] = result
+        col_fav, col_carnet, col_compare, col_calc = st.columns(4)
+        with col_fav:
+            if st.button("⭐ Ajouter aux favoris", use_container_width=True):
+                save_current_result_to_favorites()
+        with col_carnet:
+            if st.button("📝 Ajouter au carnet", use_container_width=True, key="mm_add_to_notebook_btn"):
+                user = st.session_state.get("user")
+                if not user:
+                    st.warning("Connecte-toi pour utiliser le carnet de sourcing.")
+                else:
+                    product_id = result.get("product_id") or None
+                    margin_value, margin_percent = _notebook_margin_fields(
+                        result["prix_produit"], result["livraison"], result["prix_conseille"]
+                    )
+                    entry_fields = {
+                        # "au minimum" (point 52) : jamais de valeur inventee,
+                        # None reste None en base plutot qu'un 0 ou une chaine vide.
+                        "product_id": product_id,
+                        "product_name": result.get("titre"),
+                        "product_url": result.get("product_url") or None,
+                        "image_url": result.get("image_url") or None,
+                        "purchase_price": result.get("prix_produit"),
+                        "shipping_price": result.get("livraison"),
+                        "sale_price": result.get("prix_conseille"),
+                        "margin_value": margin_value,
+                        "margin_percent": margin_percent,
+                    }
+                    # Pas de doublon silencieux (point 54) : meme user_id +
+                    # meme product_id => proposer une mise a jour plutot que
+                    # de recreer une ligne.
+                    existing = find_notebook_entry_by_product_id(user, product_id) if product_id else None
+                    if existing:
+                        st.session_state["mm_notebook_duplicate"] = {"id": existing["id"], "fields": entry_fields}
+                        st.session_state["mm_notebook_add_result"] = None
+                    else:
+                        ok = add_notebook_entry(user, {**entry_fields, "status": "a_etudier"})
+                        st.session_state["mm_notebook_add_result"] = "success" if ok else "error"
+                        st.session_state["mm_notebook_duplicate"] = None
+
+        duplicate = st.session_state.get("mm_notebook_duplicate")
+        if duplicate:
+            st.info("ℹ️ Ce produit est déjà dans votre Carnet de Sourcing.")
+            if st.button("Mettre à jour", key="mm_notebook_update_existing"):
+                user = st.session_state.get("user")
+                ok = update_notebook_entry(duplicate["id"], user, duplicate["fields"])
+                st.session_state["mm_notebook_duplicate"] = None
+                st.session_state["mm_notebook_add_result"] = "success" if ok else "error"
+                st.rerun()
+
+        add_result = st.session_state.get("mm_notebook_add_result")
+        if add_result == "success":
+            st.success("✅ Produit ajouté à votre Carnet de Sourcing.")
+            st.markdown(
+                '<a href="#carnet-sourcing" style="display:inline-block;padding:8px 18px;'
+                'border-radius:8px;background:rgba(168,85,247,0.16);color:#C084FC;'
+                'text-decoration:none;font-weight:600;font-size:0.85rem;">'
+                '📂 Voir mon carnet</a>',
+                unsafe_allow_html=True,
+            )
+        elif add_result == "error":
+            st.error("Impossible d'ajouter au carnet pour le moment.")
+        with col_compare:
+            if st.button("📊 Ajouter au comparateur", use_container_width=True):
+                new_row = _comparison_row_template(with_vat=False)
+                new_row["Nom"] = result.get("titre", "")
+                # `.get(key, 0.0)` ne suffit pas ici : la cle EXISTE toujours
+                # dans `result` mais peut valoir None (prix/livraison non
+                # trouves, voir point 5/7) -- `or 0.0` couvre aussi ce cas.
+                new_row["Prix d'achat (€)"] = result.get("prix_produit") or 0.0
+                new_row["Livraison (€)"] = result.get("livraison") or 0.0
+                new_row["Prix de vente (€)"] = result.get("prix_conseille") or 0.0
+                state_key = "mm_comparison_df_carnet"
+                existing = st.session_state.get(state_key, _empty_comparison_df(False))
+                st.session_state[state_key] = pd.concat([existing, pd.DataFrame([new_row])], ignore_index=True)
+                st.success("✅ Produit ajouté à votre comparateur.")
+                st.markdown(
+                    '<a href="#carnet-sourcing" style="display:inline-block;padding:8px 18px;'
+                    'border-radius:8px;background:rgba(6,182,212,0.16);color:#22D3EE;'
+                    'text-decoration:none;font-weight:600;font-size:0.85rem;">'
+                    '📂 Voir mon carnet</a>',
+                    unsafe_allow_html=True,
+                )
+        with col_calc:
+            if st.button("🧮 Calculer ma marge", use_container_width=True):
+                # Le Calculateur attend des nombres (st.number_input) : un
+                # prix/livraison non trouve (None, voir point 5/7) devient
+                # 0.0 ici -- l'utilisateur ajuste manuellement, jamais de
+                # None qui ferait planter le widget ou le calcul.
+                st.session_state["mm_calc_prefill_price"] = result.get("prix_produit") or 0.0
+                st.session_state["mm_calc_prefill_shipping"] = result.get("livraison") or 0.0
+                st.session_state["mm_calc_prefill_name"] = result.get("titre")
+                st.session_state["mm_calc_prefill_url"] = result.get("product_url")
+                st.session_state["page"] = "calculateur"
+                st.rerun()
+
+    other_results = [r for r in (st.session_state.get("last_results") or [])[1:]]
+    if other_results:
+        st.divider()
+        st.markdown("##### 🗂️ Autres produits trouvés pour cette recherche")
+        st.caption("Le produit au coût total le plus bas est affiché ci-dessus par défaut.")
+        cols = st.columns(len(other_results))
+        for idx, (col, alt_result) in enumerate(zip(cols, other_results)):
+            with col:
+                if alt_result.get("image_url"):
+                    st.image(alt_result["image_url"], use_container_width=True)
+                st.caption(alt_result["titre"][:60])
+                cout_total_val = alt_result.get("cout_total")
+                st.write(f"**{_fmt_eur(cout_total_val)}**" + (" coût total" if cout_total_val is not None else ""))
+                if st.button("Voir ce produit", key=f"mm_pick_alt_{idx}", use_container_width=True):
+                    st.session_state["last_result"] = alt_result
+                    st.session_state["mm_notebook_add_result"] = None
+                    st.session_state["mm_notebook_duplicate"] = None
+                    st.rerun()
+                render_aliexpress_link_button(alt_result, key_suffix=f"alt_{idx}", full_width=True)
+
+    # ZONE 3 + 4 — statistiques, activité récente et outils rapides :
+    # repositionnées SOUS la recherche/les résultats (contenu inchangé,
+    # voir render_dashboard_secondary). Puis, item 35+, le Carnet de
+    # Sourcing occupe l'espace qui restait vide en bas de page.
+    st.divider()
+    render_dashboard_secondary()
+    render_sourcing_notebook_section()
 
 
 # ============================================================
@@ -3640,6 +5770,12 @@ def render_credit_packs_grid() -> None:
         else:
             cta_html = '<div class="mm-plan-cta disabled">Bientôt disponible</div>'
 
+        ultimate_note_html = (
+            '<div class="mm-pack-per-credit" style="color:var(--accent-cyan);font-weight:700;">'
+            "50 % moins cher par analyse que Starter</div>"
+            if pack_key == "ultimate" else ""
+        )
+
         cards_html.append(
             f'<div class="mm-plan-card {popular_class}">'
             f'{badge_html}'
@@ -3647,13 +5783,16 @@ def render_credit_packs_grid() -> None:
             f'<div class="mm-pack-credits">{pack["credits"]} <span class="unit">crédits</span></div>'
             f'<div style="font-size:1.8rem;font-weight:800;margin:6px 0 2px 0;">{pack["price"]}</div>'
             f'<div class="mm-pack-per-credit">{pack["price_per_credit"]}</div>'
+            f'{ultimate_note_html}'
             f'<ul class="mm-plan-features">{benefits_html}</ul>'
             f'{cta_html}'
             f'</div>'
         )
 
     st.markdown(
-        f'<div class="mm-pricing-grid">{"".join(cards_html)}</div>',
+        f'<div class="mm-pricing-grid">{"".join(cards_html)}</div>'
+        '<div style="text-align:center;margin-top:14px;color:var(--text-muted);font-size:0.9rem;">'
+        "⏳ Les crédits n'expirent jamais.</div>",
         unsafe_allow_html=True,
     )
 
@@ -3673,9 +5812,13 @@ def render_pricing_page() -> None:
     faq_items = [
         (
             "Comment fonctionne un crédit ?",
-            "1 crédit = 1 recherche de sourcing, 1 calcul de marge ou 1 génération de fiche produit. "
-            "Chaque crédit débloque l'accès complet au produit : lien AliExpress, déclinaisons, "
-            "marges et fiche produit.",
+            "1 crédit = 1 analyse de sourcing réussie ou 1 génération de fiche IA. "
+            "Le calculateur manuel est gratuit. Chaque crédit débloque l'accès complet au produit : "
+            "lien AliExpress, déclinaisons, marges et fiche produit.",
+        ),
+        (
+            "Un crédit est-il débité si aucun résultat n'est trouvé ?",
+            "Non. Un crédit n'est débité que lorsqu'une analyse exploitable est générée.",
         ),
         (
             "Mes crédits expirent-ils ?",
@@ -3706,7 +5849,7 @@ def render_sidebar() -> None:
     with st.sidebar:
         logo_path = "assets/margemax_logo.png"
         if os.path.exists(logo_path):
-            st.image(logo_path, width=160)
+            st.image(logo_path, width=120)  # ~25% plus petit qu'avant (160px)
         else:
             st.markdown(
                 '<div class="mm-sidebar-logo-fallback">Marge<span class="accent">Max</span> '
@@ -3779,6 +5922,7 @@ def main() -> None:
     init_session_state()
     inject_custom_css()
     handle_stripe_return()
+    handle_aliexpress_oauth_return()
 
     if not is_logged_in():
         if st.session_state.get("public_page") == "auth":
