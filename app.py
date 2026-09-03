@@ -18,7 +18,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import unquote, urlparse
 
 import pandas as pd
@@ -75,13 +75,16 @@ SCRAPER_API_KEY = st.secrets.get("SCRAPER_API_KEY", "").strip()
 # .streamlit/secrets.toml, cote serveur.
 ALIEXPRESS_APP_KEY = st.secrets.get("ALIEXPRESS_APP_KEY", "544130") or "544130"
 ALIEXPRESS_APP_SECRET = st.secrets.get("ALIEXPRESS_APP_SECRET", "").strip()
-ALIEXPRESS_REST_GATEWAY = "https://api-sg.aliexpress.com/rest"  # Gateway REST (paths /auth/token/...)
-# Gateway REST/IOP (methode aliexpress.ds.*) -- MEME famille que
-# ALIEXPRESS_REST_GATEWAY (meme host api-sg.aliexpress.com, meme
-# signature HMAC-SHA256). L'ancien Gateway TOP historique
-# (eco.taobao.com/router/rest) a ete abandonne : confirme en production
-# qu'il renvoie "isv.appkey-not-exists" pour cette AppKey.
-ALIEXPRESS_SYNC_GATEWAY = "https://api-sg.aliexpress.com/sync"
+ALIEXPRESS_REST_GATEWAY = "https://api-sg.aliexpress.com/rest"  # Gateway REST (paths /auth/token/...) -- OAuth UNIQUEMENT, jamais touche ici.
+# Gateway TOP RPC historique -- utilise UNIQUEMENT pour
+# aliexpress.ds.product.get (voir _call_aliexpress_top_api). Diagnostic
+# officiel confirme en production : l'appel via api-sg.aliexpress.com/sync
+# atteignait bien AliExpress (HTTP 200) mais renvoyait "IncompleteSignature"
+# -- cette methode precise est documentee comme une API TOP classique
+# (session= au lieu d'access_token=, signature HMAC-MD5, PAS HMAC-SHA256).
+# OAuth (api-sg.aliexpress.com/rest, HMAC-SHA256) reste inchange et
+# confirme fonctionnel : ne pas y toucher.
+ALIEXPRESS_TOP_GATEWAY = "https://eco.taobao.com/router/rest"
 ALIEXPRESS_OAUTH_AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
 
 # URL publique de l'app, callback OAuth strictement identique a celle
@@ -1833,13 +1836,17 @@ def get_aliexpress_authorize_url() -> str:
 
 def _sign_top_rest(api_path: str, params: dict, app_secret: str) -> str:
     """Signature HMAC-SHA256 du Gateway REST/IOP AliExpress (paths
-    /auth/token/create, /auth/token/refresh, et methode /sync -- voir
-    _call_aliexpress_sync_api) : HMAC-SHA256(cle=app_secret, message =
-    api_path + parametres tries par cle et concatenes 'clevaleur'), en
-    hexadecimal majuscule. Le Gateway TOP historique (eco.taobao.com,
-    HMAC-MD5, sans le chemin dans la signature) a ete abandonne : il ne
-    reconnait pas cette AppKey (isv.appkey-not-exists, confirme en
-    production)."""
+    /auth/token/create, /auth/token/refresh -- OAuth uniquement) :
+    HMAC-SHA256(cle=app_secret, message = api_path + parametres tries par
+    cle et concatenes 'clevaleur'), en hexadecimal majuscule. Confirme
+    fonctionnel en production pour OAuth -- NE PAS TOUCHER.
+
+    aliexpress.ds.product.get n'utilise PAS cette signature : diagnostic
+    officiel en production, l'appel via ce protocole (Gateway /sync)
+    atteignait bien AliExpress mais renvoyait "IncompleteSignature" --
+    cette methode precise est une API TOP classique qui utilise
+    _sign_top_rpc (HMAC-MD5, sans chemin d'API) sur le Gateway
+    eco.taobao.com/router/rest (voir _call_aliexpress_top_api)."""
     sorted_items = sorted(params.items())
     base_string = api_path + "".join(f"{k}{v}" for k, v in sorted_items)
     return hmac.new(
@@ -2423,25 +2430,6 @@ def fetch_user_note(user: dict, kind: str = "carnet") -> str:
         return ""
 
 
-def save_user_note(user: dict, content: str, kind: str = "carnet") -> bool:
-    try:
-        headers = _auth_headers(user.get("access_token"))
-        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
-        response = requests.post(
-            f"{REST_URL}/user_notes",
-            headers=headers,
-            params={"on_conflict": "user_id,kind"},
-            json={
-                "user_id": user["id"], "kind": kind, "content": content,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            },
-            timeout=10,
-        )
-        return response.status_code < 400
-    except Exception:
-        return False
-
-
 # ---- Comparateur de produits (Carnet de Sourcing + Calculateur de Marge) ----
 
 def fetch_comparisons(user: dict, context: str) -> list[dict]:
@@ -2458,30 +2446,6 @@ def fetch_comparisons(user: dict, context: str) -> list[dict]:
         return response.json() if response.status_code < 400 else []
     except Exception:
         return []
-
-
-def save_comparisons(user: dict, context: str, rows: list[dict]) -> bool:
-    """Remplace l'integralite du comparatif enregistre pour ce `context`
-    (delete puis insert) -- plus simple et robuste qu'un diff ligne a
-    ligne pour un tableau edite en bloc. Ne touche jamais aux lignes de
-    l'AUTRE contexte (carnet vs calculateur, voir source_context)."""
-    try:
-        headers = _auth_headers(user.get("access_token"))
-        requests.delete(
-            f"{REST_URL}/product_comparisons",
-            headers=headers,
-            params={"user_id": f"eq.{user['id']}", "source_context": f"eq.{context}"},
-            timeout=10,
-        )
-        if not rows:
-            return True
-        headers = _auth_headers(user.get("access_token"))
-        headers["Prefer"] = "return=minimal"
-        payload = [{**row, "user_id": user["id"], "source_context": context} for row in rows]
-        response = requests.post(f"{REST_URL}/product_comparisons", headers=headers, json=payload, timeout=10)
-        return response.status_code < 400
-    except Exception:
-        return False
 
 
 def log_search_history(query: str, result_count: int, user: dict, status: str = "succes") -> None:
@@ -2757,14 +2721,127 @@ def _empty_comparison_df(with_vat: bool, n: int = 3) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _fmt_fr_amount(value: float) -> str:
+    """Montant en euros a la francaise (virgule decimale) -- utilise
+    uniquement pour les exports .txt/.csv telecharges localement (jamais
+    pour l'affichage a l'ecran, qui garde son format existant)."""
+    return f"{value:.2f} €".replace(".", ",")
+
+
+def _fmt_fr_percent(value: float) -> str:
+    return f"{value:.2f} %".replace(".", ",")
+
+
+def _fmt_fr_number(value: float) -> str:
+    """Nombre brut a la francaise (virgule decimale, sans suffixe) --
+    pour les cellules du CSV, qu'Excel FR lit nativement sans assistant
+    d'import (delimiteur ';', decimales avec virgule)."""
+    return f"{value:.2f}".replace(".", ",")
+
+
+def _comparison_rows_with_calc(edited: pd.DataFrame, with_vat: bool) -> list[dict]:
+    """Recalcule chaque ligne du comparatif EXACTEMENT comme l'affichage a
+    l'ecran (meme formule cout total/marge/marge %/ROI que la boucle
+    display_rows de render_comparison_table) -- reutilise par les deux
+    exports locaux (.txt et .csv) pour qu'ils correspondent toujours a ce
+    que l'utilisateur voit, sans dupliquer la logique de calcul deux fois."""
+    rows = []
+    for _, row in edited.iterrows():
+        nom = row.get("Nom") or "—"
+        purchase = float(row.get("Prix d'achat (€)") or 0)
+        shipping = float(row.get("Livraison (€)") or 0)
+        other = float(row.get("Autres frais (€)") or 0)
+        sale = float(row.get("Prix de vente (€)") or 0)
+        notes = row.get("Notes") or ""
+        vat = frais_paiement_pct = None
+        if with_vat:
+            vat = float(row.get("TVA (%)") or 0)
+            frais_paiement_pct = float(row.get("Frais paiement (%)") or 0)
+            cout_total = round((purchase + shipping + other) * (1 + vat / 100), 2)
+        else:
+            cout_total = round(purchase + shipping + other, 2)
+        if sale > 0:
+            marge = round(sale - cout_total, 2)
+            marge_pct = round(marge / sale * 100, 2)
+            roi_pct = round(marge / cout_total * 100, 2) if cout_total > 0 else None
+        else:
+            marge = marge_pct = roi_pct = None
+        rows.append({
+            "nom": nom, "purchase": purchase, "shipping": shipping, "other": other,
+            "vat": vat, "frais_paiement_pct": frais_paiement_pct,
+            "sale": sale, "cout_total": cout_total, "marge": marge,
+            "marge_pct": marge_pct, "roi_pct": roi_pct, "notes": notes,
+        })
+    return rows
+
+
+def _build_comparatif_txt(edited: pd.DataFrame, with_vat: bool) -> str:
+    """Contenu du fichier .txt telecharge localement pour le comparatif --
+    jamais envoye a Supabase, ne consomme aucun credit (voir
+    render_comparison_table). Lisible directement dans le Bloc-notes
+    Windows (texte brut, encodage UTF-8)."""
+    lines = ["MARGEMAX — COMPARATIF PRODUITS", "", f"Date : {datetime.now():%Y-%m-%d %H:%M}", ""]
+    for r in _comparison_rows_with_calc(edited, with_vat):
+        lines.append(f"Produit : {r['nom']}")
+        lines.append(f"Prix d'achat : {_fmt_fr_amount(r['purchase'])}")
+        lines.append(f"Livraison : {_fmt_fr_amount(r['shipping'])}")
+        lines.append(f"Autres frais : {_fmt_fr_amount(r['other'])}")
+        if with_vat:
+            lines.append(f"TVA % : {_fmt_fr_percent(r['vat'])}")
+            lines.append(f"Frais de paiement % : {_fmt_fr_percent(r['frais_paiement_pct'])}")
+        lines.append(f"Prix de vente : {_fmt_fr_amount(r['sale'])}")
+        lines.append(f"Coût total : {_fmt_fr_amount(r['cout_total'])}")
+        lines.append(f"Marge : {_fmt_fr_amount(r['marge']) if r['marge'] is not None else '—'}")
+        lines.append(f"Marge % : {_fmt_fr_percent(r['marge_pct']) if r['marge_pct'] is not None else '—'}")
+        lines.append(f"ROI : {_fmt_fr_percent(r['roi_pct']) if r['roi_pct'] is not None else '—'}")
+        lines.append(f"Notes : {r['notes']}")
+        lines.append("-" * 40)
+    return "\n".join(lines)
+
+
+def _build_comparatif_csv(edited: pd.DataFrame, with_vat: bool) -> str:
+    """Contenu du fichier .csv telecharge localement -- delimiteur ';' et
+    decimales avec virgule (convention Excel FR), pour une ouverture
+    directe sans assistant d'import. Jamais envoye a Supabase."""
+    headers = ["Produit", "Prix d'achat", "Livraison", "Autres frais"]
+    if with_vat:
+        headers += ["TVA %", "Frais de paiement %"]
+    headers += ["Prix de vente", "Coût total", "Marge", "Marge %", "ROI %", "Notes"]
+    lines = [";".join(headers)]
+    for r in _comparison_rows_with_calc(edited, with_vat):
+        cells = [r["nom"], _fmt_fr_number(r["purchase"]), _fmt_fr_number(r["shipping"]), _fmt_fr_number(r["other"])]
+        if with_vat:
+            cells += [_fmt_fr_number(r["vat"]), _fmt_fr_number(r["frais_paiement_pct"])]
+        cells += [
+            _fmt_fr_number(r["sale"]),
+            _fmt_fr_number(r["cout_total"]),
+            _fmt_fr_number(r["marge"]) if r["marge"] is not None else "",
+            _fmt_fr_number(r["marge_pct"]) if r["marge_pct"] is not None else "",
+            _fmt_fr_number(r["roi_pct"]) if r["roi_pct"] is not None else "",
+            str(r["notes"]).replace(";", ",").replace("\n", " "),
+        ]
+        lines.append(";".join(cells))
+    return "\n".join(lines)
+
+
+def _build_notes_txt(title: str, content: str) -> str:
+    """Contenu du fichier .txt telecharge localement pour les notes --
+    le texte de l'utilisateur n'est JAMAIS modifie (voir point "ne jamais
+    modifier le texte de l'utilisateur"), uniquement precede d'un titre et
+    d'une date."""
+    return f"{title}\n\nDate : {datetime.now():%Y-%m-%d %H:%M}\n\n{content}"
+
+
 def render_comparison_table(context: str, with_vat: bool = False) -> None:
     """Tableau de comparaison de plusieurs produits, reutilise a la fois
     par le Carnet de Sourcing (`context="carnet"`, sans TVA/frais de
-    paiement, voir points 43-45) et le Calculateur de Marge
-    (`context="calculateur"`, avec TVA/frais de paiement, voir points
-    46-49). Chaque contexte garde son propre comparatif enregistre
-    (colonne source_context, voir save_comparisons/fetch_comparisons) :
-    enregistrer depuis l'un n'ecrase jamais l'autre."""
+    paiement) et le Calculateur de Marge (`context="calculateur"`, avec
+    TVA/frais de paiement). Un ancien comparatif enregistre via Supabase
+    (colonne source_context, voir fetch_comparisons) reste charge en
+    lecture au premier affichage, mais les modifications ne sont PLUS
+    persistees en base : le bouton d'enregistrement a ete remplace par un
+    telechargement local .txt/.csv (voir _build_comparatif_txt/_csv),
+    sans Supabase et sans debit de credit."""
     user = st.session_state.get("user")
     title = "📊 Comparateur de Produits" if context == "carnet" else "📊 Comparer plusieurs produits"
     st.markdown(f"#### {title}")
@@ -2847,7 +2924,11 @@ def render_comparison_table(context: str, with_vat: bool = False) -> None:
         styled = summary_df.style.map(_style_value, subset=["Marge €", "Marge %", "ROI %"])
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
-    col_a, col_b, col_c = st.columns(3)
+    # Telechargement local uniquement (jamais Supabase, jamais de credit
+    # debite) : le comparatif n'est plus persiste en base depuis ce bouton
+    # -- l'utilisateur recupere son fichier .txt/.csv directement sur son
+    # poste. La colonne "Ajouter"/"Réinitialiser" reste inchangee.
+    col_a, col_b, col_c, col_d = st.columns(4)
     with col_a:
         add_label = "+ Ajouter un produit à comparer" if context == "carnet" else "+ Ajouter une ligne"
         if st.button(add_label, key=f"mm_comp_add_{context}", use_container_width=True):
@@ -2861,29 +2942,27 @@ def render_comparison_table(context: str, with_vat: bool = False) -> None:
             st.session_state[state_key] = _empty_comparison_df(with_vat)
             st.rerun()
     with col_c:
-        save_label = "💾 Enregistrer mon comparatif" if context == "carnet" else "💾 Enregistrer le comparatif"
-        if st.button(save_label, key=f"mm_comp_save_{context}", use_container_width=True):
-            if not user:
-                st.warning("Connecte-toi pour enregistrer ton comparatif.")
-            else:
-                rows_to_save = []
-                for _, row in edited.iterrows():
-                    r = {
-                        "product_name": row.get("Nom") or "",
-                        "purchase_price": float(row.get("Prix d'achat (€)") or 0),
-                        "shipping_price": float(row.get("Livraison (€)") or 0),
-                        "other_costs": float(row.get("Autres frais (€)") or 0),
-                        "sale_price": float(row.get("Prix de vente (€)") or 0),
-                        "notes": row.get("Notes") or "",
-                    }
-                    if with_vat:
-                        r["vat_percent"] = float(row.get("TVA (%)") or 0)
-                        r["payment_fee_percent"] = float(row.get("Frais paiement (%)") or 0)
-                    rows_to_save.append(r)
-                if save_comparisons(user, context, rows_to_save):
-                    st.success("Comparatif enregistré.")
-                else:
-                    st.error("Impossible d'enregistrer le comparatif pour le moment.")
+        st.download_button(
+            "⬇️ Télécharger le comparatif",
+            data=_build_comparatif_txt(edited, with_vat).encode("utf-8"),
+            file_name=f"margemax_comparatif_{datetime.now():%Y-%m-%d_%H-%M}.txt",
+            mime="text/plain",
+            use_container_width=True,
+            type="primary",
+            key=f"mm_comp_download_txt_{context}",
+        )
+    with col_d:
+        # Bouton discret (point "OPTION UTILE") : meme donnees, format CSV
+        # a la francaise (';' + virgule decimale) pour ouverture directe
+        # dans Excel sans assistant d'import.
+        st.download_button(
+            "⬇️ Télécharger en CSV",
+            data=_build_comparatif_csv(edited, with_vat).encode("utf-8-sig"),
+            file_name=f"margemax_comparatif_{datetime.now():%Y-%m-%d_%H-%M}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key=f"mm_comp_download_csv_{context}",
+        )
 
 
 def render_sourcing_notebook_section() -> None:
@@ -2909,6 +2988,14 @@ def render_sourcing_notebook_section() -> None:
     st.markdown("#### Mes notes")
     if "mm_notebook_notes_value" not in st.session_state:
         st.session_state["mm_notebook_notes_value"] = fetch_user_note(user, kind="carnet")
+    # Compteur de version du widget (voir "🗑️ Effacer les notes" plus bas) :
+    # Streamlit ne re-affiche PAS un text_area vide en changeant juste sa
+    # `value` apres avoir supprime sa cle de session_state -- le composant
+    # cote navigateur garde son contenu tant que sa `key` ne change pas
+    # reellement. Changer la cle (en y ajoutant ce compteur) force un
+    # widget entierement neuf, qui repart bien de `value=""`.
+    if "mm_notebook_notes_version" not in st.session_state:
+        st.session_state["mm_notebook_notes_version"] = 0
     notes_value = st.text_area(
         "Mes notes",
         value=st.session_state["mm_notebook_notes_value"],
@@ -2918,14 +3005,33 @@ def render_sourcing_notebook_section() -> None:
             "Ex : Tester ce produit sur TikTok\nVoir si fournisseur accepte branding\n"
             "Comparer avec Temu\nCommander échantillon"
         ),
-        key="mm_notebook_notes_input",
+        key=f"mm_notebook_notes_input_{st.session_state['mm_notebook_notes_version']}",
     )
-    if st.button("💾 Enregistrer mes notes", key="mm_save_notebook_notes"):
-        if save_user_note(user, notes_value, kind="carnet"):
-            st.session_state["mm_notebook_notes_value"] = notes_value
-            st.success("Notes enregistrées.")
+    # Telechargement local uniquement (jamais Supabase, jamais de credit
+    # debite) : le texte de l'utilisateur n'est jamais modifie, juste
+    # precede d'un titre/date (voir _build_notes_txt).
+    col_dl, col_clear = st.columns([3, 1])
+    with col_dl:
+        st.download_button(
+            "⬇️ Télécharger mes notes",
+            data=_build_notes_txt("MARGEMAX — NOTES DE SOURCING", notes_value).encode("utf-8"),
+            file_name=f"margemax_notes_{datetime.now():%Y-%m-%d_%H-%M}.txt",
+            mime="text/plain",
+            use_container_width=True,
+            type="primary",
+            key="mm_download_notebook_notes",
+        )
+    with col_clear:
+        if st.session_state.get("mm_notebook_notes_confirm_clear"):
+            if st.button("Confirmer ?", key="mm_notebook_notes_clear_confirm", use_container_width=True):
+                st.session_state["mm_notebook_notes_value"] = ""
+                st.session_state["mm_notebook_notes_version"] += 1
+                st.session_state["mm_notebook_notes_confirm_clear"] = False
+                st.rerun()
         else:
-            st.error("Impossible d'enregistrer les notes pour le moment.")
+            if st.button("🗑️ Effacer les notes", key="mm_notebook_notes_clear", use_container_width=True):
+                st.session_state["mm_notebook_notes_confirm_clear"] = True
+                st.rerun()
 
     st.divider()
 
@@ -3058,6 +3164,11 @@ def render_calculator_page() -> None:
     if user:
         if "mm_calc_notes_value" not in st.session_state:
             st.session_state["mm_calc_notes_value"] = fetch_user_note(user, kind="calculateur")
+        # Compteur de version du widget (voir "🗑️ Effacer les notes" plus
+        # bas) : necessaire pour forcer un reset visuel reel, voir le
+        # commentaire equivalent dans render_sourcing_notebook_section.
+        if "mm_calc_notes_version" not in st.session_state:
+            st.session_state["mm_calc_notes_version"] = 0
         calc_notes_value = st.text_area(
             "Mes notes de marge",
             value=st.session_state["mm_calc_notes_value"],
@@ -3067,16 +3178,34 @@ def render_calculator_page() -> None:
                 "Ex : Produit intéressant à 24,99 €\nTester prix 29,99 €\n"
                 "Marge trop faible avec livraison actuelle\nComparer avec fournisseur B"
             ),
-            key="mm_calc_notes_input",
+            key=f"mm_calc_notes_input_{st.session_state['mm_calc_notes_version']}",
         )
-        if st.button("💾 Enregistrer mes notes", key="mm_save_calc_notes"):
-            if save_user_note(user, calc_notes_value, kind="calculateur"):
-                st.session_state["mm_calc_notes_value"] = calc_notes_value
-                st.success("Notes enregistrées.")
+        # Telechargement local uniquement (jamais Supabase, jamais de
+        # credit debite) : le texte de l'utilisateur n'est jamais modifie.
+        col_dl, col_clear = st.columns([3, 1])
+        with col_dl:
+            st.download_button(
+                "⬇️ Télécharger mes notes",
+                data=_build_notes_txt("MARGEMAX — NOTES DE MARGE", calc_notes_value).encode("utf-8"),
+                file_name=f"margemax_notes_{datetime.now():%Y-%m-%d_%H-%M}.txt",
+                mime="text/plain",
+                use_container_width=True,
+                type="primary",
+                key="mm_download_calc_notes",
+            )
+        with col_clear:
+            if st.session_state.get("mm_calc_notes_confirm_clear"):
+                if st.button("Confirmer ?", key="mm_calc_notes_clear_confirm", use_container_width=True):
+                    st.session_state["mm_calc_notes_value"] = ""
+                    st.session_state["mm_calc_notes_version"] += 1
+                    st.session_state["mm_calc_notes_confirm_clear"] = False
+                    st.rerun()
             else:
-                st.error("Impossible d'enregistrer les notes pour le moment.")
+                if st.button("🗑️ Effacer les notes", key="mm_calc_notes_clear", use_container_width=True):
+                    st.session_state["mm_calc_notes_confirm_clear"] = True
+                    st.rerun()
     else:
-        st.caption("Connecte-toi pour enregistrer tes notes de marge.")
+        st.caption("Connecte-toi pour accéder à tes notes de marge.")
 
 
 # ============================================================
@@ -3505,13 +3634,42 @@ def render_account_page() -> None:
             if last_ds_error:
                 st.error(f"Dernière erreur aliexpress.ds.product.get : {last_ds_error}")
 
+            # Deux tests ADMIN DISTINCTS, deliberement separes : un echec de
+            # l'un ne doit jamais etre confondu avec un echec de l'autre --
+            # OAuth (api-sg.aliexpress.com) et l'appel produit TOP
+            # (eco.taobao.com/router/rest) sont deux protocoles/gateways
+            # totalement independants depuis la correction signature.
             st.divider()
-            st.markdown("**Test API isolé** — sans ScraperAPI ni Google, juste l'appel officiel.")
-            test_product_id = st.text_input(
-                "product_id à tester", value="1005009947135409", key="mm_api_test_pid",
+            st.markdown("**Test 1 — OAuth** (`api-sg.aliexpress.com`, inchangé, doit rester OK)")
+            stored_refresh_token = get_app_config("aliexpress_refresh_token")
+            if not stored_refresh_token:
+                st.caption("Aucun refresh_token stocké — autorise l'app ci-dessus avant de pouvoir tester.")
+            if st.button(
+                "🧪 Tester OAuth AliExpress", key="mm_test_oauth", disabled=not stored_refresh_token,
+            ):
+                with st.spinner("Renouvellement du token via /auth/token/refresh…"):
+                    st.session_state["last_aliexpress_oauth_error"] = None
+                    refreshed = refresh_aliexpress_token(stored_refresh_token)
+                st.markdown(f"**Gateway :** `{ALIEXPRESS_REST_GATEWAY}/auth/token/refresh`")
+                if refreshed:
+                    st.success("OAuth OK — token renouvelé avec succès.")
+                else:
+                    st.error(
+                        "Échec OAuth : "
+                        f"{st.session_state.get('last_aliexpress_oauth_error') or 'erreur inconnue'}"
+                    )
+
+            st.divider()
+            st.markdown(
+                "**Test 2 — API produit TOP** (`eco.taobao.com/router/rest`, "
+                "`aliexpress.ds.product.get`) — sans ScraperAPI ni Google, juste l'appel officiel."
             )
-            if st.button("🧪 Tester API produit AliExpress", key="mm_test_api_product"):
-                with st.spinner("Appel de aliexpress.ds.product.get…"):
+            test_product_id = st.text_input(
+                "product_id à tester", value="1005010664344065", key="mm_api_test_pid",
+            )
+            st.caption("ship_to_country=FR · target_currency=EUR · target_language=FR (fixes, voir aliexpress_ds_product_get)")
+            if st.button("🧪 Tester API produit TOP", key="mm_test_api_product"):
+                with st.spinner("Appel de aliexpress.ds.product.get (Gateway TOP)…"):
                     payload, api_diag = aliexpress_ds_product_get(test_product_id.strip())
                 st.markdown(
                     f"**Gateway :** `{api_diag.get('gateway')}`  \n"
@@ -3532,7 +3690,7 @@ def render_account_page() -> None:
                     with st.expander("JSON brut de la réponse"):
                         st.json(payload)
                 else:
-                    st.error("Échec de l'appel — voir le diagnostic ci-dessus.")
+                    st.error("Échec de l'appel — voir le diagnostic ci-dessus (jamais de bascule automatique de gateway).")
 
 
 def render_landing_topbar() -> None:
@@ -4410,24 +4568,46 @@ def _extract_top_response_root(payload: dict) -> dict:
     return next((v for k, v in payload.items() if k.endswith("_response")), payload)
 
 
-def _call_aliexpress_sync_api(method: str, extra_params: dict) -> tuple[dict | None, dict]:
-    """Appelle le Gateway REST/IOP AliExpress (api-sg.aliexpress.com/sync)
-    -- la MEME famille de gateway que /auth/token/create, confirmee
-    fonctionnelle en direct avec l'AppKey 544130 (echange de token OAuth
-    reussi). Le Gateway TOP historique (eco.taobao.com/router/rest, ancien
-    ALIEXPRESS_GATEWAY) a ete abandonne : teste en production, il renvoie
-    "isv.appkey-not-exists" (code 29) pour cette AppKey -- preuve concrete
-    qu'elle n'existe pas sur cette plateforme-la (differente famille
-    d'App Key qu'AliExpress ne fait pas interoperer). Signature HMAC-SHA256
-    (voir _sign_top_rest), pas HMAC-MD5.
+def _sign_top_rpc(params: dict, app_secret: str) -> str:
+    """Signature HMAC-MD5 du Gateway TOP RPC historique (eco.taobao.com/
+    router/rest), mode officiel `sign_method=hmac` -- utilisee UNIQUEMENT
+    pour aliexpress.ds.product.get (voir _call_aliexpress_top_api).
+    Algorithme : trier tous les parametres (hors `sign`) par cle ASCII,
+    concatener cle+valeur sans separateur, HMAC-MD5(cle=app_secret,
+    message=chaine), hexadecimal MAJUSCULE. DIFFERENT de _sign_top_rest
+    (HMAC-SHA256, chemin d'API en prefixe, utilise par OAuth) -- les deux
+    algorithmes ne sont PAS interchangeables, ne pas fusionner."""
+    sorted_items = sorted(params.items())
+    base_string = "".join(f"{k}{v}" for k, v in sorted_items)
+    return hmac.new(
+        app_secret.encode("utf-8"), base_string.encode("utf-8"), hashlib.md5
+    ).hexdigest().upper()
+
+
+def _call_aliexpress_top_api(method: str, business_params: dict) -> tuple[dict | None, dict]:
+    """Appelle le Gateway TOP RPC historique (eco.taobao.com/router/rest)
+    -- utilise UNIQUEMENT pour aliexpress.ds.product.get. Diagnostic
+    officiel obtenu en production (voir aliexpress_ds_product_get) :
+    l'appel via api-sg.aliexpress.com/sync atteignait bien AliExpress
+    (HTTP 200) mais renvoyait "IncompleteSignature" -- la documentation
+    AliExpress classe cette methode comme une API TOP classique, protocole
+    et signature differents du Gateway REST/IOP utilise par OAuth
+    (_sign_top_rest, NON touche ici -- OAuth confirme fonctionnel).
+    Parametres systeme TOP : app_key, method, session (PAS access_token),
+    timestamp au format "yyyy-MM-dd HH:mm:ss" en GMT+8, format=json,
+    v=2.0, sign_method=hmac. Signature HMAC-MD5 (voir _sign_top_rpc), PAS
+    HMAC-SHA256.
 
     Retourne TOUJOURS (data_ou_None, diagnostic) : diagnostic contient
     gateway/method/http_status/code/sub_code/msg/duree_secondes, meme en
     cas d'echec -- utilise par le bouton de test isole admin (voir
-    render_account_page) et par le diagnostic de recherche."""
+    render_account_page) et par le diagnostic de recherche. Si AliExpress
+    renvoie a nouveau "isv.appkey-not-exists" ou toute autre erreur, elle
+    est affichee TELLE QUELLE ici -- jamais de bascule automatique vers
+    une autre gateway ni de modification des cles."""
     started = time.time()
     diagnostic: dict = {
-        "gateway": ALIEXPRESS_SYNC_GATEWAY,
+        "gateway": ALIEXPRESS_TOP_GATEWAY,
         "method": method,
         "http_status": None,
         "code": None,
@@ -4443,20 +4623,27 @@ def _call_aliexpress_sync_api(method: str, extra_params: dict) -> tuple[dict | N
         diagnostic["msg"] = "Aucun token OAuth AliExpress enregistré — autorise l'app dans Mon Compte (admin)."
         return None, diagnostic
 
+    # Horodatage GMT+8 (China Standard Time) exige par le protocole TOP
+    # classique -- format "yyyy-MM-dd HH:mm:ss", DIFFERENT du timestamp
+    # epoch millisecondes du Gateway REST/IOP (_sign_top_rest/OAuth).
+    timestamp_cst = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+
     params = {
         "app_key": ALIEXPRESS_APP_KEY,
         "method": method,
-        "access_token": access_token,
-        "sign_method": "sha256",
-        "timestamp": str(int(time.time() * 1000)),
-        **extra_params,
+        "session": access_token,
+        "timestamp": timestamp_cst,
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "hmac",
+        **business_params,
     }
-    params["sign"] = _sign_top_rest("/sync", params, ALIEXPRESS_APP_SECRET)
+    params["sign"] = _sign_top_rpc(params, ALIEXPRESS_APP_SECRET)
 
     try:
-        # Timeout court et delibere (voir point 6) : un echec d'API doit
-        # echouer vite, jamais retenter plusieurs fois par candidat.
-        response = requests.post(ALIEXPRESS_SYNC_GATEWAY, data=params, timeout=10)
+        # Timeout court et delibere : un echec d'API doit echouer vite,
+        # jamais retenter plusieurs fois par candidat (voir search_product).
+        response = requests.post(ALIEXPRESS_TOP_GATEWAY, data=params, timeout=10)
         diagnostic["http_status"] = response.status_code
         data = response.json()
     except Exception as exc:
@@ -4465,7 +4652,10 @@ def _call_aliexpress_sync_api(method: str, extra_params: dict) -> tuple[dict | N
         return None, diagnostic
 
     diagnostic["duree_secondes"] = round(time.time() - started, 2)
-    error_block = data.get("error_response") or ({"code": data.get("code"), "sub_code": data.get("sub_code"), "msg": data.get("msg")} if data.get("code") else None)
+    # Le Gateway TOP RPC classique enveloppe TOUJOURS ses erreurs dans
+    # "error_response" -- contrairement au Gateway REST/IOP /sync qui
+    # pouvait aussi renvoyer un code au niveau racine.
+    error_block = data.get("error_response")
     if error_block:
         diagnostic["code"] = error_block.get("code")
         diagnostic["sub_code"] = error_block.get("sub_code")
@@ -4476,14 +4666,15 @@ def _call_aliexpress_sync_api(method: str, extra_params: dict) -> tuple[dict | N
 
 
 def aliexpress_ds_product_get(product_id: str) -> tuple[dict | None, dict]:
-    """aliexpress.ds.product.get via le Gateway REST/IOP -- fiche produit
-    via l'API officielle (necessite un access_token OAuth valide). A
+    """aliexpress.ds.product.get via le Gateway TOP RPC historique (voir
+    _call_aliexpress_top_api) -- fiche produit via l'API officielle
+    (necessite un access_token OAuth valide, envoye dans `session`). A
     tenter en priorite avant tout scraping des qu'un token est disponible
     et qu'un product_id a pu etre extrait de l'URL (voir
     extract_aliexpress_product_id). aliexpress.affiliate.product.query
     n'est PAS utilisee tant que la permission Affiliate n'est pas activee
     sur l'app cote console AliExpress."""
-    return _call_aliexpress_sync_api(
+    return _call_aliexpress_top_api(
         "aliexpress.ds.product.get",
         {
             "product_id": product_id,
