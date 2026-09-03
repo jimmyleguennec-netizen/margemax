@@ -3694,40 +3694,98 @@ def render_account_page() -> None:
 
             st.divider()
             st.markdown(
-                "**Test 2 — API produit** (`api-sg.aliexpress.com/rest`, "
-                "`aliexpress.ds.product.get`) — sans ScraperAPI ni Google, juste l'appel officiel."
+                "**Test 2 — Diagnostic multi-probes API produit** (`api-sg.aliexpress.com/rest`, "
+                "`aliexpress.ds.product.get`) — teste 3 variantes controlées en un seul clic pour "
+                "trancher définitivement, sans jamais rejouer un protocole déjà constaté en échec "
+                "(eco.taobao.com, /sync) ni en faire deviner un nouveau au hasard."
             )
             test_product_id = st.text_input(
                 "product_id à tester", value="1005010664344065", key="mm_api_test_pid",
             )
             st.caption(
                 "ship_to_country=FR · target_currency=EUR · target_language=fr · "
-                "remove_personal_benefit=false (fixes, voir aliexpress_ds_product_get) — "
-                "biz_model/province_code/city_code volontairement omis (pas de vraie valeur)."
+                "remove_personal_benefit=false (fixes) — biz_model/province_code/city_code "
+                "volontairement omis (pas de vraie valeur)."
             )
-            if st.button("🧪 Tester API produit AliExpress", key="mm_test_api_product"):
-                with st.spinner("Appel de aliexpress.ds.product.get…"):
-                    payload, api_diag = aliexpress_ds_product_get(test_product_id.strip())
-                st.markdown(
-                    f"**Gateway :** `{api_diag.get('gateway')}`  \n"
-                    f"**Méthode :** `{api_diag.get('method')}`  \n"
-                    f"**HTTP status :** {api_diag.get('http_status')}  \n"
-                    f"**Code AliExpress :** {api_diag.get('code') or '—'}  \n"
-                    f"**Sub-code :** {api_diag.get('sub_code') or '—'}  \n"
-                    f"**Message :** {api_diag.get('msg') or '—'}  \n"
-                    f"**Durée :** {api_diag.get('duree_secondes')} s"
-                )
-                if payload:
-                    st.success("Réponse API reçue avec succès.")
-                    parsed = _parse_ds_product_get(payload)
-                    if parsed:
-                        st.json(parsed)
-                    else:
-                        st.warning("Réponse reçue mais aucun champ titre/prix reconnu — voir le JSON brut ci-dessous.")
-                    with st.expander("JSON brut de la réponse"):
-                        st.json(payload)
+            # 3 hypotheses non testees a ce jour, chacune isolant UNE variable a la fois
+            # (voir l'historique complet dans aliexpress_ds_product_get) -- jamais utilisees
+            # automatiquement par une recherche utilisateur reelle (point G.5), uniquement
+            # ici, a la demande explicite d'un admin.
+            PROBE_DEFINITIONS = [
+                ("access_token hors signature + v=2.0 (hypothèse actuelle du moteur)",
+                 dict(token_param="access_token", token_in_signature=False, include_v=True)),
+                ("access_token dans la signature + v=2.0",
+                 dict(token_param="access_token", token_in_signature=True, include_v=True)),
+                ("session hors signature + v=2.0",
+                 dict(token_param="session", token_in_signature=False, include_v=True)),
+            ]
+            if st.button("🧪 Lancer les 3 probes de diagnostic", key="mm_test_api_product"):
+                business_params = {
+                    "product_id": test_product_id.strip(),
+                    "ship_to_country": "FR",
+                    "target_currency": "EUR",
+                    "target_language": "fr",
+                    "remove_personal_benefit": "false",
+                }
+                probe_results = []
+                for label, cfg in PROBE_DEFINITIONS:
+                    with st.spinner(f"Probe : {label}…"):
+                        payload, api_diag = _call_aliexpress_product_probe(
+                            "aliexpress.ds.product.get", business_params, probe_label=label, **cfg
+                        )
+                    probe_results.append((label, payload, api_diag))
+
+                summary_rows = [
+                    {
+                        "Probe": label,
+                        "HTTP": api_diag.get("http_status"),
+                        "Code": api_diag.get("code") or "—",
+                        "Sub-code": api_diag.get("sub_code") or "—",
+                        "Résultat": "✅ Succès" if payload else "❌ Échec",
+                    }
+                    for label, payload, api_diag in probe_results
+                ]
+                st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+
+                any_success = any(payload for _, payload, _ in probe_results)
+                for label, payload, api_diag in probe_results:
+                    with st.expander(f"{'✅' if payload else '❌'} {label}", expanded=bool(payload)):
+                        st.markdown(
+                            f"**Gateway :** `{api_diag.get('gateway')}`  \n"
+                            f"**Méthode :** `{api_diag.get('method')}`  \n"
+                            f"**HTTP status :** {api_diag.get('http_status')}  \n"
+                            f"**Code AliExpress :** {api_diag.get('code') or '—'}  \n"
+                            f"**Sub-code :** {api_diag.get('sub_code') or '—'}  \n"
+                            f"**Message :** {api_diag.get('msg') or '—'}  \n"
+                            f"**Durée :** {api_diag.get('duree_secondes')} s"
+                        )
+                        params_sent = api_diag.get("params_envoyes") or {}
+                        if params_sent:
+                            st.caption("Paramètres envoyés (valeurs sensibles jamais affichées, voir point F/V) :")
+                            st.json(params_sent)
+                        if payload:
+                            st.success("Réponse API reçue avec succès.")
+                            parsed = _parse_ds_product_get(payload)
+                            if parsed:
+                                st.json(parsed)
+                            else:
+                                st.warning("Réponse reçue mais aucun champ titre/prix reconnu — voir le JSON brut ci-dessous.")
+                            with st.expander("JSON brut de la réponse"):
+                                st.json(payload)
+                        else:
+                            st.error("Échec de ce probe.")
+                if any_success:
+                    st.success(
+                        "Au moins un probe a réussi — le protocole gagnant doit être figé comme "
+                        "implémentation définitive dans aliexpress_ds_product_get (jamais plusieurs "
+                        "gateways testées à chaque recherche utilisateur réelle)."
+                    )
                 else:
-                    st.error("Échec de l'appel — voir le diagnostic ci-dessus (jamais de bascule automatique de gateway).")
+                    st.warning(
+                        "Aucun des 3 probes n'a réussi. Copie l'ensemble de ces résultats (y compris "
+                        "les paramètres envoyés) pour affiner le diagnostic — jamais de bascule "
+                        "automatique vers eco.taobao.com ou /sync."
+                    )
 
 
 def render_landing_topbar() -> None:
@@ -4605,42 +4663,66 @@ def _extract_top_response_root(payload: dict) -> dict:
     return next((v for k, v in payload.items() if k.endswith("_response")), payload)
 
 
-def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[dict | None, dict]:
-    """Appelle le Gateway REST/IOP officiel (ALIEXPRESS_REST_GATEWAY,
-    https://api-sg.aliexpress.com/rest) SANS suffixe de chemin -- pour
-    aliexpress.ds.product.get, `method` est envoye comme parametre, pas
-    comme segment d'URL (contrairement a OAuth /auth/token/create qui,
-    lui, ajoute son chemin dedie).
+def _mask_param_summary(params: dict, token_keys: tuple[str, ...] = ("access_token", "session", "app_key")) -> dict:
+    """Resume les parametres envoyes SANS jamais exposer une valeur
+    sensible (point F/V) : pour app_key/access_token/session, indique
+    seulement "présent" -- jamais la valeur, meme partielle. Les autres
+    parametres (method, product_id, ship_to_country, etc.) sont des
+    valeurs non sensibles, affichees telles quelles pour le diagnostic."""
+    summary = {}
+    for key, value in params.items():
+        if key == "sign":
+            continue  # la signature elle-meme n'est jamais affichee
+        if key in token_keys:
+            summary[key] = "présent" if value else "absent"
+        else:
+            summary[key] = value
+    return summary
 
-    Historique des tentatives precedentes pour cette methode precise
-    (jamais pour OAuth, toujours confirme fonctionnel) :
-    - eco.taobao.com/router/rest (HMAC-MD5) -> "isv.appkey-not-exists".
-    - api-sg.aliexpress.com/sync avec le chemin "/sync" prefixe dans la
-      signature -> "IncompleteSignature".
-    - api-sg.aliexpress.com/rest avec `session=<token>` -> gateway/AppKey/
-      signature ACCEPTES (HTTP 200) mais "MissingParameter" : le CURL
-      officiel de la doc AliExpress pour cette methode utilise
-      `access_token=<token>`, pas `session=` (reserve a d'autres flux TOP) --
-      corrige ci-dessous.
 
-    Reutilise _sign_top_rest (MEME algorithme HMAC-SHA256 confirme
-    fonctionnel pour OAuth sur ce host, ET desormais confirme accepte par
-    AliExpress pour cette methode aussi) avec un prefixe de chemin VIDE --
-    aliexpress.ds.product.get n'est pas appelee sur un sous-chemin dedie
-    comme /auth/token/create, donc rien n'est prepende a la signature.
-    `access_token` fait partie des parametres signes, comme tous les
-    autres (voir params["sign"] plus bas, calcule APRES ajout d'
-    access_token au dict).
+def _call_aliexpress_product_probe(
+    method: str,
+    business_params: dict,
+    *,
+    token_param: str = "access_token",
+    token_in_signature: bool = True,
+    include_v: bool = False,
+    probe_label: str = "",
+) -> tuple[dict | None, dict]:
+    """Coeur PARAMETRABLE de l'appel produit sur le Gateway REST/IOP
+    officiel (ALIEXPRESS_REST_GATEWAY, https://api-sg.aliexpress.com/rest,
+    SANS suffixe de chemin -- `method` est envoye comme parametre, pas
+    comme segment d'URL, contrairement a OAuth /auth/token/create qui,
+    lui, ajoute son propre chemin dedie dans _sign_top_rest).
+
+    Deux inconnues non tranchees malgre la documentation officielle
+    (voir docstring de aliexpress_ds_product_get pour l'historique complet
+    des tentatives reelles en production) ont motive ce parametrage :
+    - `token_param` : nom du parametre du token ("access_token" ou
+      "session" selon la famille de gateway/doc consultee).
+    - `token_in_signature` : si le token doit faire partie de la chaine
+      signee HMAC-SHA256 ou non (un jeton opaque est parfois exclu de la
+      signature dans les API REST/IOP, contrairement aux parametres
+      metier).
+    - `include_v` : si le parametre historique `v=2.0` (mentionne par la
+      doc TOP de cette methode precise) doit etre envoye.
+
+    Reutilise TOUJOURS _sign_top_rest (HMAC-SHA256, confirme fonctionnel
+    pour OAuth sur ce host) avec un prefixe de chemin VIDE -- jamais de
+    signature recreee a la main, jamais de retour a HMAC-MD5/eco.taobao.com.
 
     Retourne TOUJOURS (data_ou_None, diagnostic) : diagnostic contient
-    gateway/method/http_status/code/sub_code/msg/duree_secondes, meme en
-    cas d'echec -- utilise par le bouton de test isole admin (voir
-    render_account_page) et par le diagnostic de recherche. Si AliExpress
-    renvoie une erreur (nouvelle ou deja vue), elle est affichee TELLE
-    QUELLE ici -- jamais de bascule automatique vers une autre gateway ni
-    de modification des cles."""
+    probe/gateway/method/http_status/code/sub_code/msg/duree_secondes/
+    params_envoyes (noms + valeurs NON sensibles uniquement, voir
+    _mask_param_summary -- jamais app_secret/access_token/refresh_token en
+    clair, point F/V). Utilise par le panneau de diagnostic isole admin
+    (voir render_account_page) ET par le moteur de recherche reel, qui
+    n'appelle JAMAIS qu'UN SEUL probe (celui juge le plus probable,
+    voir aliexpress_ds_product_get) -- jamais plusieurs gateways par
+    recherche utilisateur (point G.5)."""
     started = time.time()
     diagnostic: dict = {
+        "probe": probe_label,
         "gateway": ALIEXPRESS_REST_GATEWAY,
         "method": method,
         "http_status": None,
@@ -4648,6 +4730,7 @@ def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[di
         "sub_code": None,
         "msg": None,
         "duree_secondes": None,
+        "params_envoyes": None,
     }
     if not ALIEXPRESS_APP_SECRET:
         diagnostic["msg"] = "ALIEXPRESS_APP_SECRET vide."
@@ -4657,28 +4740,31 @@ def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[di
         diagnostic["msg"] = "Aucun token OAuth AliExpress enregistré — autorise l'app dans Mon Compte (admin)."
         return None, diagnostic
 
-    params = {
+    signed_params = {
         "app_key": ALIEXPRESS_APP_KEY,
         "method": method,
-        # access_token (pas "session" -- voir docstring, corrige suite au
-        # diagnostic "MissingParameter" reel en production) : le CURL
-        # officiel AliExpress pour aliexpress.ds.product.get utilise bien
-        # ce nom de parametre.
-        "access_token": access_token,
         "sign_method": "sha256",
         "timestamp": str(int(time.time() * 1000)),
         "format": "json",
+        **({"v": "2.0"} if include_v else {}),
         **business_params,
     }
+    if token_in_signature:
+        signed_params[token_param] = access_token
     # Prefixe de chemin VIDE (voir docstring) -- seul OAuth (/auth/token/...)
-    # prepende son propre chemin dans _sign_top_rest. access_token est deja
-    # dans `params` a ce stade, donc inclus dans le calcul de signature.
-    params["sign"] = _sign_top_rest("", params, ALIEXPRESS_APP_SECRET)
+    # prepende son propre chemin dans _sign_top_rest.
+    sign_value = _sign_top_rest("", signed_params, ALIEXPRESS_APP_SECRET)
+
+    params_to_send = dict(signed_params)
+    if not token_in_signature:
+        params_to_send[token_param] = access_token
+    params_to_send["sign"] = sign_value
+    diagnostic["params_envoyes"] = _mask_param_summary(params_to_send)
 
     try:
         # Timeout court et delibere : un echec d'API doit echouer vite,
         # jamais retenter plusieurs fois par candidat (voir search_product).
-        response = requests.post(ALIEXPRESS_REST_GATEWAY, data=params, timeout=10)
+        response = requests.post(ALIEXPRESS_REST_GATEWAY, data=params_to_send, timeout=10)
         diagnostic["http_status"] = response.status_code
         data = response.json()
     except Exception as exc:
@@ -4699,18 +4785,45 @@ def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[di
 
 def aliexpress_ds_product_get(product_id: str) -> tuple[dict | None, dict]:
     """aliexpress.ds.product.get via le Gateway REST/IOP officiel (voir
-    _call_aliexpress_product_api) -- fiche produit via l'API officielle
-    (necessite un access_token OAuth valide, envoye dans `session`). A
-    tenter en priorite avant tout scraping des qu'un token est disponible
-    et qu'un product_id a pu etre extrait de l'URL (voir
+    _call_aliexpress_product_probe) -- fiche produit via l'API officielle.
+    A tenter en priorite avant tout scraping des qu'un token est
+    disponible et qu'un product_id a pu etre extrait de l'URL (voir
     extract_aliexpress_product_id). biz_model/province_code/city_code
     (optionnels dans la doc officielle) ne sont volontairement PAS
     envoyes tant qu'on n'a pas de vraies valeurs -- les exemples de la
     doc ("biz_model", "provice", "city") ne sont que des placeholders.
     aliexpress.affiliate.product.query n'est PAS utilisee tant que la
     permission Affiliate n'est pas activee sur l'app cote console
-    AliExpress."""
-    return _call_aliexpress_product_api(
+    AliExpress.
+
+    HISTORIQUE COMPLET des tentatives reelles en production pour cette
+    methode precise (jamais pour OAuth, toujours confirme fonctionnel) :
+    1. eco.taobao.com/router/rest, HMAC-MD5 -> "isv.appkey-not-exists"
+       (code 29) : cette AppKey n'existe pas sur cette famille de gateway.
+    2. api-sg.aliexpress.com/sync, chemin "/sync" prefixe dans la
+       signature SHA256 -> "IncompleteSignature".
+    3. api-sg.aliexpress.com/rest, `session=<token>` inclus dans la
+       signature SHA256, prefixe vide -> gateway/AppKey/signature
+       ACCEPTES (HTTP 200) mais "MissingParameter".
+    4. api-sg.aliexpress.com/rest, `access_token=<token>` inclus dans la
+       signature SHA256, prefixe vide -> "IncompleteSignature" (a
+       nouveau, alors que le SEUL changement etait le nom du parametre).
+
+    ANALYSE (tentative 3 vs 4) : passer de "session" a "access_token" a
+    fait regresser un probleme de PARAMETRE MANQUANT vers un probleme de
+    SIGNATURE INVALIDE, alors que le nom du parametre seul ne devrait pas
+    casser un calcul de signature purement mecanique (tri + concatenation).
+    L'explication la plus coherente : `access_token` ne doit PAS faire
+    partie de la chaine signee (contrairement a "session" dans l'essai 3,
+    qui semble avoir ete accepte comme parametre "generique" mais pas
+    reconnu comme LE token attendu -- d'ou "manquant"). Cette fonction
+    utilise donc desormais : `access_token` envoye mais EXCLU du calcul
+    de signature, `v=2.0` reintroduit (mentionne par la doc TOP de cette
+    methode, jamais teste sur ce Gateway REST/IOP). C'EST UNE HYPOTHESE,
+    PAS UNE CERTITUDE -- voir le panneau "Diagnostic AliExpress (admin)"
+    qui teste plusieurs variantes controlees en parallele pour trancher
+    definitivement (voir render_account_page)."""
+    return _call_aliexpress_product_probe(
         "aliexpress.ds.product.get",
         {
             "product_id": product_id,
@@ -4719,6 +4832,10 @@ def aliexpress_ds_product_get(product_id: str) -> tuple[dict | None, dict]:
             "target_language": "fr",
             "remove_personal_benefit": "false",
         },
+        token_param="access_token",
+        token_in_signature=False,
+        include_v=True,
+        probe_label="access_token hors signature + v=2.0",
     )
 
 
