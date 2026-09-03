@@ -3,8 +3,8 @@ MargeMax — Outil de sourcing et de recherche de produits AliExpress
 pour e-commerçants et dropshippers.
 
 Stack : Streamlit + Supabase (DB / Auth) + AliExpress Open Platform (OAuth
-+ Gateway TOP aliexpress.ds.product.get quand un token est disponible,
-avec repli sur le parser web direct sinon)
++ aliexpress.ds.product.get via le Gateway REST/IOP quand un token est
+disponible, avec repli sur le parser web direct sinon)
 """
 
 import base64
@@ -18,7 +18,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import unquote, urlparse
 
 import pandas as pd
@@ -75,16 +75,17 @@ SCRAPER_API_KEY = st.secrets.get("SCRAPER_API_KEY", "").strip()
 # .streamlit/secrets.toml, cote serveur.
 ALIEXPRESS_APP_KEY = st.secrets.get("ALIEXPRESS_APP_KEY", "544130") or "544130"
 ALIEXPRESS_APP_SECRET = st.secrets.get("ALIEXPRESS_APP_SECRET", "").strip()
-ALIEXPRESS_REST_GATEWAY = "https://api-sg.aliexpress.com/rest"  # Gateway REST (paths /auth/token/...) -- OAuth UNIQUEMENT, jamais touche ici.
-# Gateway TOP RPC historique -- utilise UNIQUEMENT pour
-# aliexpress.ds.product.get (voir _call_aliexpress_top_api). Diagnostic
-# officiel confirme en production : l'appel via api-sg.aliexpress.com/sync
-# atteignait bien AliExpress (HTTP 200) mais renvoyait "IncompleteSignature"
-# -- cette methode precise est documentee comme une API TOP classique
-# (session= au lieu d'access_token=, signature HMAC-MD5, PAS HMAC-SHA256).
-# OAuth (api-sg.aliexpress.com/rest, HMAC-SHA256) reste inchange et
-# confirme fonctionnel : ne pas y toucher.
-ALIEXPRESS_TOP_GATEWAY = "https://eco.taobao.com/router/rest"
+# Gateway REST/IOP officiel -- utilise pour DEUX choses distinctes :
+# 1. OAuth (paths /auth/token/create, /auth/token/refresh) -- confirme
+#    fonctionnel en production, jamais touche.
+# 2. aliexpress.ds.product.get, appelee sur ce MEME host mais SANS suffixe
+#    de chemin (POST direct sur ALIEXPRESS_REST_GATEWAY, `method=` envoye
+#    comme parametre -- voir _call_aliexpress_product_api). Documentation
+#    officielle AliExpress + exemple SDK IOP fournis par l'utilisateur.
+#    Deux gateways precedemment essayees et abandonnees pour cette methode :
+#    eco.taobao.com/router/rest (isv.appkey-not-exists) puis .../sync avec
+#    le chemin "/sync" prefixe dans la signature (IncompleteSignature).
+ALIEXPRESS_REST_GATEWAY = "https://api-sg.aliexpress.com/rest"
 ALIEXPRESS_OAUTH_AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
 
 # URL publique de l'app, callback OAuth strictement identique a celle
@@ -602,6 +603,41 @@ def inject_custom_css() -> None:
             transform: translateY(-2px);
         }
         div.stButton > button:active { transform: translateY(0); }
+
+        /* Boutons de telechargement (st.download_button) -- st.button est
+        style ci-dessus via "div.stButton", mais Streamlit rend
+        st.download_button dans un conteneur DIFFERENT ("div.stDownloadButton"),
+        qui n'heritait d'AUCUNE regle : le label retombait donc sur le style
+        Streamlit natif, parfois tronque/invisible selon le theme. Regle
+        dediee pour "⬇️ Télécharger mes notes"/"⬇️ Télécharger" (comparatifs) :
+        fond rouge conserve (voir type="primary"), texte TOUJOURS visible en
+        entier (pas de troncature, retour a la ligne autorise si necessaire).
+        Le bouton secondaire "⬇️ Télécharger en CSV" (sans type="primary")
+        n'est pas touche par ce selecteur -- reste inchange. */
+        div.stDownloadButton > button[kind="primary"] {
+            background: #EF4444;
+            border: none;
+            border-radius: 8px;
+            padding: 0.55rem 1.2rem;
+            font-weight: 600;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: unset;
+            line-height: 1.3;
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+            transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease), filter 0.25s var(--ease);
+        }
+        div.stDownloadButton > button[kind="primary"] * {
+            color: #FFFFFF !important;
+            opacity: 1 !important;
+            white-space: normal !important;
+        }
+        div.stDownloadButton > button[kind="primary"]:hover {
+            filter: brightness(1.08);
+            box-shadow: 0 8px 26px rgba(239, 68, 68, 0.5);
+            transform: translateY(-2px);
+        }
+        div.stDownloadButton > button[kind="primary"]:active { transform: translateY(0); }
 
         [data-testid="stLinkButton"] a {
             background: linear-gradient(135deg, var(--accent-indigo), var(--accent-violet)) !important;
@@ -1835,18 +1871,15 @@ def get_aliexpress_authorize_url() -> str:
 
 
 def _sign_top_rest(api_path: str, params: dict, app_secret: str) -> str:
-    """Signature HMAC-SHA256 du Gateway REST/IOP AliExpress (paths
-    /auth/token/create, /auth/token/refresh -- OAuth uniquement) :
-    HMAC-SHA256(cle=app_secret, message = api_path + parametres tries par
-    cle et concatenes 'clevaleur'), en hexadecimal majuscule. Confirme
-    fonctionnel en production pour OAuth -- NE PAS TOUCHER.
-
-    aliexpress.ds.product.get n'utilise PAS cette signature : diagnostic
-    officiel en production, l'appel via ce protocole (Gateway /sync)
-    atteignait bien AliExpress mais renvoyait "IncompleteSignature" --
-    cette methode precise est une API TOP classique qui utilise
-    _sign_top_rpc (HMAC-MD5, sans chemin d'API) sur le Gateway
-    eco.taobao.com/router/rest (voir _call_aliexpress_top_api)."""
+    """Signature HMAC-SHA256 du Gateway REST/IOP AliExpress
+    (api-sg.aliexpress.com/rest) : HMAC-SHA256(cle=app_secret, message =
+    api_path + parametres tries par cle et concatenes 'clevaleur'), en
+    hexadecimal majuscule. `api_path` est le segment de chemin dedie
+    APRES /rest (ex: "/auth/token/create" pour OAuth) ; chaine vide pour
+    un appel "generique" comme aliexpress.ds.product.get, poste
+    directement sur /rest avec `method=` en parametre (voir
+    _call_aliexpress_product_api) -- confirme fonctionnel en production
+    pour OAuth, NE PAS TOUCHER a cette fonction."""
     sorted_items = sorted(params.items())
     base_string = api_path + "".join(f"{k}{v}" for k, v in sorted_items)
     return hmac.new(
@@ -2943,7 +2976,7 @@ def render_comparison_table(context: str, with_vat: bool = False) -> None:
             st.rerun()
     with col_c:
         st.download_button(
-            "⬇️ Télécharger le comparatif",
+            "⬇️ Télécharger",
             data=_build_comparatif_txt(edited, with_vat).encode("utf-8"),
             file_name=f"margemax_comparatif_{datetime.now():%Y-%m-%d_%H-%M}.txt",
             mime="text/plain",
@@ -3636,9 +3669,9 @@ def render_account_page() -> None:
 
             # Deux tests ADMIN DISTINCTS, deliberement separes : un echec de
             # l'un ne doit jamais etre confondu avec un echec de l'autre --
-            # OAuth (api-sg.aliexpress.com) et l'appel produit TOP
-            # (eco.taobao.com/router/rest) sont deux protocoles/gateways
-            # totalement independants depuis la correction signature.
+            # OAuth (paths /auth/token/...) et l'appel produit (methode
+            # generique sur /rest) partagent le meme host/gateway mais pas
+            # le meme chemin ni les memes parametres systeme.
             st.divider()
             st.markdown("**Test 1 — OAuth** (`api-sg.aliexpress.com`, inchangé, doit rester OK)")
             stored_refresh_token = get_app_config("aliexpress_refresh_token")
@@ -3661,15 +3694,19 @@ def render_account_page() -> None:
 
             st.divider()
             st.markdown(
-                "**Test 2 — API produit TOP** (`eco.taobao.com/router/rest`, "
+                "**Test 2 — API produit** (`api-sg.aliexpress.com/rest`, "
                 "`aliexpress.ds.product.get`) — sans ScraperAPI ni Google, juste l'appel officiel."
             )
             test_product_id = st.text_input(
                 "product_id à tester", value="1005010664344065", key="mm_api_test_pid",
             )
-            st.caption("ship_to_country=FR · target_currency=EUR · target_language=FR (fixes, voir aliexpress_ds_product_get)")
-            if st.button("🧪 Tester API produit TOP", key="mm_test_api_product"):
-                with st.spinner("Appel de aliexpress.ds.product.get (Gateway TOP)…"):
+            st.caption(
+                "ship_to_country=FR · target_currency=EUR · target_language=fr · "
+                "remove_personal_benefit=false (fixes, voir aliexpress_ds_product_get) — "
+                "biz_model/province_code/city_code volontairement omis (pas de vraie valeur)."
+            )
+            if st.button("🧪 Tester API produit AliExpress", key="mm_test_api_product"):
+                with st.spinner("Appel de aliexpress.ds.product.get…"):
                     payload, api_diag = aliexpress_ds_product_get(test_product_id.strip())
                 st.markdown(
                     f"**Gateway :** `{api_diag.get('gateway')}`  \n"
@@ -4568,46 +4605,43 @@ def _extract_top_response_root(payload: dict) -> dict:
     return next((v for k, v in payload.items() if k.endswith("_response")), payload)
 
 
-def _sign_top_rpc(params: dict, app_secret: str) -> str:
-    """Signature HMAC-MD5 du Gateway TOP RPC historique (eco.taobao.com/
-    router/rest), mode officiel `sign_method=hmac` -- utilisee UNIQUEMENT
-    pour aliexpress.ds.product.get (voir _call_aliexpress_top_api).
-    Algorithme : trier tous les parametres (hors `sign`) par cle ASCII,
-    concatener cle+valeur sans separateur, HMAC-MD5(cle=app_secret,
-    message=chaine), hexadecimal MAJUSCULE. DIFFERENT de _sign_top_rest
-    (HMAC-SHA256, chemin d'API en prefixe, utilise par OAuth) -- les deux
-    algorithmes ne sont PAS interchangeables, ne pas fusionner."""
-    sorted_items = sorted(params.items())
-    base_string = "".join(f"{k}{v}" for k, v in sorted_items)
-    return hmac.new(
-        app_secret.encode("utf-8"), base_string.encode("utf-8"), hashlib.md5
-    ).hexdigest().upper()
+def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[dict | None, dict]:
+    """Appelle le Gateway REST/IOP officiel (ALIEXPRESS_REST_GATEWAY,
+    https://api-sg.aliexpress.com/rest) SANS suffixe de chemin -- pour
+    aliexpress.ds.product.get, `method` est envoye comme parametre, pas
+    comme segment d'URL (contrairement a OAuth /auth/token/create qui,
+    lui, ajoute son chemin dedie). Base sur la documentation officielle
+    AliExpress + l'exemple SDK IOP officiel fournis par l'utilisateur
+    (iop.IopClient(url="https://api-sg.aliexpress.com/rest", ...),
+    request.execute(request, access_token) -> access_token envoye dans
+    `session`).
 
+    Deux gateways precedemment essayees et abandonnees pour cette methode
+    precise (jamais pour OAuth, toujours confirme fonctionnel) :
+    - eco.taobao.com/router/rest (HMAC-MD5) -> "isv.appkey-not-exists".
+    - api-sg.aliexpress.com/sync avec le chemin "/sync" prefixe dans la
+      signature -> "IncompleteSignature" (HTTP 200, requete atteignait
+      bien AliExpress, signature/protocole incorrects pour CETTE methode).
 
-def _call_aliexpress_top_api(method: str, business_params: dict) -> tuple[dict | None, dict]:
-    """Appelle le Gateway TOP RPC historique (eco.taobao.com/router/rest)
-    -- utilise UNIQUEMENT pour aliexpress.ds.product.get. Diagnostic
-    officiel obtenu en production (voir aliexpress_ds_product_get) :
-    l'appel via api-sg.aliexpress.com/sync atteignait bien AliExpress
-    (HTTP 200) mais renvoyait "IncompleteSignature" -- la documentation
-    AliExpress classe cette methode comme une API TOP classique, protocole
-    et signature differents du Gateway REST/IOP utilise par OAuth
-    (_sign_top_rest, NON touche ici -- OAuth confirme fonctionnel).
-    Parametres systeme TOP : app_key, method, session (PAS access_token),
-    timestamp au format "yyyy-MM-dd HH:mm:ss" en GMT+8, format=json,
-    v=2.0, sign_method=hmac. Signature HMAC-MD5 (voir _sign_top_rpc), PAS
-    HMAC-SHA256.
+    Reutilise _sign_top_rest (MEME algorithme HMAC-SHA256 confirme
+    fonctionnel pour OAuth sur ce host) avec un prefixe de chemin VIDE --
+    aliexpress.ds.product.get n'est pas appelee sur un sous-chemin dedie
+    comme /auth/token/create, donc rien n'est prepende a la signature.
+    Cette reconstruction n'a PAS pu etre verifiee contre le code source
+    reel du SDK IOP officiel (introuvable publiquement en l'etat) --
+    c'est la meilleure hypothese etayee disponible, a confirmer par le
+    test admin en production.
 
     Retourne TOUJOURS (data_ou_None, diagnostic) : diagnostic contient
     gateway/method/http_status/code/sub_code/msg/duree_secondes, meme en
     cas d'echec -- utilise par le bouton de test isole admin (voir
     render_account_page) et par le diagnostic de recherche. Si AliExpress
-    renvoie a nouveau "isv.appkey-not-exists" ou toute autre erreur, elle
-    est affichee TELLE QUELLE ici -- jamais de bascule automatique vers
-    une autre gateway ni de modification des cles."""
+    renvoie une erreur (nouvelle ou deja vue), elle est affichee TELLE
+    QUELLE ici -- jamais de bascule automatique vers une autre gateway ni
+    de modification des cles."""
     started = time.time()
     diagnostic: dict = {
-        "gateway": ALIEXPRESS_TOP_GATEWAY,
+        "gateway": ALIEXPRESS_REST_GATEWAY,
         "method": method,
         "http_status": None,
         "code": None,
@@ -4623,27 +4657,23 @@ def _call_aliexpress_top_api(method: str, business_params: dict) -> tuple[dict |
         diagnostic["msg"] = "Aucun token OAuth AliExpress enregistré — autorise l'app dans Mon Compte (admin)."
         return None, diagnostic
 
-    # Horodatage GMT+8 (China Standard Time) exige par le protocole TOP
-    # classique -- format "yyyy-MM-dd HH:mm:ss", DIFFERENT du timestamp
-    # epoch millisecondes du Gateway REST/IOP (_sign_top_rest/OAuth).
-    timestamp_cst = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
-
     params = {
         "app_key": ALIEXPRESS_APP_KEY,
         "method": method,
         "session": access_token,
-        "timestamp": timestamp_cst,
+        "sign_method": "sha256",
+        "timestamp": str(int(time.time() * 1000)),
         "format": "json",
-        "v": "2.0",
-        "sign_method": "hmac",
         **business_params,
     }
-    params["sign"] = _sign_top_rpc(params, ALIEXPRESS_APP_SECRET)
+    # Prefixe de chemin VIDE (voir docstring) -- seul OAuth (/auth/token/...)
+    # prepende son propre chemin dans _sign_top_rest.
+    params["sign"] = _sign_top_rest("", params, ALIEXPRESS_APP_SECRET)
 
     try:
         # Timeout court et delibere : un echec d'API doit echouer vite,
         # jamais retenter plusieurs fois par candidat (voir search_product).
-        response = requests.post(ALIEXPRESS_TOP_GATEWAY, data=params, timeout=10)
+        response = requests.post(ALIEXPRESS_REST_GATEWAY, data=params, timeout=10)
         diagnostic["http_status"] = response.status_code
         data = response.json()
     except Exception as exc:
@@ -4652,10 +4682,7 @@ def _call_aliexpress_top_api(method: str, business_params: dict) -> tuple[dict |
         return None, diagnostic
 
     diagnostic["duree_secondes"] = round(time.time() - started, 2)
-    # Le Gateway TOP RPC classique enveloppe TOUJOURS ses erreurs dans
-    # "error_response" -- contrairement au Gateway REST/IOP /sync qui
-    # pouvait aussi renvoyer un code au niveau racine.
-    error_block = data.get("error_response")
+    error_block = data.get("error_response") or ({"code": data.get("code"), "sub_code": data.get("sub_code"), "msg": data.get("msg")} if data.get("code") else None)
     if error_block:
         diagnostic["code"] = error_block.get("code")
         diagnostic["sub_code"] = error_block.get("sub_code")
@@ -4666,21 +4693,26 @@ def _call_aliexpress_top_api(method: str, business_params: dict) -> tuple[dict |
 
 
 def aliexpress_ds_product_get(product_id: str) -> tuple[dict | None, dict]:
-    """aliexpress.ds.product.get via le Gateway TOP RPC historique (voir
-    _call_aliexpress_top_api) -- fiche produit via l'API officielle
+    """aliexpress.ds.product.get via le Gateway REST/IOP officiel (voir
+    _call_aliexpress_product_api) -- fiche produit via l'API officielle
     (necessite un access_token OAuth valide, envoye dans `session`). A
     tenter en priorite avant tout scraping des qu'un token est disponible
     et qu'un product_id a pu etre extrait de l'URL (voir
-    extract_aliexpress_product_id). aliexpress.affiliate.product.query
-    n'est PAS utilisee tant que la permission Affiliate n'est pas activee
-    sur l'app cote console AliExpress."""
-    return _call_aliexpress_top_api(
+    extract_aliexpress_product_id). biz_model/province_code/city_code
+    (optionnels dans la doc officielle) ne sont volontairement PAS
+    envoyes tant qu'on n'a pas de vraies valeurs -- les exemples de la
+    doc ("biz_model", "provice", "city") ne sont que des placeholders.
+    aliexpress.affiliate.product.query n'est PAS utilisee tant que la
+    permission Affiliate n'est pas activee sur l'app cote console
+    AliExpress."""
+    return _call_aliexpress_product_api(
         "aliexpress.ds.product.get",
         {
             "product_id": product_id,
             "ship_to_country": "FR",
             "target_currency": "EUR",
-            "target_language": "FR",
+            "target_language": "fr",
+            "remove_personal_benefit": "false",
         },
     )
 
