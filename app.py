@@ -4610,27 +4610,27 @@ def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[di
     https://api-sg.aliexpress.com/rest) SANS suffixe de chemin -- pour
     aliexpress.ds.product.get, `method` est envoye comme parametre, pas
     comme segment d'URL (contrairement a OAuth /auth/token/create qui,
-    lui, ajoute son chemin dedie). Base sur la documentation officielle
-    AliExpress + l'exemple SDK IOP officiel fournis par l'utilisateur
-    (iop.IopClient(url="https://api-sg.aliexpress.com/rest", ...),
-    request.execute(request, access_token) -> access_token envoye dans
-    `session`).
+    lui, ajoute son chemin dedie).
 
-    Deux gateways precedemment essayees et abandonnees pour cette methode
-    precise (jamais pour OAuth, toujours confirme fonctionnel) :
+    Historique des tentatives precedentes pour cette methode precise
+    (jamais pour OAuth, toujours confirme fonctionnel) :
     - eco.taobao.com/router/rest (HMAC-MD5) -> "isv.appkey-not-exists".
     - api-sg.aliexpress.com/sync avec le chemin "/sync" prefixe dans la
-      signature -> "IncompleteSignature" (HTTP 200, requete atteignait
-      bien AliExpress, signature/protocole incorrects pour CETTE methode).
+      signature -> "IncompleteSignature".
+    - api-sg.aliexpress.com/rest avec `session=<token>` -> gateway/AppKey/
+      signature ACCEPTES (HTTP 200) mais "MissingParameter" : le CURL
+      officiel de la doc AliExpress pour cette methode utilise
+      `access_token=<token>`, pas `session=` (reserve a d'autres flux TOP) --
+      corrige ci-dessous.
 
     Reutilise _sign_top_rest (MEME algorithme HMAC-SHA256 confirme
-    fonctionnel pour OAuth sur ce host) avec un prefixe de chemin VIDE --
+    fonctionnel pour OAuth sur ce host, ET desormais confirme accepte par
+    AliExpress pour cette methode aussi) avec un prefixe de chemin VIDE --
     aliexpress.ds.product.get n'est pas appelee sur un sous-chemin dedie
     comme /auth/token/create, donc rien n'est prepende a la signature.
-    Cette reconstruction n'a PAS pu etre verifiee contre le code source
-    reel du SDK IOP officiel (introuvable publiquement en l'etat) --
-    c'est la meilleure hypothese etayee disponible, a confirmer par le
-    test admin en production.
+    `access_token` fait partie des parametres signes, comme tous les
+    autres (voir params["sign"] plus bas, calcule APRES ajout d'
+    access_token au dict).
 
     Retourne TOUJOURS (data_ou_None, diagnostic) : diagnostic contient
     gateway/method/http_status/code/sub_code/msg/duree_secondes, meme en
@@ -4660,14 +4660,19 @@ def _call_aliexpress_product_api(method: str, business_params: dict) -> tuple[di
     params = {
         "app_key": ALIEXPRESS_APP_KEY,
         "method": method,
-        "session": access_token,
+        # access_token (pas "session" -- voir docstring, corrige suite au
+        # diagnostic "MissingParameter" reel en production) : le CURL
+        # officiel AliExpress pour aliexpress.ds.product.get utilise bien
+        # ce nom de parametre.
+        "access_token": access_token,
         "sign_method": "sha256",
         "timestamp": str(int(time.time() * 1000)),
         "format": "json",
         **business_params,
     }
     # Prefixe de chemin VIDE (voir docstring) -- seul OAuth (/auth/token/...)
-    # prepende son propre chemin dans _sign_top_rest.
+    # prepende son propre chemin dans _sign_top_rest. access_token est deja
+    # dans `params` a ce stade, donc inclus dans le calcul de signature.
     params["sign"] = _sign_top_rest("", params, ALIEXPRESS_APP_SECRET)
 
     try:
