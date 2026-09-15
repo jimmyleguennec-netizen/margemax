@@ -316,17 +316,17 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                     {mode === "login" ? (
                       <OverlayFace
                         key="to-signup"
-                        title="New here?"
+                        title="Nouveau ici ?"
                         text="Créez votre compte et recevez 3 crédits offerts pour analyser vos premiers produits."
-                        cta="Sign Up"
+                        cta="S'inscrire"
                         onClick={() => setMode("signup")}
                       />
                     ) : (
                       <OverlayFace
                         key="to-login"
-                        title="Already a member?"
+                        title="Déjà un compte ?"
                         text="Connectez-vous pour retrouver votre carnet de sourcing et vos crédits."
-                        cta="Sign In"
+                        cta="Se connecter"
                         onClick={() => setMode("login")}
                       />
                     )}
