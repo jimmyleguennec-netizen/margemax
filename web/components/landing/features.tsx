@@ -26,7 +26,7 @@ const features = [
     icon: BookMarked,
     title: "Carnet & comparateur",
     description:
-      "Centralisez vos favoris, comparez plusieurs fournisseurs et exportez vos analyses en un clic.",
+      "Centralisez vos favoris, comparez plusieurs offres et exportez vos analyses en un clic.",
     accent: "pink",
     span: "lg:col-span-1",
   },

@@ -29,14 +29,14 @@ const reliability = [
 
 const suppliers = [
   {
-    name: "Fournisseur A",
+    name: "Annonce A",
     price: "18,90 €",
     marge: "14,20 €",
     margePct: "35,6 %",
     best: true,
   },
   {
-    name: "Fournisseur B",
+    name: "Annonce B",
     price: "21,50 €",
     marge: "11,60 €",
     margePct: "27,8 %",
@@ -206,7 +206,7 @@ function WindowsDemoWindow() {
           {/* Barre de titre style Windows 11 */}
           <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] pl-4">
             <span className="truncate text-xs font-medium text-white/50">
-              MargeMax — Comparateur de fournisseurs
+              MargeMax — Comparateur d&apos;offres AliExpress
             </span>
             <div className="flex items-center">
               <button
@@ -238,7 +238,7 @@ function WindowsDemoWindow() {
 
           <div className="space-y-4 p-6 text-left">
             <p className="text-sm text-white/50">
-              Même produit, deux fournisseurs — MargeMax classe
+              Même produit, deux annonces AliExpress — MargeMax classe
               automatiquement le meilleur ROI.
             </p>
 

@@ -76,27 +76,25 @@ export function Hero() {
           variants={item}
           className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl"
         >
-          Trouvez le fournisseur AliExpress{" "}
+          Trouvez le produit AliExpress{" "}
           <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(217,70,239,0.4)]">
             le moins cher au coût total réel
           </span>
         </motion.h1>
 
         <motion.p variants={item} className="max-w-xl text-lg text-white/60">
-          Produit + Livraison + Taxes -- calculés sur le checkout réel, pas
-          une estimation.
+          Produit + livraison + taxes — calculés sur le checkout réel de
+          l&apos;annonce la moins chère, pas une estimation.
         </motion.p>
 
         <motion.p
           variants={item}
           className="max-w-2xl text-sm text-white/40"
         >
-          Recherche par mots-clés ou lien AliExpress direct{" "}
-          <span className="text-cyan-400">→</span> scan global AliExpress{" "}
-          <span className="text-cyan-400">→</span> extraction des coûts de
-          checkout réels (sous-total, livraison, frais
-          d&apos;importation/TVA) <span className="text-cyan-400">→</span>{" "}
-          détection de la meilleure marge.
+          Scan global des annonces AliExpress{" "}
+          <span className="text-cyan-400">→</span> extraction des prix de
+          checkout réels <span className="text-cyan-400">→</span> sélection
+          de l&apos;offre la moins chère avec la meilleure marge.
         </motion.p>
 
         <motion.div

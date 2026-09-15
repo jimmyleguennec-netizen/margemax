@@ -49,7 +49,7 @@ const guideSteps: {
     label: "4. Décidez",
     title: "Comparez et agissez",
     description:
-      "Ajoutez le produit à votre carnet, comparez plusieurs fournisseurs et passez à l'achat en confiance.",
+      "Ajoutez le produit à votre carnet, comparez plusieurs offres et passez à l'achat en confiance.",
   },
 ];
 
