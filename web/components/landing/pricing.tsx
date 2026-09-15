@@ -33,7 +33,7 @@ const item = {
 
 export function Pricing() {
   return (
-    <section id="pricing" className="container py-20 sm:py-28">
+    <section id="pricing" className="container scroll-mt-20 py-20 sm:py-28">
       <div className="mx-auto mb-8 max-w-2xl text-center">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Des crédits, pas un abonnement

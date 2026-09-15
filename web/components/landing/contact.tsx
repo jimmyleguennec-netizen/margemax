@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
-import { Mail, ShieldCheck, Timer } from "lucide-react";
+import { Mail, MessageSquare, ShieldCheck, Timer, User } from "lucide-react";
 
 const COUNTDOWN_SECONDS = 5;
 const CONTACT_EMAIL =
@@ -44,7 +44,7 @@ export function Contact() {
   }
 
   return (
-    <section ref={sectionRef} id="contact" className="container py-20 sm:py-28">
+    <section ref={sectionRef} id="contact" className="container scroll-mt-20 py-20 sm:py-28">
       <div className="mx-auto mb-10 max-w-2xl text-center">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Une question ? Écrivez-nous
@@ -70,14 +70,17 @@ export function Contact() {
           >
             Nom
           </label>
-          <input
-            id="contact-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="Jean Dupont"
-            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
-          />
+          <div className="relative flex items-center">
+            <User className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+            <input
+              id="contact-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Jean Dupont"
+              className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">
@@ -108,15 +111,18 @@ export function Contact() {
           >
             Message
           </label>
-          <textarea
-            id="contact-message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            required
-            rows={4}
-            placeholder="Votre question..."
-            className="w-full resize-none rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
-          />
+          <div className="relative">
+            <MessageSquare className="pointer-events-none absolute left-3 top-3.5 z-10 h-4 w-4 text-cyan-400/60" />
+            <textarea
+              id="contact-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              required
+              rows={4}
+              placeholder="Votre question..."
+              className="w-full resize-none rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            />
+          </div>
         </div>
 
         <button

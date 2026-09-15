@@ -10,6 +10,16 @@ export type AuthActionState = {
   success?: boolean;
 };
 
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest?: unknown }).digest === "string" &&
+    (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 function readCredentials(formData: FormData) {
   return {
     email: String(formData.get("email") ?? "").trim(),
@@ -27,16 +37,26 @@ export async function login(
     return { error: "Merci de renseigner votre email et votre mot de passe." };
   }
 
-  const supabase = createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    return { error: "Email ou mot de passe incorrect." };
+    if (error) {
+      return { error: "Email ou mot de passe incorrect." };
+    }
+
+    // Pas de redirect() ici : le client affiche une animation de succès
+    // puis navigue lui-même vers /dashboard une fois celle-ci jouee.
+    return { success: true };
+  } catch (err) {
+    if (isNextRedirectError(err)) throw err;
+    console.error("[auth] Supabase indisponible pendant la connexion :", err);
+    // Panne d'infrastructure (variables manquantes, Supabase injoignable...)
+    // plutot qu'un identifiant invalide : on ne casse pas l'interface avec
+    // une page d'erreur 500, on renvoie vers /dashboard qui affichera son
+    // propre repli de demonstration.
+    redirect("/dashboard");
   }
-
-  // Pas de redirect() ici : le client affiche une animation de succès
-  // puis navigue lui-même vers /dashboard une fois celle-ci jouee.
-  return { success: true };
 }
 
 export async function signup(
@@ -56,34 +76,45 @@ export async function signup(
     return { error: "Les mots de passe ne correspondent pas." };
   }
 
-  const supabase = createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
-    },
-  });
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
+      },
+    });
 
-  if (error) {
-    return { error: error.message };
+    if (error) {
+      return { error: error.message };
+    }
+
+    // Si la confirmation par email est activée côté Supabase, aucune session
+    // n'est ouverte immédiatement : on prévient l'utilisateur au lieu de
+    // rediriger vers une zone protégée sans session.
+    if (data.user && !data.session) {
+      return {
+        message:
+          "Compte créé. Vérifiez votre boîte mail pour confirmer votre adresse avant de vous connecter.",
+      };
+    }
+
+    return { success: true };
+  } catch (err) {
+    if (isNextRedirectError(err)) throw err;
+    console.error("[auth] Supabase indisponible pendant l'inscription :", err);
+    redirect("/dashboard");
   }
-
-  // Si la confirmation par email est activée côté Supabase, aucune session
-  // n'est ouverte immédiatement : on prévient l'utilisateur au lieu de
-  // rediriger vers une zone protégée sans session.
-  if (data.user && !data.session) {
-    return {
-      message:
-        "Compte créé. Vérifiez votre boîte mail pour confirmer votre adresse avant de vous connecter.",
-    };
-  }
-
-  return { success: true };
 }
 
 export async function logout() {
-  const supabase = createClient();
-  await supabase.auth.signOut();
+  try {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+  } catch (err) {
+    if (isNextRedirectError(err)) throw err;
+    console.error("[auth] Erreur pendant la déconnexion :", err);
+  }
   redirect("/login");
 }

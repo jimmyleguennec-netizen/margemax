@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   Calculator,
   History,
   LogOut,
@@ -40,23 +41,34 @@ function ComingSoonPanel({
   );
 }
 
-function ParametresPanel({ email }: { email: string }) {
+function ParametresPanel({ email, isDemo }: { email: string; isDemo: boolean }) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
         <div>
-          <p className="text-sm text-white/40">Connecté en tant que</p>
+          <p className="text-sm text-white/40">
+            {isDemo ? "Aperçu de démonstration" : "Connecté en tant que"}
+          </p>
           <p className="text-lg font-medium text-white">{email}</p>
         </div>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white/80 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(244,114,182,0.5)]"
+        {isDemo ? (
+          <a
+            href="/login"
+            className="flex items-center gap-2 rounded-full border border-cyan-400/30 px-5 py-2.5 text-sm font-medium text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.6)]"
           >
-            <LogOut className="h-4 w-4" />
-            Se déconnecter
-          </button>
-        </form>
+            Réessayer la connexion
+          </a>
+        ) : (
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white/80 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(244,114,182,0.5)]"
+            >
+              <LogOut className="h-4 w-4" />
+              Se déconnecter
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
@@ -73,7 +85,13 @@ function ParametresPanel({ email }: { email: string }) {
   );
 }
 
-export function DashboardShell({ email }: { email: string }) {
+export function DashboardShell({
+  email,
+  isDemo = false,
+}: {
+  email: string;
+  isDemo?: boolean;
+}) {
   const [active, setActive] = useState("recherche");
 
   return (
@@ -115,6 +133,16 @@ export function DashboardShell({ email }: { email: string }) {
         </div>
       </header>
 
+      {isDemo && (
+        <div className="border-b border-yellow-400/20 bg-yellow-400/[0.06] px-4 py-2.5 text-center text-xs text-yellow-200">
+          <span className="inline-flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Mode démonstration -- la connexion à Supabase est momentanément
+            indisponible, ceci est un aperçu statique de l&apos;interface.
+          </span>
+        </div>
+      )}
+
       <main className="container py-10">
         <AnimatePresence mode="wait">
           <motion.div
@@ -142,7 +170,9 @@ export function DashboardShell({ email }: { email: string }) {
                 description="Retrouvez ici vos recherches précédentes, vos favoris et votre comparateur de fournisseurs."
               />
             )}
-            {active === "parametres" && <ParametresPanel email={email} />}
+            {active === "parametres" && (
+              <ParametresPanel email={email} isDemo={isDemo} />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

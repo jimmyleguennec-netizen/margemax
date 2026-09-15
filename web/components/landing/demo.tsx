@@ -243,7 +243,7 @@ function WindowsDemoWindow() {
 
 export function Demo() {
   return (
-    <section id="demo" className="container pb-20 sm:pb-28">
+    <section id="demo" className="container scroll-mt-20 pb-20 sm:pb-28">
       <div className="mx-auto mb-12 max-w-2xl text-center">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Une fiche claire, pas une estimation au doigt mouillé

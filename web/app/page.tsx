@@ -4,9 +4,12 @@ import { Demo } from "@/components/landing/demo";
 import { InteractiveDemo } from "@/components/landing/interactive-demo";
 import { Features } from "@/components/landing/features";
 import { QuickGuide } from "@/components/landing/quick-guide";
+import { CreditCalculator } from "@/components/landing/credit-calculator";
 import { Pricing } from "@/components/landing/pricing";
+import { Faq } from "@/components/landing/faq";
 import { Contact } from "@/components/landing/contact";
 import { CtaFooter } from "@/components/landing/cta-footer";
+import { LiveActivityToast } from "@/components/landing/live-activity-toast";
 
 export default function HomePage() {
   return (
@@ -31,10 +34,14 @@ export default function HomePage() {
         <InteractiveDemo />
         <Features />
         <QuickGuide />
+        <CreditCalculator />
         <Pricing />
+        <Faq />
         <Contact />
         <CtaFooter />
       </main>
+
+      <LiveActivityToast />
     </div>
   );
 }
