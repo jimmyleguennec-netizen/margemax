@@ -1,12 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { CheckCircle2, Minus, Package, Square, TrendingUp, X } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  Minus,
+  Package,
+  Square,
+  Star,
+  TrendingUp,
+  Truck,
+  Undo2,
+  X,
+} from "lucide-react";
 
 const rows = [
-  { label: "Prix produit", value: "18,90 €" },
-  { label: "Livraison", value: "4,50 €" },
-  { label: "Frais d'importation", value: "2,30 €" },
+  { label: "Sous-total produit", value: "7,89 €" },
+  { label: "Frais de livraison", value: "1,99 €" },
+  { label: "Frais d'importation estimés", value: "3,60 €" },
+];
+
+const reliability = [
+  { icon: Star, label: "4,8/5 (2 340 avis)" },
+  { icon: Undo2, label: "Retours sous 15 j" },
+  { icon: Truck, label: "Livraison 12-20 j" },
 ];
 
 const suppliers = [
@@ -86,20 +104,41 @@ function MacDemoWindow() {
               ))}
               <div className="my-2 h-px bg-white/10" />
               <div className="flex items-center justify-between font-semibold text-white">
-                <span>Coût total</span>
-                <span>25,70 €</span>
+                <span className="uppercase tracking-wide">
+                  Total réel checkout
+                </span>
+                <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                  13,48 €
+                </span>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.55, duration: 0.4 }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Coût 100 % vérifié
+              </motion.div>
             </div>
 
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.55, duration: 0.4 }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]"
+              transition={{ delay: 0.6, duration: 0.4 }}
+              className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-white/40"
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Coût vérifié
+              {reliability.map((r) => (
+                <span key={r.label} className="flex items-center gap-1.5">
+                  <r.icon className="h-3.5 w-3.5 text-cyan-400/70" />
+                  {r.label}
+                </span>
+              ))}
             </motion.div>
 
             <motion.div
@@ -112,22 +151,32 @@ function MacDemoWindow() {
               <div>
                 <p className="text-xs text-white/40">Marge nette</p>
                 <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-                  14,20 €
+                  11,42 €
                 </p>
-                <p className="text-xs text-white/40">35,6 %</p>
+                <p className="text-xs text-white/40">45,9 %</p>
               </div>
               <div>
                 <p className="flex items-center gap-1 text-xs text-white/40">
                   <TrendingUp className="h-3.5 w-3.5" /> ROI
                 </p>
                 <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-                  55,3 %
+                  84,7 %
                 </p>
                 <p className="text-xs text-white/40">
-                  Prix de vente : 39,90 €
+                  Prix de vente : 24,90 €
                 </p>
               </div>
             </motion.div>
+
+            <Link
+              href="https://www.aliexpress.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 rounded-lg border border-white/15 py-2.5 text-sm font-semibold text-white/80 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.5)]"
+            >
+              Voir l&apos;offre sur AliExpress
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
       </div>

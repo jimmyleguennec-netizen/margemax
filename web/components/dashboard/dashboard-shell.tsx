@@ -15,6 +15,7 @@ import {
 import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
 import { CreditCardInput } from "@/components/ui/credit-card-input";
+import { SearchPanel } from "@/components/dashboard/search-panel";
 
 const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
@@ -152,12 +153,7 @@ export function DashboardShell({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
           >
-            {active === "recherche" && (
-              <ComingSoonPanel
-                title="Recherche de produits"
-                description="La recherche AliExpress (par lien direct ou par mot-clé) arrive prochainement sur la nouvelle interface."
-              />
-            )}
+            {active === "recherche" && <SearchPanel />}
             {active === "calculateur" && (
               <ComingSoonPanel
                 title="Calculateur de marge"
