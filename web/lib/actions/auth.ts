@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export type AuthActionState = {
   error?: string;
   message?: string;
+  success?: boolean;
 };
 
 function readCredentials(formData: FormData) {
@@ -33,7 +34,9 @@ export async function login(
     return { error: "Email ou mot de passe incorrect." };
   }
 
-  redirect("/dashboard");
+  // Pas de redirect() ici : le client affiche une animation de succès
+  // puis navigue lui-même vers /dashboard une fois celle-ci jouee.
+  return { success: true };
 }
 
 export async function signup(
@@ -76,7 +79,7 @@ export async function signup(
     };
   }
 
-  redirect("/dashboard");
+  return { success: true };
 }
 
 export async function logout() {

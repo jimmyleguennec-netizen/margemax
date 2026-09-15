@@ -74,3 +74,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fond degrade anime -- overlay coulissant de la page d'authentification
+   neon (components/auth/neon-auth-panel.tsx). */
+.neon-gradient-bg {
+  background: linear-gradient(120deg, #7c3aed, #d946ef, #06b6d4);
+  background-size: 200% 200%;
+  animation: neon-pan 6s ease infinite;
+}
+
+@keyframes neon-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
