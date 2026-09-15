@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormState, useFormStatus } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Mail, ShieldCheck } from "lucide-react";
 
 import { login, signup, type AuthActionState } from "@/lib/actions/auth";
+import { RgbLoader } from "@/components/ui/rgb-loader";
+import { PasswordInput } from "@/components/ui/password-input";
 
 type Mode = "login" | "signup";
 type FormDispatch = (payload: FormData) => void;
@@ -63,7 +65,7 @@ function NeonSubmitButton({ children }: { children: React.ReactNode }) {
       disabled={pending}
       className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold uppercase tracking-wide text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.7)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {pending && <RgbLoader size={16} />}
       {children}
     </button>
   );
@@ -123,12 +125,10 @@ function LoginForm({
         icon={Mail}
         autoComplete="email"
       />
-      <NeonField
+      <PasswordInput
         id={`${idPrefix}-login-password`}
         name="password"
-        type="password"
         label="Mot de passe"
-        icon={Lock}
         autoComplete="current-password"
       />
       <NeonMessage state={state} />
@@ -162,21 +162,17 @@ function SignupForm({
         icon={Mail}
         autoComplete="email"
       />
-      <NeonField
+      <PasswordInput
         id={`${idPrefix}-signup-password`}
         name="password"
-        type="password"
         label="Mot de passe"
-        icon={Lock}
         autoComplete="new-password"
         minLength={6}
       />
-      <NeonField
+      <PasswordInput
         id={`${idPrefix}-signup-confirm`}
         name="confirmPassword"
-        type="password"
         label="Confirmer le mot de passe"
-        icon={Lock}
         autoComplete="new-password"
         minLength={6}
       />

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
@@ -94,17 +94,12 @@ export function Pricing() {
 
                 <div className="flex-1" />
 
-                <Link
+                <AnimatedBuyButton
+                  label="Choisir ce pack"
+                  successLabel="C'est parti !"
                   href="/signup"
-                  className={cn(
-                    "mt-6 flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300",
-                    pack.popular
-                      ? "bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)]"
-                      : "border border-white/15 text-white/80 hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_16px_-4px_rgba(34,211,238,0.5)]"
-                  )}
-                >
-                  Choisir ce pack
-                </Link>
+                  className="mt-6"
+                />
               </div>
             </div>
           </motion.div>

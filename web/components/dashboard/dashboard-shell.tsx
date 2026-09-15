@@ -13,6 +13,7 @@ import {
 
 import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
+import { CreditCardInput } from "@/components/ui/credit-card-input";
 
 const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
@@ -41,20 +42,33 @@ function ComingSoonPanel({
 
 function ParametresPanel({ email }: { email: string }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
-      <div>
-        <p className="text-sm text-white/40">Connecté en tant que</p>
-        <p className="text-lg font-medium text-white">{email}</p>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
+        <div>
+          <p className="text-sm text-white/40">Connecté en tant que</p>
+          <p className="text-lg font-medium text-white">{email}</p>
+        </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white/80 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(244,114,182,0.5)]"
+          >
+            <LogOut className="h-4 w-4" />
+            Se déconnecter
+          </button>
+        </form>
       </div>
-      <form action={logout}>
-        <button
-          type="submit"
-          className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white/80 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(244,114,182,0.5)]"
-        >
-          <LogOut className="h-4 w-4" />
-          Se déconnecter
-        </button>
-      </form>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+        <h3 className="mb-1 text-center text-sm font-medium uppercase tracking-wider text-cyan-200/70">
+          Moyen de paiement
+        </h3>
+        <p className="mb-6 text-center text-xs text-white/40">
+          Aperçu visuel de la carte -- l&apos;achat de crédits se fait
+          aujourd&apos;hui via Stripe Checkout.
+        </p>
+        <CreditCardInput />
+      </div>
     </div>
   );
 }
