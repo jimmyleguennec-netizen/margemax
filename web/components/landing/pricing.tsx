@@ -61,7 +61,13 @@ export function Pricing() {
         className="grid items-start gap-6 sm:grid-cols-2 lg:grid-cols-5"
       >
         {packs.map((pack) => (
-          <motion.div key={pack.key} variants={item} className="relative h-full">
+          <motion.div
+            key={pack.key}
+            variants={item}
+            whileHover={{ scale: 1.08, zIndex: 30 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="group relative h-full"
+          >
             {pack.popular && (
               <span className="absolute -top-3 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-3 py-1 text-xs font-semibold text-white shadow-[0_0_16px_-2px_rgba(34,211,238,0.8)]">
                 Le plus populaire
@@ -70,10 +76,10 @@ export function Pricing() {
 
             <div
               className={cn(
-                "relative h-full rounded-2xl p-[1.5px] transition-transform duration-300",
+                "relative h-full rounded-2xl p-[1.5px] transition-all duration-300",
                 pack.popular
-                  ? "bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-purple-500 shadow-[0_0_50px_-10px_rgba(217,70,239,0.6)] sm:scale-105"
-                  : "bg-white/10"
+                  ? "bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-purple-500 shadow-[0_0_50px_-10px_rgba(217,70,239,0.6)] sm:scale-105 group-hover:shadow-[0_0_90px_-10px_rgba(217,70,239,0.95)]"
+                  : "bg-white/10 group-hover:bg-gradient-to-b group-hover:from-cyan-400/80 group-hover:via-fuchsia-500/70 group-hover:to-purple-500/80 group-hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.8)]"
               )}
             >
               <div
@@ -98,7 +104,7 @@ export function Pricing() {
                   label="Choisir ce pack"
                   successLabel="C'est parti !"
                   href="/signup"
-                  className="mt-6"
+                  className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
               </div>
             </div>
