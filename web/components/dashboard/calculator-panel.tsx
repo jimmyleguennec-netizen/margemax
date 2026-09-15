@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp } from "lucide-react";
+import { Gauge, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 
 function parseEuro(value: string): number {
   const n = Number(value.replace(",", "."));
@@ -10,11 +10,34 @@ function parseEuro(value: string): number {
 }
 
 function formatEuro(n: number): string {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  return (
+    n.toLocaleString("fr-FR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + " €"
+  );
+}
+
+function toInputValue(n: number): string {
+  return n.toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatPct(n: number): string {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+  return (
+    n.toLocaleString("fr-FR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }) + " %"
+  );
+}
+
+// Arrondi psychologique (ex: 32,56 -> 32,90) pour les prix suggeres.
+function roundToPsychological(price: number): number {
+  if (price <= 0) return 0;
+  return Math.max(0.9, Math.round(price) - 0.1);
 }
 
 function NeonNumberField({
@@ -53,13 +76,33 @@ function NeonNumberField({
   );
 }
 
-export function CalculatorPanel() {
-  const [purchase, setPurchase] = useState("7,89");
-  const [shipping, setShipping] = useState("1,99");
-  const [importTax, setImportTax] = useState("3,60");
-  const [salePrice, setSalePrice] = useState("24,90");
+function AnimatedNumber({
+  value,
+  className,
+}: {
+  value: string;
+  className?: string;
+}) {
+  return (
+    <motion.p
+      key={value}
+      initial={{ opacity: 0.3, scale: 0.95, filter: "brightness(1.8)" }}
+      animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className={className}
+    >
+      {value}
+    </motion.p>
+  );
+}
 
-  const result = useMemo(() => {
+export function CalculatorPanel() {
+  const [purchase, setPurchase] = useState("14,49");
+  const [shipping, setShipping] = useState("0,00");
+  const [importTax, setImportTax] = useState("3,60");
+  const [salePrice, setSalePrice] = useState("29,90");
+
+  const estimate = useMemo(() => {
     const p = parseEuro(purchase);
     const s = parseEuro(shipping);
     const t = parseEuro(importTax);
@@ -70,10 +113,38 @@ export function CalculatorPanel() {
     const marginPct = sale > 0 ? (margin / sale) * 100 : 0;
     const roiPct = totalCost > 0 ? (margin / totalCost) * 100 : 0;
 
-    return { totalCost, margin, marginPct, roiPct };
+    const recommendedPrice = roundToPsychological(totalCost * 1.8);
+    const highPrice = roundToPsychological(totalCost * 2.3);
+    const lowPrice = roundToPsychological(totalCost * 1.5);
+
+    const marginHigh = highPrice - totalCost;
+    const roiHigh = totalCost > 0 ? (marginHigh / totalCost) * 100 : 0;
+    const marginLow = lowPrice - totalCost;
+    const roiLow = totalCost > 0 ? (marginLow / totalCost) * 100 : 0;
+
+    const importRatio = totalCost > 0 ? t / totalCost : 0;
+    const reliability =
+      totalCost > 0
+        ? Math.min(99, Math.max(60, Math.round(97 - importRatio * 35)))
+        : 0;
+
+    return {
+      totalCost,
+      margin,
+      marginPct,
+      roiPct,
+      recommendedPrice,
+      highPrice,
+      lowPrice,
+      marginHigh,
+      roiHigh,
+      marginLow,
+      roiLow,
+      reliability,
+    };
   }, [purchase, shipping, importTax, salePrice]);
 
-  const isProfitable = result.margin > 0;
+  const isProfitable = estimate.margin > 0;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -82,7 +153,8 @@ export function CalculatorPanel() {
           Calculateur de marge
         </h2>
         <p className="mt-1 mb-6 text-sm text-white/40">
-          Renseignez vos propres coûts -- le calcul se met à jour en direct.
+          Renseignez vos propres coûts -- le calcul et les estimations se
+          mettent à jour en direct.
         </p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -106,50 +178,66 @@ export function CalculatorPanel() {
           />
           <NeonNumberField
             id="calc-sale"
-            label="Prix de vente"
+            label="Prix de vente (manuel)"
             value={salePrice}
             onChange={setSalePrice}
           />
         </div>
 
-        <motion.div
-          key={`${result.totalCost}-${result.margin}`}
-          initial={{ opacity: 0.6 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className="mt-8 grid grid-cols-2 gap-4 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.04] p-5 sm:grid-cols-4"
-        >
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSalePrice(toInputValue(estimate.lowPrice))}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(244,114,182,0.5)]"
+          >
+            <TrendingDown className="h-3.5 w-3.5" />
+            Appliquer Marge Basse
+          </button>
+          <button
+            type="button"
+            onClick={() => setSalePrice(toInputValue(estimate.highPrice))}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]"
+          >
+            <TrendingUp className="h-3.5 w-3.5" />
+            Appliquer Marge Haute
+          </button>
+        </div>
+
+        {/* Resultat du prix de vente manuel */}
+        <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-5 sm:grid-cols-4">
           <div>
             <p className="text-xs text-white/40">Coût total</p>
-            <p className="mt-1 text-lg font-bold text-white">
-              {formatEuro(result.totalCost)}
-            </p>
+            <AnimatedNumber
+              value={formatEuro(estimate.totalCost)}
+              className="mt-1 text-lg font-bold text-white"
+            />
           </div>
           <div>
             <p className="text-xs text-white/40">Marge nette</p>
-            <p
+            <AnimatedNumber
+              value={formatEuro(estimate.margin)}
               className={`mt-1 text-lg font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] ${
                 isProfitable ? "text-cyan-300" : "text-pink-400"
               }`}
-            >
-              {formatEuro(result.margin)}
-            </p>
+            />
           </div>
           <div>
             <p className="text-xs text-white/40">Marge %</p>
-            <p className="mt-1 text-lg font-bold text-white">
-              {formatPct(result.marginPct)}
-            </p>
+            <AnimatedNumber
+              value={formatPct(estimate.marginPct)}
+              className="mt-1 text-lg font-bold text-white"
+            />
           </div>
           <div>
             <p className="flex items-center gap-1 text-xs text-white/40">
               <TrendingUp className="h-3 w-3" /> ROI
             </p>
-            <p className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-              {formatPct(result.roiPct)}
-            </p>
+            <AnimatedNumber
+              value={formatPct(estimate.roiPct)}
+              className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]"
+            />
           </div>
-        </motion.div>
+        </div>
 
         {!isProfitable && (
           <p className="mt-3 text-center text-xs text-pink-300">
@@ -157,6 +245,103 @@ export function CalculatorPanel() {
             réduisez les coûts.
           </p>
         )}
+
+        {/* Bloc 1 : Couts reels */}
+        <div className="mt-8">
+          <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">
+            Bloc 1 -- Coûts réels
+          </h3>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm">
+            <div className="flex items-center justify-between text-white/50">
+              <span>Prix produit</span>
+              <span className="font-medium text-white">
+                {formatEuro(parseEuro(purchase))}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-white/50">
+              <span>Livraison</span>
+              <span className="font-medium text-white">
+                {formatEuro(parseEuro(shipping))}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-white/50">
+              <span>Taxes / import</span>
+              <span className="font-medium text-white">
+                {formatEuro(parseEuro(importTax))}
+              </span>
+            </div>
+            <div className="my-2 h-px bg-white/10" />
+            <div className="flex items-center justify-between font-semibold text-white">
+              <span>Coût total</span>
+              <AnimatedNumber
+                value={formatEuro(estimate.totalCost)}
+                className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Bloc 2 : Estimations & Marges */}
+        <div className="mt-6">
+          <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">
+            Bloc 2 -- Estimations &amp; Marges
+          </h3>
+
+          <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] p-5">
+            <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+              <div>
+                <p className="flex items-center gap-1.5 text-xs text-white/40">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                  Prix de vente recommandé estimé
+                </p>
+                <AnimatedNumber
+                  value={formatEuro(estimate.recommendedPrice)}
+                  className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]"
+                />
+              </div>
+              <span className="flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1.5 text-xs font-semibold text-green-300 shadow-[0_0_16px_-4px_rgba(74,222,128,0.7)]">
+                <Gauge className="h-3.5 w-3.5" />
+                Indice de fiabilité : {estimate.reliability} %
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p className="flex items-center gap-1.5 text-xs text-white/40">
+                  <TrendingDown className="h-3.5 w-3.5 text-pink-300" />
+                  Marge basse (fourchette prudente)
+                </p>
+                <AnimatedNumber
+                  value={formatEuro(estimate.lowPrice)}
+                  className="mt-1 text-lg font-bold text-white"
+                />
+                <p className="mt-1 text-xs text-white/40">
+                  Marge {formatEuro(estimate.marginLow)} ·{" "}
+                  {formatPct(estimate.roiLow)} ROI
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p className="flex items-center gap-1.5 text-xs text-white/40">
+                  <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
+                  Marge haute (fourchette premium)
+                </p>
+                <AnimatedNumber
+                  value={formatEuro(estimate.highPrice)}
+                  className="mt-1 text-lg font-bold text-white"
+                />
+                <p className="mt-1 text-xs text-white/40">
+                  Marge {formatEuro(estimate.marginHigh)} ·{" "}
+                  {formatPct(estimate.roiHigh)} ROI
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-center text-[11px] text-white/30">
+              Estimation calculée à partir de vos coûts réels -- pas une
+              donnée de marché garantie.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
