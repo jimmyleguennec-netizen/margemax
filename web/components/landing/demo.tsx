@@ -11,35 +11,35 @@ import {
   Star,
   TrendingUp,
   Truck,
-  Undo2,
   X,
 } from "lucide-react";
 
+const PRODUCT_URL = "https://fr.aliexpress.com/item/1005006478208156.html";
+
 const rows = [
-  { label: "Sous-total produit", value: "7,89 €" },
-  { label: "Frais de livraison", value: "1,99 €" },
+  { label: "Sous-total produit", value: "14,49 €" },
+  { label: "Frais de livraison", value: "Gratuit (0,00 €)" },
   { label: "Frais d'importation estimés", value: "3,60 €" },
 ];
 
 const reliability = [
-  { icon: Star, label: "4,8/5 (2 340 avis)" },
-  { icon: Undo2, label: "Retours sous 15 j" },
-  { icon: Truck, label: "Livraison 12-20 j" },
+  { icon: Star, label: "3,9/5 (47 vendus)" },
+  { icon: Truck, label: "Colissimo / Colis Privé" },
 ];
 
-const suppliers = [
+const offers = [
   {
-    name: "Annonce A",
-    price: "18,90 €",
-    marge: "14,20 €",
-    margePct: "35,6 %",
+    name: "Offre N°1 — Sélection MargeMax",
+    price: "18,09 €",
+    marge: "21,81 €",
+    margePct: "120,5 % ROI",
     best: true,
   },
   {
-    name: "Annonce B",
-    price: "21,50 €",
-    marge: "11,60 €",
-    margePct: "27,8 %",
+    name: "Offre N°2 — Annonce alternative",
+    price: "24,90 €",
+    marge: "15,00 €",
+    margePct: "60,2 % ROI",
     best: false,
   },
 ];
@@ -80,10 +80,10 @@ function MacDemoWindow() {
               </div>
               <div>
                 <p className="font-medium leading-tight text-white">
-                  Chargeur sans fil 3-en-1
+                  Station de charge sans fil 3-en-1 pliable
                 </p>
                 <p className="text-sm text-white/40">
-                  Variante sélectionnée : Noir
+                  Compatible iPhone / Watch / AirPods
                 </p>
               </div>
             </div>
@@ -108,7 +108,7 @@ function MacDemoWindow() {
                   Total réel checkout
                 </span>
                 <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                  13,48 €
+                  18,09 €
                 </span>
               </div>
             </div>
@@ -151,25 +151,25 @@ function MacDemoWindow() {
               <div>
                 <p className="text-xs text-white/40">Marge nette</p>
                 <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-                  11,42 €
+                  21,81 €
                 </p>
-                <p className="text-xs text-white/40">45,9 %</p>
+                <p className="text-xs text-white/40">54,7 %</p>
               </div>
               <div>
                 <p className="flex items-center gap-1 text-xs text-white/40">
                   <TrendingUp className="h-3.5 w-3.5" /> ROI
                 </p>
                 <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-                  84,7 %
+                  120,5 %
                 </p>
                 <p className="text-xs text-white/40">
-                  Prix de vente : 24,90 €
+                  Prix de vente conseillé : 39,90 €
                 </p>
               </div>
             </motion.div>
 
             <Link
-              href="https://www.aliexpress.com"
+              href={PRODUCT_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 rounded-lg border border-white/15 py-2.5 text-sm font-semibold text-white/80 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.5)]"
@@ -243,7 +243,7 @@ function WindowsDemoWindow() {
             </p>
 
             <div className="space-y-3">
-              {suppliers.map((s, i) => (
+              {offers.map((s, i) => (
                 <motion.div
                   key={s.name}
                   initial={{ opacity: 0, x: 8 }}
@@ -309,8 +309,8 @@ export function Demo() {
       </div>
 
       <p className="mt-4 text-center text-xs text-white/30">
-        Exemple illustratif — chaque recherche affiche les données réelles du
-        produit analysé.
+        Exemple basé sur une véritable annonce AliExpress — chaque recherche
+        affiche les données réelles au moment de l&apos;analyse.
       </p>
     </section>
   );
