@@ -4,8 +4,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const benefits = [
@@ -37,19 +35,19 @@ export function Pricing() {
   return (
     <section id="pricing" className="container py-20 sm:py-28">
       <div className="mx-auto mb-8 max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Des crédits, pas un abonnement
         </h2>
-        <p className="mt-3 text-muted-foreground">
+        <p className="mt-3 text-white/50">
           3 crédits offerts à l&apos;inscription. Achetez uniquement ce dont
           vous avez besoin, sans engagement, sans date de renouvellement.
         </p>
       </div>
 
-      <ul className="mx-auto mb-12 flex max-w-3xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+      <ul className="mx-auto mb-12 flex max-w-3xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/50">
         {benefits.map((b) => (
           <li key={b} className="flex items-center gap-1.5">
-            <Check className="h-4 w-4 shrink-0 text-primary" />
+            <Check className="h-4 w-4 shrink-0 text-cyan-400" />
             {b}
           </li>
         ))}
@@ -60,46 +58,60 @@ export function Pricing() {
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
-        className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid items-start gap-6 sm:grid-cols-2 lg:grid-cols-5"
       >
         {packs.map((pack) => (
-          <motion.div key={pack.key} variants={item}>
-            <Card
+          <motion.div key={pack.key} variants={item} className="relative h-full">
+            {pack.popular && (
+              <span className="absolute -top-3 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-3 py-1 text-xs font-semibold text-white shadow-[0_0_16px_-2px_rgba(34,211,238,0.8)]">
+                Le plus populaire
+              </span>
+            )}
+
+            <div
               className={cn(
-                "relative flex h-full flex-col",
-                pack.popular && "border-primary shadow-md ring-1 ring-primary"
+                "relative h-full rounded-2xl p-[1.5px] transition-transform duration-300",
+                pack.popular
+                  ? "bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-purple-500 shadow-[0_0_50px_-10px_rgba(217,70,239,0.6)] sm:scale-105"
+                  : "bg-white/10"
               )}
             >
-              {pack.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                  Le plus populaire
-                </span>
-              )}
-              <CardHeader>
-                <p className="text-sm font-medium text-muted-foreground">
+              <div
+                className={cn(
+                  "flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6",
+                  pack.popular && "bg-[#0d0a16]"
+                )}
+              >
+                <p className="text-sm font-medium text-white/50">
                   Pack {pack.label}
                 </p>
-                <p className="text-3xl font-bold">{pack.price}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="mt-1 text-3xl font-bold text-white">
+                  {pack.price}
+                </p>
+                <p className="mt-1 text-sm text-white/40">
                   {pack.credits} crédits · {pack.perCredit}
                 </p>
-              </CardHeader>
-              <CardContent className="flex-1" />
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={pack.popular ? "default" : "outline"}
-                  asChild
+
+                <div className="flex-1" />
+
+                <Link
+                  href="/signup"
+                  className={cn(
+                    "mt-6 flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-300",
+                    pack.popular
+                      ? "bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)]"
+                      : "border border-white/15 text-white/80 hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_16px_-4px_rgba(34,211,238,0.5)]"
+                  )}
                 >
-                  <Link href="/signup">Choisir ce pack</Link>
-                </Button>
-              </CardFooter>
-            </Card>
+                  Choisir ce pack
+                </Link>
+              </div>
+            </div>
           </motion.div>
         ))}
       </motion.div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
+      <p className="mt-8 text-center text-xs text-white/30">
         Paiement 100 % sécurisé via Stripe. Créez votre compte pour acheter un
         pack de crédits.
       </p>

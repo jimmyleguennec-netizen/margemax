@@ -6,7 +6,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="dark relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-[#05050a] px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-[#05050a] px-4 py-12">
       <div
         aria-hidden
         className="pointer-events-none absolute -left-32 top-1/4 -z-10 h-[420px] w-[420px] rounded-full bg-cyan-500/20 blur-[120px]"

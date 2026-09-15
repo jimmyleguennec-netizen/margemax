@@ -4,8 +4,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-
 const container = {
   hidden: {},
   show: {
@@ -26,9 +24,9 @@ export function Hero() {
         className="pointer-events-none absolute inset-x-0 -top-40 -z-10 flex justify-center blur-3xl"
       >
         <motion.div
-          animate={{ scale: [1, 1.1, 1], opacity: [0.35, 0.5, 0.35] }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="h-[420px] w-[720px] rounded-full bg-gradient-to-tr from-primary/40 via-primary/10 to-transparent"
+          className="h-[420px] w-[720px] rounded-full bg-gradient-to-tr from-cyan-500/40 via-fuchsia-500/20 to-transparent"
         />
       </div>
 
@@ -40,41 +38,55 @@ export function Hero() {
       >
         <motion.div
           variants={item}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-4 py-1.5 text-sm font-medium text-secondary-foreground"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-cyan-100 backdrop-blur-sm"
         >
-          <Sparkles className="h-4 w-4 text-primary" />
-          Marge réelle vérifiée, pas estimée
+          <Sparkles className="h-4 w-4 text-cyan-400" />
+          Marge{" "}
+          <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+            réelle
+          </span>{" "}
+          vérifiée, pas estimée
         </motion.div>
 
         <motion.h1
           variants={item}
-          className="max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl"
+          className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl"
         >
           Trouvez vos meilleures opportunités de{" "}
-          <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(217,70,239,0.4)]">
             sourcing AliExpress
           </span>
         </motion.h1>
 
-        <motion.p
-          variants={item}
-          className="max-w-xl text-lg text-muted-foreground"
-        >
+        <motion.p variants={item} className="max-w-xl text-lg text-white/60">
           MargeMax analyse un produit AliExpress et calcule instantanément le
-          prix, la livraison, les frais d&apos;importation réels, votre marge
-          et votre ROI — sans jamais inventer une donnée.
+          prix, la livraison, les{" "}
+          <span className="text-cyan-300">frais d&apos;importation réels</span>,
+          votre marge et votre ROI — sans jamais inventer une donnée.
         </motion.p>
 
-        <motion.div variants={item} className="flex flex-wrap items-center justify-center gap-3">
-          <Button size="lg" asChild>
-            <Link href="/signup">
+        <motion.div
+          variants={item}
+          className="flex flex-wrap items-center justify-center gap-4"
+        >
+          {/* CTA principal -- bordure lumineuse animee (border beam) */}
+          <span className="relative inline-flex overflow-hidden rounded-full p-[1.5px]">
+            <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#22d3ee_0%,#d946ef_50%,#22d3ee_100%)]" />
+            <Link
+              href="/signup"
+              className="relative z-10 inline-flex items-center gap-2 rounded-full bg-[#05050a] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0a0a14]"
+            >
               Essayer gratuitement
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </Button>
-          <Button size="lg" variant="outline" asChild>
-            <Link href="/login">J&apos;ai déjà un compte</Link>
-          </Button>
+          </span>
+
+          <Link
+            href="/login"
+            className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white/80 backdrop-blur-sm transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_20px_-4px_rgba(34,211,238,0.5)]"
+          >
+            J&apos;ai déjà un compte
+          </Link>
         </motion.div>
       </motion.div>
     </section>
