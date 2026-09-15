@@ -8,39 +8,64 @@ export const metadata: Metadata = {
 
 export default function MentionsLegalesPage() {
   return (
-    <LegalPage title="Mentions légales" updatedAt="[à compléter]">
+    <LegalPage title="Mentions légales" updatedAt="15 septembre 2026">
       <LegalSection title="Éditeur du site">
         <p>
-          Le site MargeMax est édité par [Raison sociale / Nom du porteur de
-          projet], [forme juridique -- ex. SASU, auto-entreprise...],
-          immatriculée sous le numéro SIRET [numéro SIRET], dont le siège
-          social est situé [adresse complète].
+          Le site et le service MargeMax sont édités par la société{" "}
+          <strong className="text-white">AutOutilShop SAS</strong>, société
+          par actions simplifiée immatriculée au Registre du Commerce et des
+          Sociétés (RCS) de Narbonne, dont le siège social est situé au 4 rue
+          Gustave Delory, 11100 Narbonne, France.
         </p>
         <p>
-          Directeur de la publication : [Nom du responsable].
-          <br />
-          Contact : [adresse email de contact].
+          Contact :{" "}
+          <a
+            href="mailto:contact@autoutilshop.com"
+            className="text-cyan-300 hover:underline"
+          >
+            contact@autoutilshop.com
+          </a>
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Directeur de la publication">
+        <p>
+          Le directeur de la publication est le Président de la société
+          AutOutilShop SAS.
         </p>
       </LegalSection>
 
       <LegalSection title="Hébergement">
         <p>
-          Le site est hébergé par [nom de l&apos;hébergeur -- ex. Vercel Inc.],
-          [adresse de l&apos;hébergeur].
+          Le site MargeMax est hébergé par Vercel Inc., dont le siège social
+          est situé au 440 N Barranca Ave #4133, Covina, CA 91723,
+          États-Unis.
         </p>
       </LegalSection>
 
       <LegalSection title="Propriété intellectuelle">
         <p>
-          L&apos;ensemble des contenus présents sur MargeMax (textes, logos,
-          interface, code) est protégé par le droit de la propriété
-          intellectuelle. Toute reproduction non autorisée est interdite.
+          L&apos;ensemble des éléments composant la plateforme MargeMax --
+          notamment son code source, son design, ses interfaces, ses
+          animations, son logo et l&apos;ensemble des contenus visuels ou
+          textuels qui y figurent -- est la propriété exclusive
+          d&apos;AutOutilShop SAS ou de ses partenaires, et est protégé à ce
+          titre par le droit d&apos;auteur, le droit des marques et, plus
+          généralement, l&apos;ensemble des dispositions applicables en
+          matière de propriété intellectuelle.
+        </p>
+        <p>
+          Toute reproduction, représentation, modification, publication ou
+          adaptation de tout ou partie des éléments du site, quel que soit le
+          moyen ou le procédé utilisé, est interdite sans l&apos;autorisation
+          écrite préalable d&apos;AutOutilShop SAS.
         </p>
       </LegalSection>
 
       <LegalSection title="Données personnelles">
         <p>
-          Le traitement des données personnelles est détaillé dans notre{" "}
+          Le traitement des données personnelles des utilisateurs du site
+          MargeMax est détaillé dans notre{" "}
           <a href="/confidentialite" className="text-cyan-300 hover:underline">
             politique de confidentialité
           </a>

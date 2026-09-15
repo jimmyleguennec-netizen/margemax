@@ -8,51 +8,86 @@ export const metadata: Metadata = {
 
 export default function ConfidentialitePage() {
   return (
-    <LegalPage title="Politique de confidentialité" updatedAt="[à compléter]">
+    <LegalPage title="Politique de confidentialité" updatedAt="15 septembre 2026">
+      <LegalSection title="Responsable du traitement">
+        <p>
+          Le responsable du traitement des données personnelles collectées
+          sur MargeMax est la société AutOutilShop SAS, 4 rue Gustave
+          Delory, 11100 Narbonne, France --{" "}
+          <a
+            href="mailto:contact@autoutilshop.com"
+            className="text-cyan-300 hover:underline"
+          >
+            contact@autoutilshop.com
+          </a>
+          .
+        </p>
+      </LegalSection>
+
       <LegalSection title="Données collectées">
         <p>
-          MargeMax collecte : votre adresse email et mot de passe (compte,
-          via Supabase Auth), l&apos;historique de vos recherches et
-          analyses effectuées depuis votre compte, et les informations de
-          paiement traitées directement par Stripe (jamais stockées par
-          MargeMax).
+          Dans le cadre de la création et de l&apos;utilisation d&apos;un
+          compte MargeMax, sont collectées : l&apos;adresse email du client,
+          ainsi que ses données de connexion et d&apos;utilisation du
+          service (historique des analyses réalisées, solde et
+          consommation de crédits).
         </p>
       </LegalSection>
 
       <LegalSection title="Finalité du traitement">
         <p>
-          Ces données sont utilisées pour fournir le service (authentification,
-          gestion des crédits, historique d&apos;analyses), améliorer le
-          produit, et répondre à vos demandes via le formulaire de contact.
+          Ces données sont utilisées exclusivement pour la gestion du compte
+          utilisateur, l&apos;attribution et le suivi des crédits, ainsi que
+          la sécurisation des accès au service, via la plateforme
+          d&apos;authentification Supabase.
+        </p>
+        <p>
+          Le traitement des paiements est géré exclusivement par Stripe,
+          prestataire de paiement tiers : AutOutilShop SAS ne collecte ni ne
+          conserve aucune donnée de carte bancaire.
         </p>
       </LegalSection>
 
-      <LegalSection title="Sous-traitants">
+      <LegalSection title="Destinataires des données">
         <p>
-          Supabase (authentification et base de données), Stripe (paiement),
-          [ajouter tout autre sous-traitant -- ex. hébergeur, service
-          d&apos;emailing].
+          Les données personnelles sont traitées par AutOutilShop SAS et par
+          ses sous-traitants techniques : Supabase (authentification et
+          hébergement des données de compte) et Stripe (traitement des
+          paiements). Aucune donnée n&apos;est cédée, louée ou vendue à des
+          tiers à des fins commerciales.
         </p>
       </LegalSection>
 
-      <LegalSection title="Durée de conservation">
-        <p>[À compléter -- durée de conservation des données de compte et d'historique.]</p>
-      </LegalSection>
-
-      <LegalSection title="Vos droits">
+      <LegalSection title="Conformité RGPD -- vos droits">
         <p>
-          Conformément au RGPD, vous disposez d&apos;un droit d&apos;accès,
-          de rectification, d&apos;effacement et de portabilité de vos
-          données. Pour exercer ces droits, contactez-nous à [adresse email
-          de contact dédiée RGPD].
+          Conformément au Règlement Général sur la Protection des Données
+          (RGPD) et à la loi Informatique et Libertés, tout utilisateur
+          dispose d&apos;un droit d&apos;accès, de rectification et de
+          suppression des données le concernant, ainsi que d&apos;un droit
+          à la portabilité et d&apos;un droit d&apos;opposition pour motif
+          légitime.
+        </p>
+        <p>
+          Ces droits peuvent être exercés à tout moment sur simple demande
+          adressée à{" "}
+          <a
+            href="mailto:contact@autoutilshop.com"
+            className="text-cyan-300 hover:underline"
+          >
+            contact@autoutilshop.com
+          </a>
+          . Une réponse sera apportée dans les meilleurs délais et au plus
+          tard dans le délai légal d&apos;un mois.
         </p>
       </LegalSection>
 
-      <LegalSection title="Cookies">
+      <LegalSection title="Sécurité">
         <p>
-          [À compléter selon les cookies effectivement utilisés -- cookies
-          de session Supabase nécessaires au fonctionnement du service, et
-          tout cookie de mesure d&apos;audience éventuellement ajouté.]
+          AutOutilShop SAS met en œuvre les mesures techniques et
+          organisationnelles appropriées pour assurer la sécurité et la
+          confidentialité des données personnelles traitées, et s&apos;appuie
+          à cet effet sur des prestataires reconnus (Supabase, Stripe,
+          Vercel).
         </p>
       </LegalSection>
     </LegalPage>

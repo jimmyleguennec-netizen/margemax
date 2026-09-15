@@ -33,13 +33,6 @@ export function LegalPage({
             Dernière mise à jour : {updatedAt}
           </p>
 
-          <div className="mt-6 rounded-xl border border-yellow-400/20 bg-yellow-400/[0.06] p-4 text-sm text-yellow-200">
-            Modèle à compléter -- les champs entre crochets doivent être
-            remplacés par les informations réelles de la société avant
-            publication. Faites relire ce document par un professionnel du
-            droit avant sa mise en ligne définitive.
-          </div>
-
           <div className="prose-invert mt-10 space-y-8 text-white/70">
             {children}
           </div>
