@@ -16,6 +16,7 @@ const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
 type SearchResult = {
   title: string;
   url: string;
+  product_image_url: string | null;
   subtotal: number | null;
   shipping: number | null;
   importFee: number | null;
@@ -69,6 +70,7 @@ function extractFromJsonLd(html: string): {
   title?: string;
   price?: number;
   currency?: string;
+  imageUrl?: string;
 } {
   const matches = html.matchAll(
     /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi
@@ -87,6 +89,10 @@ function extractFromJsonLd(html: string): {
         ? product.offers[0]
         : product.offers;
 
+      const rawImage = Array.isArray(product.image)
+        ? product.image[0]
+        : product.image;
+
       return {
         title: typeof product.name === "string" ? product.name : undefined,
         price:
@@ -97,6 +103,7 @@ function extractFromJsonLd(html: string): {
           typeof offer?.priceCurrency === "string"
             ? offer.priceCurrency
             : undefined,
+        imageUrl: typeof rawImage === "string" ? rawImage : undefined,
       };
     } catch {
       // Bloc JSON-LD malforme ou absent sur cette page -- on l'ignore et
@@ -107,6 +114,15 @@ function extractFromJsonLd(html: string): {
   }
 
   return {};
+}
+
+// Repli si le JSON-LD ne contient pas d'image : balise meta og:image,
+// presente sur la quasi-totalite des pages produit AliExpress.
+function extractOgImage(html: string): string | undefined {
+  const match = html.match(
+    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i
+  );
+  return match?.[1];
 }
 
 function extractShippingAndImportFee(html: string): {
@@ -166,8 +182,9 @@ export async function POST(request: Request) {
 
   try {
     const html = await fetchHtmlViaScraperApi(targetUrl);
-    const { title, price, currency } = extractFromJsonLd(html);
+    const { title, price, currency, imageUrl } = extractFromJsonLd(html);
     const { shipping, importFee } = extractShippingAndImportFee(html);
+    const productImageUrl = imageUrl ?? extractOgImage(html) ?? null;
 
     if (price === undefined || Number.isNaN(price)) {
       return NextResponse.json(
@@ -185,6 +202,7 @@ export async function POST(request: Request) {
     const result: SearchResult = {
       title: title ?? "Titre indisponible",
       url: targetUrl,
+      product_image_url: productImageUrl,
       subtotal,
       shipping,
       importFee,

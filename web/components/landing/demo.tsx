@@ -6,13 +6,14 @@ import {
   CheckCircle2,
   ExternalLink,
   Minus,
-  Package,
   Square,
   Star,
   TrendingUp,
   Truck,
   X,
 } from "lucide-react";
+
+import { ProductThumbnail } from "@/components/ui/product-thumbnail";
 
 const PRODUCT_URL = "https://fr.aliexpress.com/item/1005006478208156.html";
 
@@ -74,10 +75,11 @@ function MacDemoWindow() {
           </div>
 
           <div className="space-y-5 p-6 text-left">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white/5">
-                <Package className="h-6 w-6 text-cyan-300" />
-              </div>
+            <div className="flex items-center gap-4">
+              <ProductThumbnail
+                src={null}
+                alt="Station de charge sans fil 3-en-1 pliable"
+              />
               <div>
                 <p className="font-medium leading-tight text-white">
                   Station de charge sans fil 3-en-1 pliable

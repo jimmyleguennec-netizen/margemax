@@ -8,17 +8,18 @@ import {
   CheckCircle2,
   ExternalLink,
   Link2,
-  Package,
   Search,
 } from "lucide-react";
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { ProductThumbnail } from "@/components/ui/product-thumbnail";
 
 type Status = "idle" | "loading" | "result" | "error";
 
 type ApiResult = {
   title: string;
   url: string;
+  product_image_url: string | null;
   subtotal: number | null;
   shipping: number | null;
   importFee: number | null;
@@ -162,16 +163,17 @@ export function SearchPanel({
             transition={{ duration: 0.3 }}
             className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] backdrop-blur-sm"
           >
-            <div className="flex items-center gap-3 border-b border-white/10 p-5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/5">
-                <Package className="h-5 w-5 text-cyan-300" />
-              </div>
+            <div className="flex items-center gap-4 border-b border-white/10 p-5">
+              <ProductThumbnail
+                src={result.product_image_url}
+                alt={result.title}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-white">
                   {result.title}
                 </p>
               </div>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
+              <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
                 <CheckCircle2 className="h-3 w-3" />
                 Vérifié
               </span>
