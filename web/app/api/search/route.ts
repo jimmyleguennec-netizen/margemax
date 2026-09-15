@@ -36,6 +36,24 @@ function buildProductUrl(productId: string): string {
   return `https://www.aliexpress.com/item/${productId}.html`;
 }
 
+function buildSearchUrl(keyword: string): string {
+  const url = new URL("https://www.aliexpress.com/wholesale");
+  url.searchParams.set("SearchText", keyword);
+  return url.toString();
+}
+
+// Recherche par mot-cle : scrape la page de resultats AliExpress et prend
+// la premiere annonce trouvee comme candidate. Approche best-effort (pas de
+// classement/filtrage avance des resultats) -- consomme un second appel
+// ScraperAPI en plus de celui utilise pour recuperer la fiche produit.
+async function findFirstProductIdFromKeyword(
+  keyword: string
+): Promise<string | null> {
+  const searchHtml = await fetchHtmlViaScraperApi(buildSearchUrl(keyword));
+  const match = searchHtml.match(/item\/(\d{9,15})\.html/);
+  return match ? match[1] : null;
+}
+
 async function fetchHtmlViaScraperApi(targetUrl: string): Promise<string> {
   if (!SCRAPER_API_KEY) {
     throw new Error(
@@ -162,25 +180,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const productId = extractProductId(query);
-
-  if (!productId) {
-    // La recherche par mot-cle necessiterait de scraper une page de
-    // resultats AliExpress puis de choisir un candidat -- pas encore
-    // implemente dans cette route. On le dit explicitement plutot que de
-    // renvoyer un faux resultat.
-    return NextResponse.json(
-      {
-        error:
-          "La recherche par mot-clé n'est pas encore implémentée dans cette route -- collez un lien produit direct (ex : aliexpress.com/item/XXXXXXXXX.html) pour un résultat exact.",
-      },
-      { status: 501 }
-    );
-  }
-
-  const targetUrl = buildProductUrl(productId);
+  const directProductId = extractProductId(query);
 
   try {
+    const productId =
+      directProductId ?? (await findFirstProductIdFromKeyword(query));
+
+    if (!productId) {
+      return NextResponse.json(
+        {
+          error:
+            "Aucune annonce trouvée pour ce mot-clé sur AliExpress -- essayez un terme plus précis ou collez un lien produit direct.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const targetUrl = buildProductUrl(productId);
     const html = await fetchHtmlViaScraperApi(targetUrl);
     const { title, price, currency, imageUrl } = extractFromJsonLd(html);
     const { shipping, importFee } = extractShippingAndImportFee(html);

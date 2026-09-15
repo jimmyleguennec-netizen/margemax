@@ -25,7 +25,23 @@ export default async function DashboardPage() {
       redirect("/login");
     }
 
-    return <DashboardShell email={user.email ?? ""} />;
+    // Solde de credits reel (table public.profiles, voir schema_margemax.sql
+    // -- credits/credits_gauge_max, RLS "select using (auth.uid() = id)").
+    // Si la table/colonne n'existe pas encore sur le projet Supabase
+    // connecte, on affiche simplement "--" plutot que de planter la page.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("credits, credits_gauge_max")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    return (
+      <DashboardShell
+        email={user.email ?? ""}
+        credits={profile?.credits ?? null}
+        creditsMax={profile?.credits_gauge_max ?? null}
+      />
+    );
   } catch (err) {
     // redirect() ci-dessus fonctionne en lancant une exception interne
     // Next.js -- il ne faut surtout pas l'intercepter comme une vraie

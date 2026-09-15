@@ -3,14 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  AlertTriangle,
-  Calculator,
-  History,
-  LogOut,
-  Search,
-  Settings,
-} from "lucide-react";
+import { Calculator, History, LogOut, Search, Settings, Zap } from "lucide-react";
 
 import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
@@ -27,7 +20,17 @@ const tabs: AnimatedTabItem[] = [
   { value: "parametres", label: "Paramètres", icon: Settings },
 ];
 
-function ParametresPanel({ email, isDemo }: { email: string; isDemo: boolean }) {
+function ParametresPanel({
+  email,
+  isDemo,
+  credits,
+  creditsMax,
+}: {
+  email: string;
+  isDemo: boolean;
+  credits: number | null;
+  creditsMax: number | null;
+}) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
@@ -37,6 +40,14 @@ function ParametresPanel({ email, isDemo }: { email: string; isDemo: boolean }) 
           </p>
           <p className="text-lg font-medium text-white">{email}</p>
         </div>
+        {credits !== null && (
+          <p className="flex items-center gap-1.5 text-sm text-cyan-300">
+            <Zap className="h-4 w-4" />
+            {credits} crédit{credits > 1 ? "s" : ""}
+            {creditsMax !== null ? ` sur ${creditsMax}` : ""} disponible
+            {credits > 1 ? "s" : ""}
+          </p>
+        )}
         {isDemo ? (
           <a
             href="/login"
@@ -74,9 +85,13 @@ function ParametresPanel({ email, isDemo }: { email: string; isDemo: boolean }) 
 export function DashboardShell({
   email,
   isDemo = false,
+  credits = null,
+  creditsMax = null,
 }: {
   email: string;
   isDemo?: boolean;
+  credits?: number | null;
+  creditsMax?: number | null;
 }) {
   const [active, setActive] = useState("recherche");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -108,6 +123,13 @@ export function DashboardShell({
               layoutId="dashboard-tab-indicator"
               className="hidden sm:inline-flex"
             />
+            {credits !== null && (
+              <span className="flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)]">
+                <Zap className="h-3.5 w-3.5" />
+                {credits}
+                {creditsMax !== null ? ` / ${creditsMax}` : ""} crédits
+              </span>
+            )}
           </div>
 
           {/* Onglets en dessous du header sur mobile, scrollables horizontalement */}
@@ -120,16 +142,6 @@ export function DashboardShell({
             />
           </div>
         </header>
-
-        {isDemo && (
-          <div className="border-b border-yellow-400/20 bg-yellow-400/[0.06] px-4 py-2.5 text-center text-xs text-yellow-200">
-            <span className="inline-flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Mode démonstration -- la connexion à Supabase est momentanément
-              indisponible, ceci est un aperçu statique de l&apos;interface.
-            </span>
-          </div>
-        )}
 
         <main className="relative z-10 container py-10 pointer-events-auto">
           <AnimatePresence mode="wait">
@@ -150,7 +162,12 @@ export function DashboardShell({
               {active === "calculateur" && <CalculatorPanel />}
               {active === "historique" && <HistoryPanel entries={history} />}
               {active === "parametres" && (
-                <ParametresPanel email={email} isDemo={isDemo} />
+                <ParametresPanel
+                  email={email}
+                  isDemo={isDemo}
+                  credits={credits}
+                  creditsMax={creditsMax}
+                />
               )}
             </motion.div>
           </AnimatePresence>

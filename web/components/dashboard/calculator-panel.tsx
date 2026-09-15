@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Gauge, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 
+import { computeMarginEstimate } from "@/lib/margin-estimate";
+
 function parseEuro(value: string): number {
   const n = Number(value.replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? n : 0;
@@ -32,12 +34,6 @@ function formatPct(n: number): string {
       maximumFractionDigits: 1,
     }) + " %"
   );
-}
-
-// Arrondi psychologique (ex: 32,56 -> 32,90) pour les prix suggeres.
-function roundToPsychological(price: number): number {
-  if (price <= 0) return 0;
-  return Math.max(0.9, Math.round(price) - 0.1);
 }
 
 function NeonNumberField({
@@ -113,34 +109,14 @@ export function CalculatorPanel() {
     const marginPct = sale > 0 ? (margin / sale) * 100 : 0;
     const roiPct = totalCost > 0 ? (margin / totalCost) * 100 : 0;
 
-    const recommendedPrice = roundToPsychological(totalCost * 1.8);
-    const highPrice = roundToPsychological(totalCost * 2.3);
-    const lowPrice = roundToPsychological(totalCost * 1.5);
-
-    const marginHigh = highPrice - totalCost;
-    const roiHigh = totalCost > 0 ? (marginHigh / totalCost) * 100 : 0;
-    const marginLow = lowPrice - totalCost;
-    const roiLow = totalCost > 0 ? (marginLow / totalCost) * 100 : 0;
-
-    const importRatio = totalCost > 0 ? t / totalCost : 0;
-    const reliability =
-      totalCost > 0
-        ? Math.min(99, Math.max(60, Math.round(97 - importRatio * 35)))
-        : 0;
+    const priceEstimate = computeMarginEstimate(totalCost, t);
 
     return {
       totalCost,
       margin,
       marginPct,
       roiPct,
-      recommendedPrice,
-      highPrice,
-      lowPrice,
-      marginHigh,
-      roiHigh,
-      marginLow,
-      roiLow,
-      reliability,
+      ...priceEstimate,
     };
   }, [purchase, shipping, importTax, salePrice]);
 

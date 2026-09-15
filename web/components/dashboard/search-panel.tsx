@@ -7,12 +7,17 @@ import {
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
+  Gauge,
   Link2,
   Search,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { ProductThumbnail } from "@/components/ui/product-thumbnail";
+import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 type Status = "idle" | "loading" | "result" | "error";
 
@@ -35,6 +40,79 @@ function formatEuro(n: number | null): string {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }) + " €"
+  );
+}
+
+function formatPct(n: number): string {
+  return (
+    n.toLocaleString("fr-FR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }) + " %"
+  );
+}
+
+function EstimateBlock({
+  total,
+  importFee,
+}: {
+  total: number;
+  importFee: number | null;
+}) {
+  const estimate = computeMarginEstimate(total, importFee);
+
+  return (
+    <div className="border-t border-cyan-400/20 bg-cyan-400/[0.05] p-5">
+      <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div>
+          <p className="flex items-center gap-1.5 text-xs text-white/40">
+            <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+            Prix de vente recommandé estimé
+          </p>
+          <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
+            {formatEuro(estimate.recommendedPrice)}
+          </p>
+        </div>
+        <span className="flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1.5 text-xs font-semibold text-green-300 shadow-[0_0_16px_-4px_rgba(74,222,128,0.7)]">
+          <Gauge className="h-3.5 w-3.5" />
+          Indice de fiabilité : {estimate.reliability} %
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <p className="flex items-center gap-1.5 text-xs text-white/40">
+            <TrendingDown className="h-3.5 w-3.5 text-pink-300" />
+            Marge basse (fourchette prudente)
+          </p>
+          <p className="mt-1 text-lg font-bold text-white">
+            {formatEuro(estimate.lowPrice)}
+          </p>
+          <p className="mt-1 text-xs text-white/40">
+            Marge {formatEuro(estimate.marginLow)} ·{" "}
+            {formatPct(estimate.roiLow)} ROI
+          </p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+          <p className="flex items-center gap-1.5 text-xs text-white/40">
+            <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
+            Marge haute (fourchette premium)
+          </p>
+          <p className="mt-1 text-lg font-bold text-white">
+            {formatEuro(estimate.highPrice)}
+          </p>
+          <p className="mt-1 text-xs text-white/40">
+            Marge {formatEuro(estimate.marginHigh)} ·{" "}
+            {formatPct(estimate.roiHigh)} ROI
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-center text-[11px] text-white/30">
+        Estimation calculée à partir du coût réel de cette annonce -- pas
+        une donnée de marché garantie.
+      </p>
+    </div>
   );
 }
 
@@ -120,7 +198,7 @@ export function SearchPanel({
               id="search-query"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ex : aliexpress.com/item/1005006478208156.html"
+              placeholder="ex : chargeur induction iphone -- ou -- aliexpress.com/item/..."
               className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
             />
           </div>
@@ -134,8 +212,8 @@ export function SearchPanel({
           </button>
         </div>
         <p className="mt-2 text-xs text-white/30">
-          Collez un lien produit direct pour un résultat exact -- la
-          recherche par mots-clés n&apos;est pas encore prise en charge.
+          Entrez des mots-clés ou collez l&apos;URL d&apos;une annonce
+          AliExpress pour lancer l&apos;analyse complète.
         </p>
       </form>
 
@@ -229,6 +307,10 @@ export function SearchPanel({
                 pas pu être extraits de cette page -- ils sont affichés
                 comme absents plutôt qu&apos;estimés au hasard.
               </p>
+            )}
+
+            {result.total !== null && (
+              <EstimateBlock total={result.total} importFee={result.importFee} />
             )}
           </motion.div>
         )}
