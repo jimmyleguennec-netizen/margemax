@@ -8,6 +8,7 @@ const links = [
   { href: "#demo", label: "Démo" },
   { href: "#features", label: "Fonctionnalités" },
   { href: "#pricing", label: "Tarifs" },
+  { href: "#contact", label: "Contact" },
 ];
 
 export function Navbar() {

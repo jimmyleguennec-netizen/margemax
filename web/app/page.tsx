@@ -1,8 +1,11 @@
 import { Navbar } from "@/components/landing/navbar";
 import { Hero } from "@/components/landing/hero";
 import { Demo } from "@/components/landing/demo";
+import { InteractiveDemo } from "@/components/landing/interactive-demo";
 import { Features } from "@/components/landing/features";
+import { QuickGuide } from "@/components/landing/quick-guide";
 import { Pricing } from "@/components/landing/pricing";
+import { Contact } from "@/components/landing/contact";
 import { CtaFooter } from "@/components/landing/cta-footer";
 
 export default function HomePage() {
@@ -25,8 +28,11 @@ export default function HomePage() {
       <main>
         <Hero />
         <Demo />
+        <InteractiveDemo />
         <Features />
+        <QuickGuide />
         <Pricing />
+        <Contact />
         <CtaFooter />
       </main>
     </div>

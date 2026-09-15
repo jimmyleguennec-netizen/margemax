@@ -2,7 +2,31 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Smartphone, Sparkles, ShieldCheck, Zap } from "lucide-react";
+
+const badges = [
+  {
+    icon: Zap,
+    stat: "< 3s",
+    label: "Temps de calcul",
+    accent: "text-cyan-300",
+    glow: "rgba(34,211,238,0.6)",
+  },
+  {
+    icon: ShieldCheck,
+    stat: "100 %",
+    label: "Données réelles sans estimation",
+    accent: "text-fuchsia-300",
+    glow: "rgba(232,121,249,0.6)",
+  },
+  {
+    icon: Smartphone,
+    stat: "24/7",
+    label: "Disponible sur mobile & PC",
+    accent: "text-pink-300",
+    glow: "rgba(244,114,182,0.6)",
+  },
+];
 
 const container = {
   hidden: {},
@@ -87,6 +111,29 @@ export function Hero() {
           >
             J&apos;ai déjà un compte
           </Link>
+        </motion.div>
+
+        <motion.div
+          variants={item}
+          className="mt-4 flex flex-wrap items-center justify-center gap-4"
+        >
+          {badges.map((badge) => (
+            <div
+              key={badge.label}
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 backdrop-blur-sm transition-all duration-300 hover:border-white/20"
+            >
+              <badge.icon className={`h-5 w-5 shrink-0 ${badge.accent}`} />
+              <div className="text-left">
+                <p
+                  className={`text-lg font-bold leading-none ${badge.accent}`}
+                  style={{ textShadow: `0 0 12px ${badge.glow}` }}
+                >
+                  {badge.stat}
+                </p>
+                <p className="mt-1 text-xs text-white/40">{badge.label}</p>
+              </div>
+            </div>
+          ))}
         </motion.div>
       </motion.div>
     </section>

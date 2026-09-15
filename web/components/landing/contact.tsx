@@ -1,0 +1,154 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { Mail, ShieldCheck, Timer } from "lucide-react";
+
+const COUNTDOWN_SECONDS = 5;
+const CONTACT_EMAIL =
+  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@margemax.app";
+
+export function Contact() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
+
+  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (!isInView) return;
+    if (secondsLeft <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isInView, secondsLeft]);
+
+  const canSend = isInView && secondsLeft === 0;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSend) return;
+
+    const subject = encodeURIComponent(`Contact MargeMax -- ${name || "Visiteur"}`);
+    const body = encodeURIComponent(
+      `${message}\n\n--\n${name}\n${email}`
+    );
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+    setSent(true);
+  }
+
+  return (
+    <section ref={sectionRef} id="contact" className="container py-20 sm:py-28">
+      <div className="mx-auto mb-10 max-w-2xl text-center">
+        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          Une question ? Écrivez-nous
+        </h2>
+        <p className="mt-3 text-white/50">
+          Réponse sous 24h ouvrées. Le bouton d&apos;envoi s&apos;active après
+          une courte vérification anti-spam.
+        </p>
+      </div>
+
+      <motion.form
+        onSubmit={handleSubmit}
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.5 }}
+        className="mx-auto max-w-lg space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm"
+      >
+        <div className="space-y-1.5">
+          <label
+            htmlFor="contact-name"
+            className="text-xs font-medium uppercase tracking-wider text-cyan-200/70"
+          >
+            Nom
+          </label>
+          <input
+            id="contact-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            placeholder="Jean Dupont"
+            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="contact-email"
+            className="text-xs font-medium uppercase tracking-wider text-cyan-200/70"
+          >
+            Email
+          </label>
+          <div className="relative flex items-center">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+            <input
+              id="contact-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="vous@exemple.com"
+              className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label
+            htmlFor="contact-message"
+            className="text-xs font-medium uppercase tracking-wider text-cyan-200/70"
+          >
+            Message
+          </label>
+          <textarea
+            id="contact-message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            required
+            rows={4}
+            placeholder="Votre question..."
+            className="w-full resize-none rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={!canSend}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:bg-[position:0%_0]"
+        >
+          {canSend ? (
+            <>
+              <Mail className="h-4 w-4" />
+              Envoyer le message
+            </>
+          ) : (
+            <>
+              <Timer className="h-4 w-4 animate-pulse" />
+              Envoi possible dans {secondsLeft}s...
+            </>
+          )}
+        </button>
+
+        {sent && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="flex items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Votre client mail s&apos;est ouvert avec le message pré-rempli --
+            confirmez l&apos;envoi depuis celui-ci.
+          </motion.p>
+        )}
+      </motion.form>
+    </section>
+  );
+}
