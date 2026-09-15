@@ -11,34 +11,30 @@ import {
 
 const faqs = [
   {
-    question: "Dois-je m'engager sur un abonnement ?",
+    question: "Comment fonctionne le calcul des marges réelles ?",
     answer:
-      "Non. MargeMax fonctionne avec des crédits prépayés, achetés une seule fois, sans engagement ni renouvellement automatique. Vous ne payez que ce que vous utilisez.",
+      "MargeMax combine le prix produit, la livraison et les frais d'importation réellement appliqués -- jamais une estimation au hasard. Dès que le total réellement payé au checkout est retrouvé, un badge de vérification croisée confirme que le calcul de marge et de ROI correspond bien à la réalité.",
   },
   {
-    question: "Mes crédits expirent-ils ?",
+    question: "Pourquoi acheter des crédits au lieu d'un abonnement ?",
     answer:
-      "Jamais. Les crédits achetés vous appartiennent à vie -- aucune date d'expiration, aucun abonnement mensuel à surveiller.",
+      "Parce que vous ne payez que ce que vous utilisez, sans mensualité qui tourne dans le vide les mois calmes. Aucun engagement, aucun renouvellement automatique -- vous achetez un pack quand vous en avez besoin, point final.",
   },
   {
-    question: "Comment fonctionne un crédit ?",
+    question: "Les crédits ont-ils une date d'expiration ?",
     answer:
-      "Un crédit correspond à une analyse complète d'un produit : prix, livraison, frais d'importation réels, marge nette et ROI calculés en une seule fois.",
+      "Non, jamais. Les crédits achetés vous appartiennent à vie, sans date limite ni compte à rebours -- utilisez-les à votre rythme.",
   },
   {
-    question: "Les chiffres affichés sont-ils vraiment vérifiés ?",
+    question:
+      "Que se passe-t-il si un produit AliExpress ne peut pas être analysé ?",
     answer:
-      "Oui. Chaque champ indique sa source, et dès que le total réellement payé au checkout est retrouvé, un badge de vérification croisée le confirme -- jamais une donnée inventée ou estimée à l'aveugle.",
+      "Vous êtes prévenu immédiatement et aucun crédit n'est débité. MargeMax n'invente jamais une donnée manquante : si une information ne peut pas être récupérée (page indisponible, produit retiré...), elle reste clairement signalée comme absente plutôt que devinée.",
   },
   {
-    question: "Puis-je acheter plusieurs packs de crédits ?",
+    question: "Comment fonctionne le générateur de fiches produits IA ?",
     answer:
-      "Bien sûr, les crédits s'additionnent simplement à votre solde existant. Achetez le pack qui correspond à votre volume du moment, sans jamais perdre ce qui vous reste.",
-  },
-  {
-    question: "Que faire si j'ai une question avant d'acheter ?",
-    answer:
-      "Écrivez-nous via le formulaire de contact ci-dessous -- nous répondons sous 24h ouvrées, avant comme après votre achat.",
+      "À partir des données déjà vérifiées de votre analyse (titre, image, caractéristiques, prix), il génère en un clic une fiche produit prête à publier -- que vous pouvez ensuite relire et ajuster avant mise en ligne.",
   },
 ];
 
@@ -77,7 +73,7 @@ export function Faq() {
             <motion.div key={faq.question} variants={item}>
               <AccordionItem
                 value={`faq-${i}`}
-                className="group rounded-xl border border-white/10 bg-white/[0.03] px-5 backdrop-blur-sm transition-all duration-300 data-[state=open]:border-cyan-400/40 data-[state=open]:shadow-[0_0_35px_-10px_rgba(217,70,239,0.5),0_0_20px_-8px_rgba(34,211,238,0.5)]"
+                className="group rounded-xl border border-white/10 bg-white/[0.03] px-5 backdrop-blur-sm transition-all duration-300 data-[state=open]:border-cyan-400/40 data-[state=open]:shadow-[0_0_35px_-10px_rgba(139,92,246,0.6),0_0_20px_-8px_rgba(0,240,255,0.6)]"
               >
                 <AccordionTrigger className="text-white/90 hover:text-white">
                   {faq.question}

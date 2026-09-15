@@ -10,6 +10,7 @@ import { Faq } from "@/components/landing/faq";
 import { Contact } from "@/components/landing/contact";
 import { CtaFooter } from "@/components/landing/cta-footer";
 import { LiveActivityToast } from "@/components/landing/live-activity-toast";
+import { InteractiveGrid } from "@/components/ui/interactive-grid";
 
 export default function HomePage() {
   return (
@@ -22,10 +23,7 @@ export default function HomePage() {
         aria-hidden
         className="pointer-events-none fixed -right-40 top-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-fuchsia-500/10 blur-[140px]"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:48px_48px]"
-      />
+      <InteractiveGrid />
 
       <Navbar />
       <main>
