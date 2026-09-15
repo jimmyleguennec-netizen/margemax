@@ -23,23 +23,24 @@ export default function HomePage() {
         aria-hidden
         className="pointer-events-none fixed -right-40 top-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-fuchsia-500/10 blur-[140px]"
       />
-      <InteractiveGrid />
 
-      <Navbar />
-      <main>
-        <Hero />
-        <Demo />
-        <InteractiveDemo />
-        <Features />
-        <QuickGuide />
-        <CreditCalculator />
-        <Pricing />
-        <Faq />
-        <Contact />
-        <CtaFooter />
-      </main>
+      <InteractiveGrid>
+        <Navbar />
+        <main>
+          <Hero />
+          <Demo />
+          <InteractiveDemo />
+          <Features />
+          <QuickGuide />
+          <CreditCalculator />
+          <Pricing />
+          <Faq />
+          <Contact />
+          <CtaFooter />
+        </main>
 
-      <LiveActivityToast />
+        <LiveActivityToast />
+      </InteractiveGrid>
     </div>
   );
 }

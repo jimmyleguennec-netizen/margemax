@@ -2,8 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 const CELL_SIZE = 40; // px
-const FADE_MS = 500;
+const FADE_MS = 600;
 const NEON_COLORS = ["#00f0ff", "#8b5cf6"];
 
 type LitCell = {
@@ -15,24 +17,38 @@ type LitCell = {
 };
 
 /**
- * Fond de grille interactif : la grille elle-meme est dessinee en pur CSS
- * (background-image, aucun cout de DOM), et seule la case survolee est
- * rendue comme un petit <div> temporaire qui s'allume instantanement puis
- * s'eteint en fondu (transition CSS) avant d'etre retire. Beaucoup plus
- * leger qu'un <div> par case sur une grille pleine page.
+ * Fond de grille interactif, en position fixed plein ecran derriere tout le
+ * contenu (z-0). La grille elle-meme est dessinee en pur CSS
+ * (background-image, aucun cout de DOM) ; seule la case survolee est rendue
+ * comme un petit <div> temporaire qui s'allume instantanement puis s'eteint
+ * en fondu (transition CSS) avant d'etre retire.
+ *
+ * Pour que les cases reagissent au survol MEME quand la souris est au-dessus
+ * du contenu (boutons, cartes, texte), ce composant enveloppe {children} au
+ * lieu d'etre un simple calque absolu derriere eux : le mousemove est capte
+ * sur le conteneur englobant et remonte naturellement (bubbling DOM) depuis
+ * n'importe quel element survole, quel que soit son z-index ou son
+ * pointer-events. Aucun pointer-events:none n'est applique nulle part sur le
+ * contenu -- tous les boutons, liens, champs et cartes du site restent
+ * cliquables exactement comme avant, sans avoir a etre audites un par un.
  */
-export function InteractiveGrid() {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function InteractiveGrid({
+  children,
+  className,
+}: {
+  children?: React.ReactNode;
+  className?: string;
+}) {
   const [cells, setCells] = useState<LitCell[]>([]);
   const nextId = useRef(0);
   const lastKeyRef = useRef<string | null>(null);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const col = Math.floor((e.clientX - rect.left) / CELL_SIZE);
-    const row = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+    // Le calque visuel est fixed inset-0 (= plein viewport), donc les
+    // coordonnees ecran (clientX/clientY) correspondent deja directement
+    // aux coordonnees du calque -- pas besoin de getBoundingClientRect.
+    const col = Math.floor(e.clientX / CELL_SIZE);
+    const row = Math.floor(e.clientY / CELL_SIZE);
     const key = `${row}-${col}`;
     if (lastKeyRef.current === key) return;
     lastKeyRef.current = key;
@@ -57,32 +73,36 @@ export function InteractiveGrid() {
 
   return (
     <div
-      ref={containerRef}
       onMouseMove={handleMouseMove}
-      aria-hidden
-      className="pointer-events-auto absolute inset-0 -z-10 overflow-hidden"
-      style={{
-        backgroundColor: "#05050a",
-        backgroundImage:
-          "linear-gradient(rgba(139,92,246,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.09) 1px, transparent 1px)",
-        backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
-      }}
+      className={cn("pointer-events-auto relative", className)}
     >
-      {cells.map((cell) => (
-        <div
-          key={cell.id}
-          className="pointer-events-none absolute"
-          style={{
-            left: cell.col * CELL_SIZE,
-            top: cell.row * CELL_SIZE,
-            width: CELL_SIZE,
-            height: CELL_SIZE,
-            background: cell.lit ? cell.color : "transparent",
-            boxShadow: cell.lit ? `0 0 18px 3px ${cell.color}` : "none",
-            transition: "background 0.5s ease, box-shadow 0.5s ease",
-          }}
-        />
-      ))}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0 h-full w-full overflow-hidden"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(139,92,246,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.1) 1px, transparent 1px)",
+          backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
+        }}
+      >
+        {cells.map((cell) => (
+          <div
+            key={cell.id}
+            className="pointer-events-none absolute"
+            style={{
+              left: cell.col * CELL_SIZE,
+              top: cell.row * CELL_SIZE,
+              width: CELL_SIZE,
+              height: CELL_SIZE,
+              backgroundColor: cell.lit ? cell.color : "transparent",
+              boxShadow: cell.lit ? `0 0 18px 3px ${cell.color}` : "none",
+              transition: `background-color ${FADE_MS}ms ease, box-shadow ${FADE_MS}ms ease`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }
