@@ -36,8 +36,8 @@ export function PasswordInput({
       >
         {label}
       </label>
-      <div className="relative">
-        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+      <div className="relative flex items-center">
+        <Lock className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
         <input
           id={id}
           name={name}
@@ -52,7 +52,7 @@ export function PasswordInput({
           onClick={toggle}
           aria-label={visible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
           className={cn(
-            "absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-cyan-300/60 transition-colors duration-300 hover:text-cyan-300",
+            "absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 text-cyan-300/60 transition-colors duration-300 hover:text-cyan-300",
             pulse && "text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
           )}
         >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ShoppingCart } from "lucide-react";
@@ -9,34 +9,62 @@ import { cn } from "@/lib/utils";
 
 type Status = "idle" | "success";
 
+const REDIRECT_DELAY = 1500;
+const RESET_DELAY = 2000;
+
 export function AnimatedBuyButton({
   label,
   successLabel = "Ajouté !",
   href,
+  packId,
   onConfirm,
   className,
 }: {
   label: string;
   successLabel?: string;
+  /** Present => mode "redirection" (ex. visiteur non connecte depuis la Landing Page). */
   href?: string;
+  /** Ajoute ?pack=<packId> a l'URL de redirection, pour reprendre l'achat de ce pack une fois connecte. */
+  packId?: string;
+  /** Mode "autonome" (pas de href) : appele juste avant la reinitialisation. */
   onConfirm?: () => void;
   className?: string;
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const router = useRouter();
+  const timeoutRef = useRef<ReturnType<typeof window.setTimeout>>();
+
+  // Ne laisse jamais un timeout en attente reinitialiser un bouton demonte
+  // (navigation ailleurs, fermeture de la carte, etc.).
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   function handleClick() {
     if (status !== "idle") return;
     setStatus("success");
 
-    window.setTimeout(() => {
-      onConfirm?.();
-      if (href) {
-        router.push(href);
-      } else {
+    if (href) {
+      // Visiteur non connecte (Landing Page) : on laisse l'animation de
+      // confirmation se jouer puis on redirige -- jamais de retour a
+      // l'etat idle ici puisque le composant va etre demonte.
+      timeoutRef.current = window.setTimeout(() => {
+        onConfirm?.();
+        const target = packId
+          ? `${href}${href.includes("?") ? "&" : "?"}pack=${encodeURIComponent(packId)}`
+          : href;
+        router.push(target);
+      }, REDIRECT_DELAY);
+    } else {
+      // Usage autonome (pas de redirection) : revient toujours a l'etat
+      // initial pour que le bouton ne reste jamais bloque sur "succes".
+      timeoutRef.current = window.setTimeout(() => {
+        onConfirm?.();
         setStatus("idle");
-      }
-    }, 900);
+      }, RESET_DELAY);
+    }
   }
 
   return (

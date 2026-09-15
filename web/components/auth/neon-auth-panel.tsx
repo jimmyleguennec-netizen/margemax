@@ -40,8 +40,8 @@ function NeonField({
       >
         {label}
       </label>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+      <div className="relative flex items-center">
+        <Icon className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
         <input
           id={id}
           name={name}
