@@ -6,6 +6,7 @@ import { Gauge } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
+import { buildPackCheckoutHref } from "@/lib/stripe-links";
 
 const packs = [
   { key: "starter", label: "Starter", credits: 5, price: "2,99 €" },
@@ -126,8 +127,7 @@ export function CreditCalculator() {
           <AnimatedBuyButton
             label={`Choisir ${recommended.label}`}
             successLabel="C'est parti !"
-            href="/login"
-            packId={recommended.key}
+            href={buildPackCheckoutHref(recommended.key)}
             className="sm:w-auto sm:px-8"
           />
         </div>

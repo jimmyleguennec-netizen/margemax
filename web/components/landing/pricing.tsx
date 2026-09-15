@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
+import { buildPackCheckoutHref } from "@/lib/stripe-links";
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
@@ -103,8 +104,7 @@ export function Pricing() {
                 <AnimatedBuyButton
                   label="Choisir ce pack"
                   successLabel="C'est parti !"
-                  href="/login"
-                  packId={pack.key}
+                  href={buildPackCheckoutHref(pack.key)}
                   className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
               </div>
@@ -114,8 +114,7 @@ export function Pricing() {
       </motion.div>
 
       <p className="mt-8 text-center text-xs text-white/30">
-        Paiement 100 % sécurisé via Stripe. Créez votre compte pour acheter un
-        pack de crédits.
+        Paiement 100 % sécurisé via Stripe.
       </p>
     </section>
   );
