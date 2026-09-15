@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ShieldCheck, CreditCard } from "lucide-react";
 
 export function CtaFooter() {
   return (
@@ -40,15 +41,37 @@ export function CtaFooter() {
       </section>
 
       <footer className="border-t border-white/10 py-8">
-        <div className="container flex flex-col items-center justify-between gap-4 text-sm text-white/40 sm:flex-row">
-          <p>© {new Date().getFullYear()} MargeMax. Tous droits réservés.</p>
-          <div className="flex gap-6">
-            <Link href="/login" className="hover:text-white">
-              Connexion
-            </Link>
-            <Link href="/signup" className="hover:text-white">
-              Créer un compte
-            </Link>
+        <div className="container flex flex-col items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <span className="flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1.5 text-xs font-medium text-cyan-200">
+              <CreditCard className="h-3.5 w-3.5" />
+              Paiement 100 % sécurisé via Stripe
+            </span>
+            <span className="flex items-center gap-1.5 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/[0.06] px-3 py-1.5 text-xs font-medium text-fuchsia-200">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Données 100 % réelles vérifiées
+            </span>
+          </div>
+
+          <div className="flex w-full flex-col items-center justify-between gap-4 border-t border-white/5 pt-6 text-sm text-white/40 sm:flex-row">
+            <p>© {new Date().getFullYear()} MargeMax. Tous droits réservés.</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              <Link href="/login" className="hover:text-white">
+                Connexion
+              </Link>
+              <Link href="/signup" className="hover:text-white">
+                Créer un compte
+              </Link>
+              <Link href="/mentions-legales" className="hover:text-white">
+                Mentions légales
+              </Link>
+              <Link href="/cgv" className="hover:text-white">
+                CGV / CGU
+              </Link>
+              <Link href="/confidentialite" className="hover:text-white">
+                Confidentialité
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

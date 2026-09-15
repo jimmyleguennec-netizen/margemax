@@ -29,15 +29,37 @@ const DEMO_RESULT = {
   total: "13,48 €",
 };
 
-export function SearchPanel() {
+export function SearchPanel({
+  onResult,
+}: {
+  onResult?: (entry: {
+    id: string;
+    query: string;
+    title: string;
+    total: string;
+    url: string;
+    timestamp: number;
+  }) => void;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<Status>("idle");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!query.trim() || status === "loading") return;
+    const trimmed = query.trim();
+    if (!trimmed || status === "loading") return;
     setStatus("loading");
-    window.setTimeout(() => setStatus("result"), 1100);
+    window.setTimeout(() => {
+      setStatus("result");
+      onResult?.({
+        id: `${Date.now()}`,
+        query: trimmed,
+        title: DEMO_RESULT.title,
+        total: DEMO_RESULT.total,
+        url: DEMO_RESULT.url,
+        timestamp: Date.now(),
+      });
+    }, 1100);
   }
 
   return (

@@ -126,7 +126,7 @@ export function CreditCalculator() {
           <AnimatedBuyButton
             label={`Choisir ${recommended.label}`}
             successLabel="C'est parti !"
-            href="/signup"
+            href="/login"
             packId={recommended.key}
             className="sm:w-auto sm:px-8"
           />

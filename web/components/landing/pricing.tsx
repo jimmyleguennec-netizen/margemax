@@ -103,7 +103,7 @@ export function Pricing() {
                 <AnimatedBuyButton
                   label="Choisir ce pack"
                   successLabel="C'est parti !"
-                  href="/signup"
+                  href="/login"
                   packId={pack.key}
                   className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
