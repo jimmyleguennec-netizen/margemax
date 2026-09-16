@@ -1,35 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
-import { Mail, MessageSquare, ShieldCheck, Timer, User } from "lucide-react";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Mail, MessageSquare, ShieldCheck, User } from "lucide-react";
 
-const COUNTDOWN_SECONDS = 5;
 const CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@margemax.app";
 
 export function Contact() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const isInView = useInView(sectionRef, { once: true, amount: 0.3 });
-
-  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
 
-  useEffect(() => {
-    if (!isInView) return;
-    if (secondsLeft <= 0) return;
-
-    const timer = window.setInterval(() => {
-      setSecondsLeft((s) => Math.max(0, s - 1));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [isInView, secondsLeft]);
-
-  const canSend = isInView && secondsLeft === 0;
+  const canSend = Boolean(name.trim() && email.trim() && message.trim());
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,14 +28,13 @@ export function Contact() {
   }
 
   return (
-    <section ref={sectionRef} id="contact" className="container scroll-mt-20 py-20 sm:py-28">
+    <section id="contact" className="container scroll-mt-20 py-20 sm:py-28">
       <div className="mx-auto mb-10 max-w-2xl text-center">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Une question ? Écrivez-nous
         </h2>
         <p className="mt-3 text-white/50">
-          Réponse sous 24h ouvrées. Le bouton d&apos;envoi s&apos;active après
-          une courte vérification anti-spam.
+          Réponse sous 24h ouvrées.
         </p>
       </div>
 
@@ -130,17 +113,8 @@ export function Contact() {
           disabled={!canSend}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:bg-[position:0%_0]"
         >
-          {canSend ? (
-            <>
-              <Mail className="h-4 w-4" />
-              Envoyer le message
-            </>
-          ) : (
-            <>
-              <Timer className="h-4 w-4 animate-pulse" />
-              Envoi possible dans {secondsLeft}s...
-            </>
-          )}
+          <Mail className="h-4 w-4" />
+          Envoyer le message
         </button>
 
         {sent && (

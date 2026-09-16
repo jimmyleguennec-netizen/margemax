@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Calculator,
+  CheckCircle2,
   Link2,
-  LogIn,
+  Search,
   Sparkles,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CircularGauge } from "@/components/ui/circular-gauge";
 
 const guideSteps: {
   id: string;
@@ -20,42 +23,110 @@ const guideSteps: {
   description: string;
 }[] = [
   {
-    id: "compte",
-    icon: LogIn,
-    label: "1. Connectez-vous",
-    title: "Créez votre compte gratuit",
+    id: "recherche",
+    icon: Search,
+    label: "1. Recherche",
+    title: "Saisissez un mot-clé ou collez l'URL d'une annonce AliExpress",
     description:
-      "10 secondes, aucune carte bancaire requise -- 3 crédits offerts dès l'inscription pour tester l'outil.",
-  },
-  {
-    id: "lien",
-    icon: Link2,
-    label: "2. Collez un lien",
-    title: "Ajoutez l'URL du produit",
-    description:
-      "Copiez le lien AliExpress du produit qui vous intéresse, ou lancez une recherche par mot-clé.",
+      "Fonctionne avec un simple mot-clé (ex. « chargeur induction ») ou un lien produit direct.",
   },
   {
     id: "analyse",
-    icon: Sparkles,
-    label: "3. Lancez l'analyse",
-    title: "MargeMax calcule tout",
+    icon: Calculator,
+    label: "2. Analyse",
+    title: "Analyse instantanée des prix, livraison et taxes d'importation",
     description:
-      "Prix, livraison, frais d'importation réels et marge nette calculés en moins de 3 secondes.",
+      "Chaque coût est extrait réellement au checkout -- jamais une estimation au hasard.",
+  },
+  {
+    id: "marge",
+    icon: Sparkles,
+    label: "3. Marge",
+    title: "Découverte de la marge nette réelle et de l'indice de fiabilité",
+    description:
+      "Marge, ROI et un score de fiabilité calculé sur la stabilité des coûts.",
   },
   {
     id: "decision",
     icon: TrendingUp,
-    label: "4. Décidez",
-    title: "Comparez et agissez",
+    label: "4. Décision",
+    title: "Sélection de l'offre la plus rentable",
     description:
-      "Ajoutez le produit à votre carnet, comparez plusieurs offres et passez à l'achat en confiance.",
+      "Comparez plusieurs annonces AliExpress et gardez la meilleure automatiquement.",
   },
 ];
+
+function SearchVisual() {
+  return (
+    <div className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/50">
+      <Link2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+      <span className="truncate">chargeur induction iphone</span>
+    </div>
+  );
+}
+
+function AnalyzeVisual() {
+  const rows = [
+    { label: "Sous-total", value: "14,49 €" },
+    { label: "Livraison", value: "Gratuit" },
+    { label: "Taxes", value: "3,60 €" },
+  ];
+  return (
+    <div className="mt-4 space-y-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-center justify-between text-white/50">
+          <span>{row.label}</span>
+          <span className="font-medium text-white">{row.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MarginVisual() {
+  return (
+    <div className="mt-4 flex items-center gap-4 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
+      <CircularGauge value={94} size={52} strokeWidth={4} />
+      <div>
+        <p className="text-xs text-white/40">Marge nette</p>
+        <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+          21,81 €
+        </p>
+        <p className="text-xs text-white/40">ROI 120,5 %</p>
+      </div>
+    </div>
+  );
+}
+
+function DecisionVisual() {
+  return (
+    <div className="mt-4 space-y-1.5">
+      <div className="flex items-center justify-between rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] px-3 py-2 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
+        <span className="flex items-center gap-1.5 text-white">
+          <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />
+          Offre N°1
+        </span>
+        <span className="font-medium text-cyan-300">120,5 % ROI</span>
+      </div>
+      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/50">
+        <span>Offre N°2</span>
+        <span>60,2 % ROI</span>
+      </div>
+    </div>
+  );
+}
+
+const visuals: Record<string, () => JSX.Element> = {
+  recherche: SearchVisual,
+  analyse: AnalyzeVisual,
+  marge: MarginVisual,
+  decision: DecisionVisual,
+};
 
 export function QuickGuide() {
   const [active, setActive] = useState(guideSteps[0].id);
   const activeStep = guideSteps.find((step) => step.id === active) ?? guideSteps[0];
+  const ActiveVisual = visuals[activeStep.id];
 
   return (
     <section className="container py-20 sm:py-28">
@@ -103,7 +174,7 @@ export function QuickGuide() {
           })}
         </div>
 
-        <div className="relative min-h-[220px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+        <div className="relative min-h-[280px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeStep.id}
@@ -121,6 +192,7 @@ export function QuickGuide() {
               <p className="mt-2 max-w-md text-sm text-white/50">
                 {activeStep.description}
               </p>
+              <ActiveVisual />
             </motion.div>
           </AnimatePresence>
         </div>

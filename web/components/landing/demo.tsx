@@ -88,7 +88,7 @@ function MacDemoWindow() {
               <ProductThumbnail
                 src="/images/product-charger.jpg"
                 alt="Station de charge sans fil 3-en-1 pliable"
-                className="h-16 w-16"
+                className="h-16 w-16 shadow-[0_0_15px_rgba(0,240,255,0.25)] hover:shadow-[0_0_15px_rgba(0,240,255,0.25)]"
               />
               <div>
                 <p className="font-medium leading-tight text-white">

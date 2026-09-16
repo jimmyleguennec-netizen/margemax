@@ -90,9 +90,9 @@ export function LiveActivityToast() {
         {activity && (
           <motion.div
             key={key}
-            initial={{ opacity: 0, x: -24, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -24, scale: 0.95 }}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
             className="pointer-events-auto flex max-w-xs items-center gap-3 rounded-xl border border-cyan-400/20 bg-[#0a0a14]/90 p-3.5 pr-3 shadow-[0_0_30px_-8px_rgba(34,211,238,0.6)] backdrop-blur-md"
           >
