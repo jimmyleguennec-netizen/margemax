@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import { ProductThumbnail } from "@/components/ui/product-thumbnail";
+import { MIconBadge } from "@/components/ui/m-icon-badge";
 import { CountUp } from "@/components/ui/count-up";
 
 function formatEuro(n: number): string {
@@ -85,11 +85,7 @@ function MacDemoWindow() {
 
           <div className="space-y-5 p-6 text-left">
             <div className="flex items-center gap-4">
-              <ProductThumbnail
-                src="/images/product-charger.jpg"
-                alt="Station de charge sans fil 3-en-1 pliable"
-                className="h-16 w-16 shadow-[0_0_15px_rgba(0,240,255,0.25)] hover:shadow-[0_0_15px_rgba(0,240,255,0.25)]"
-              />
+              <MIconBadge />
               <div>
                 <p className="font-medium leading-tight text-white">
                   Station de charge sans fil 3-en-1 pliable

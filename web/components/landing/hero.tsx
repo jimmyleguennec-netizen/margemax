@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
+
+import { MIconBadge } from "@/components/ui/m-icon-badge";
 
 const container = {
   hidden: {},
@@ -106,13 +107,7 @@ export function Hero() {
           className="mt-6 w-full max-w-2xl rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 text-left shadow-[0_0_30px_rgba(0,240,255,0.15)] backdrop-blur-xl"
         >
           <div className="flex items-center gap-4">
-            <Image
-              src="/images/product-charger.jpg"
-              alt="Aperçu produit analysé par MargeMax"
-              width={80}
-              height={80}
-              className="rounded-xl border border-cyan-500/40 object-cover shadow-[0_0_15px_rgba(0,240,255,0.3)]"
-            />
+            <MIconBadge />
             <div>
               <h2 className="text-xl font-bold text-cyan-400">
                 C&apos;est quoi, MargeMax ?
