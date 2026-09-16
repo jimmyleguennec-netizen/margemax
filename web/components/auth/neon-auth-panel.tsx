@@ -119,7 +119,6 @@ function LoginForm({
           Accédez à votre espace MargeMax.
         </p>
       </div>
-      <OAuthButtons />
       <NeonField
         id={`${idPrefix}-login-email`}
         name="email"
@@ -141,6 +140,7 @@ function LoginForm({
       />
       <NeonMessage state={state} />
       <NeonSubmitButton>Se connecter</NeonSubmitButton>
+      <OAuthButtons />
     </form>
   );
 }
@@ -162,7 +162,6 @@ function SignupForm({
           Commencez à calculer vos marges en quelques secondes.
         </p>
       </div>
-      <OAuthButtons />
       <NeonField
         id={`${idPrefix}-signup-email`}
         name="email"
@@ -192,6 +191,7 @@ function SignupForm({
       />
       <NeonMessage state={state} />
       <NeonSubmitButton>Créer mon compte</NeonSubmitButton>
+      <OAuthButtons />
     </form>
   );
 }

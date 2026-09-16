@@ -32,7 +32,7 @@ function GoogleIcon({ className }: { className?: string }) {
 function AppleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="M16.365 1.43c0 1.14-.468 2.207-1.229 2.997-.813.844-2.13 1.503-3.22 1.415-.137-1.08.42-2.22 1.19-2.99.836-.86 2.28-1.51 3.26-1.422zM20.7 17.14c-.59 1.36-.87 1.96-1.63 3.17-1.06 1.68-2.55 3.78-4.4 3.79-1.64.02-2.06-1.07-4.28-1.06-2.22.01-2.68 1.08-4.32 1.06-1.85-.02-3.26-1.9-4.32-3.58-2.96-4.65-3.27-10.1-1.44-13-1.3-2.24.04-4.23.87-5.03.8-.78 1.94-1.34 3.03-1.34 1.17 0 1.9.64 2.87.64.94 0 1.5-.64 2.87-.64.96 0 2.02.53 2.85 1.44a3.9 3.9 0 0 0-2.1 3.44c.02 2.42 2.13 3.24 2.15 3.25-.02.06-.34 1.16-1.13 2.29z" />
+      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.39-3.104c.843-1.025 1.415-2.454 1.259-3.883-1.22.052-2.7.818-3.573 1.845-.78.907-1.462 2.36-1.28 3.752 1.36.104 2.75-.688 3.594-1.714z" />
     </svg>
   );
 }
@@ -140,13 +140,15 @@ function AppleButton() {
 export function OAuthButtons() {
   return (
     <div className="space-y-2.5">
-      <GoogleButton />
-      <AppleButton />
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-white/10" />
-        <span className="text-[11px] uppercase tracking-wider text-white/30">ou</span>
+        <span className="text-[11px] uppercase tracking-wider text-white/30">
+          ou continuer avec
+        </span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
+      <GoogleButton />
+      <AppleButton />
     </div>
   );
 }
