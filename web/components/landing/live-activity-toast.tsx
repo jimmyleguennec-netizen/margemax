@@ -85,7 +85,7 @@ export function LiveActivityToast() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 left-4 z-40 sm:bottom-6 sm:left-6">
+    <div className="pointer-events-none fixed bottom-4 left-1/2 z-50 w-full max-w-[90vw] -translate-x-1/2 sm:bottom-6 sm:left-6 sm:w-auto sm:max-w-xs sm:translate-x-0">
       <AnimatePresence>
         {activity && (
           <motion.div
@@ -94,7 +94,7 @@ export function LiveActivityToast() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className="pointer-events-auto flex max-w-xs items-center gap-3 rounded-xl border border-cyan-400/20 bg-[#0a0a14]/90 p-3.5 pr-3 shadow-[0_0_30px_-8px_rgba(34,211,238,0.6)] backdrop-blur-md"
+            className="pointer-events-auto flex w-full items-center gap-3 rounded-xl border border-cyan-400/20 bg-[#0a0a14]/90 p-3.5 pr-3 shadow-[0_0_30px_-8px_rgba(34,211,238,0.6)] backdrop-blur-md"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 text-cyan-300">
               {activity.kind === "analysis" ? (

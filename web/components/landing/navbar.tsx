@@ -8,7 +8,7 @@ import {
   useMotionValueEvent,
   useScroll,
 } from "framer-motion";
-import { Facebook, Instagram, Twitter } from "lucide-react";
+import { Facebook, Instagram, Menu, Twitter, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
@@ -73,9 +73,87 @@ function TopBar() {
   );
 }
 
+function MobileMenu({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-xl sm:hidden"
+        >
+          <div className="container flex h-16 items-center justify-between">
+            <Link href="/" onClick={onClose}>
+              <Logo className="h-12" />
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fermer le menu"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 transition-colors hover:bg-cyan-400/10"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <nav className="container flex flex-1 flex-col items-center justify-center gap-2">
+            {links.map((link, i) => (
+              <motion.div
+                key={link.href}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 + i * 0.05, duration: 0.3 }}
+              >
+                <Link
+                  href={link.href}
+                  onClick={onClose}
+                  className="block px-4 py-3 text-2xl font-semibold text-white/80 transition-colors hover:text-cyan-300"
+                >
+                  {link.label}
+                </Link>
+              </motion.div>
+            ))}
+          </nav>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+            className="container mb-10 flex flex-col gap-3"
+          >
+            <Link
+              href="/login"
+              onClick={onClose}
+              className="rounded-full border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white/80"
+            >
+              Connexion
+            </Link>
+            <Link
+              href="/signup"
+              onClick={onClose}
+              className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
+            >
+              Essayer gratuitement
+            </Link>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function Navbar() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { scrollY } = useScroll();
 
   useMotionValueEvent(scrollY, "change", (latest) => {
@@ -149,7 +227,7 @@ export function Navbar() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
             <Link
               href="/login"
               className="origin-center rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-all duration-300 hover:scale-x-105 hover:text-white"
@@ -163,8 +241,19 @@ export function Navbar() {
               Essayer gratuitement
             </Link>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Ouvrir le menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 transition-colors hover:bg-cyan-400/10 sm:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
         </div>
       </div>
+
+      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
     </motion.header>
   );
 }
