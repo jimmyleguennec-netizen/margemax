@@ -54,24 +54,42 @@ export function Hero() {
         animate="show"
         className="container flex flex-col items-center gap-6 py-24 text-center sm:py-32"
       >
-        <motion.h1
+        <motion.div
           variants={item}
-          className="max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-6xl"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-slate-900/90 px-4 py-1.5 text-xs font-semibold text-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.2)]"
         >
-          Tu veux lancer ta boutique e-commerce, mais tu galères à dénicher des{" "}
-          <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-indigo-400 bg-clip-text font-black text-transparent drop-shadow-[0_0_25px_rgba(0,240,255,0.4)]">
-            produits vraiment rentables
-          </span>{" "}
-          ?
-        </motion.h1>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+          </span>
+          ⚡ SOURCING AUTOMATISÉ ALIEXPRESS — CALCUL DE MARGE REELLE
+        </motion.div>
 
-        <motion.p
-          variants={item}
-          className="max-w-2xl text-lg font-medium text-slate-200"
-        >
-          Marre des marges théoriques qui s&apos;effondrent au moment de
-          payer la livraison et les taxes ? Bienvenue sur MargeMax.
-        </motion.p>
+        <motion.div variants={item} className="relative max-w-3xl">
+          <div className="pointer-events-none absolute inset-y-0 -left-44 hidden w-36 items-center lg:flex">
+            <div className="rounded-xl border border-cyan-400/30 bg-slate-900/90 px-3 py-2 text-left text-xs font-medium text-cyan-200 shadow-[0_0_15px_rgba(0,240,255,0.2)] backdrop-blur-sm">
+              📊 +10 000 produits analysés
+            </div>
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 -right-44 hidden w-36 items-center lg:flex">
+            <div className="rounded-xl border border-fuchsia-400/30 bg-slate-900/90 px-3 py-2 text-left text-xs font-medium text-fuchsia-200 shadow-[0_0_15px_rgba(217,70,239,0.2)] backdrop-blur-sm">
+              🎯 0 surprise au checkout
+            </div>
+          </div>
+
+          <h1 className="text-center tracking-tight">
+            <span className="mb-3 block text-lg font-medium text-slate-300 md:text-xl">
+              Marre de perdre de l&apos;argent avec de fausses marges ?
+            </span>
+            <span className="block text-4xl font-extrabold text-white sm:text-6xl">
+              Déniche des{" "}
+              <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-indigo-400 bg-clip-text font-black text-transparent drop-shadow-[0_0_30px_rgba(0,240,255,0.5)]">
+                produits gagnants 100% rentables
+              </span>{" "}
+              pour ta boutique.
+            </span>
+          </h1>
+        </motion.div>
 
         <motion.div
           variants={item}
