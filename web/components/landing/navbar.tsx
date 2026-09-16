@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+import { Logo } from "@/components/ui/logo";
+
 const links = [
   { href: "#demo", label: "Démo" },
   { href: "#features", label: "Fonctionnalités" },
@@ -23,11 +25,8 @@ export function Navbar() {
       className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/40 backdrop-blur-xl"
     >
       <div className="container flex h-16 items-center justify-between">
-        <Link
-          href="/"
-          className="text-lg font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]"
-        >
-          Marge<span className="text-cyan-400">Max</span>
+        <Link href="/">
+          <Logo />
         </Link>
 
         <nav

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
+import { Logo } from "@/components/ui/logo";
 
 export function LegalPage({
   title,
@@ -16,11 +17,8 @@ export function LegalPage({
       <div className="min-h-screen bg-[#05050a]">
         <header className="border-b border-white/10 bg-black/40 backdrop-blur-xl">
           <div className="container flex h-16 items-center">
-            <Link
-              href="/"
-              className="text-lg font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]"
-            >
-              Marge<span className="text-cyan-400">Max</span>
+            <Link href="/">
+              <Logo />
             </Link>
           </div>
         </header>

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ShieldCheck, CreditCard } from "lucide-react";
 
+import { Logo } from "@/components/ui/logo";
+
 export function CtaFooter() {
   return (
     <>
@@ -51,6 +53,9 @@ export function CtaFooter() {
 
       <footer className="border-t border-white/10 py-8">
         <div className="container flex flex-col items-center gap-6">
+          <Link href="/">
+            <Logo />
+          </Link>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <span className="flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1.5 text-xs font-medium text-cyan-200">
               <CreditCard className="h-3.5 w-3.5" />

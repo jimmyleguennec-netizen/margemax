@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
+import { Logo } from "@/components/ui/logo";
 
 export default function AuthLayout({
   children,
@@ -19,11 +20,8 @@ export default function AuthLayout({
           className="pointer-events-none absolute -right-32 bottom-1/4 -z-10 h-[420px] w-[420px] rounded-full bg-fuchsia-500/20 blur-[120px]"
         />
 
-        <Link
-          href="/"
-          className="relative z-10 text-xl font-bold tracking-tight text-white drop-shadow-[0_0_14px_rgba(34,211,238,0.6)]"
-        >
-          Marge<span className="text-cyan-400">Max</span>
+        <Link href="/" className="relative z-10">
+          <Logo className="h-11" />
         </Link>
 
         <div className="relative z-10 pointer-events-auto w-full flex flex-col items-center">

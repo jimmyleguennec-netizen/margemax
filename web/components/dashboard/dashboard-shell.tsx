@@ -9,6 +9,7 @@ import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
 import { CreditCardInput } from "@/components/ui/credit-card-input";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
+import { Logo } from "@/components/ui/logo";
 import { SearchPanel } from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
@@ -110,11 +111,8 @@ export function DashboardShell({
 
         <header className="sticky top-0 z-50 border-b border-white/10 bg-black/40 backdrop-blur-xl">
           <div className="container flex h-16 items-center justify-between">
-            <Link
-              href="/"
-              className="text-lg font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]"
-            >
-              Marge<span className="text-cyan-400">Max</span>
+            <Link href="/">
+              <Logo />
             </Link>
             <AnimatedTabs
               tabs={tabs}
