@@ -6,6 +6,11 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
+import { CountUp } from "@/components/ui/count-up";
+
+function formatEuro(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
@@ -15,11 +20,11 @@ const benefits = [
 ];
 
 const packs = [
-  { key: "starter", label: "Starter", credits: 5, price: "2,99 €", perCredit: "0,60 €/crédit", popular: false },
-  { key: "essentiel", label: "Essentiel", credits: 15, price: "7,99 €", perCredit: "0,53 €/crédit", popular: false },
-  { key: "avance", label: "Avancé", credits: 35, price: "14,99 €", perCredit: "0,42 €/crédit", popular: true },
-  { key: "pro", label: "Pro", credits: 80, price: "29,99 €", perCredit: "0,37 €/crédit", popular: false },
-  { key: "ultimate", label: "Ultimate", credits: 200, price: "59,99 €", perCredit: "0,30 €/crédit", popular: false },
+  { key: "starter", label: "Starter", credits: 5, priceValue: 2.99, perCredit: "0,60 €/crédit", popular: false },
+  { key: "essentiel", label: "Essentiel", credits: 15, priceValue: 7.99, perCredit: "0,53 €/crédit", popular: false },
+  { key: "avance", label: "Avancé", credits: 35, priceValue: 14.99, perCredit: "0,42 €/crédit", popular: true },
+  { key: "pro", label: "Pro", credits: 80, priceValue: 29.99, perCredit: "0,37 €/crédit", popular: false },
+  { key: "ultimate", label: "Ultimate", credits: 200, priceValue: 59.99, perCredit: "0,30 €/crédit", popular: false },
 ];
 
 const container = {
@@ -93,7 +98,7 @@ export function Pricing() {
                   Pack {pack.label}
                 </p>
                 <p className="mt-1 text-3xl font-bold text-white">
-                  {pack.price}
+                  <CountUp value={pack.priceValue} format={formatEuro} />
                 </p>
                 <p className="mt-1 text-sm text-white/40">
                   {pack.credits} crédits · {pack.perCredit}

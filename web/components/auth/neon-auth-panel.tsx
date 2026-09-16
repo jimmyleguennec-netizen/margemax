@@ -216,6 +216,8 @@ function OverlayFace({
   );
 }
 
+const PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+
 function SuccessOverlay() {
   return (
     <motion.div
@@ -224,25 +226,52 @@ function SuccessOverlay() {
       exit={{ opacity: 0 }}
       className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 rounded-2xl bg-black/85 backdrop-blur-md"
     >
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 18 }}
-        className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-cyan-400 shadow-[0_0_40px_rgba(34,211,238,0.8)]"
-      >
-        <motion.svg viewBox="0 0 24 24" className="h-10 w-10" fill="none">
-          <motion.path
-            d="M4 12.5L9.5 18L20 6"
-            stroke="#22d3ee"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: "easeInOut" }}
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        {/* Onde circulaire */}
+        <motion.span
+          initial={{ scale: 0.4, opacity: 0.8 }}
+          animate={{ scale: 2.6, opacity: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="absolute inset-0 rounded-full border-2 border-cyan-400"
+        />
+
+        {/* Eclats de particules */}
+        {PARTICLE_ANGLES.map((angle, i) => (
+          <motion.span
+            key={angle}
+            initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+            animate={{
+              x: Math.cos((angle * Math.PI) / 180) * 46,
+              y: Math.sin((angle * Math.PI) / 180) * 46,
+              opacity: 0,
+              scale: 0,
+            }}
+            transition={{ duration: 0.7, delay: 0.15 + i * 0.01, ease: "easeOut" }}
+            className="absolute h-1.5 w-1.5 rounded-full bg-cyan-300"
+            style={{ boxShadow: "0 0 6px 2px rgba(34,211,238,0.8)" }}
           />
-        </motion.svg>
-      </motion.div>
+        ))}
+
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 18 }}
+          className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full border-2 border-cyan-400 shadow-[0_0_40px_rgba(34,211,238,0.8)]"
+        >
+          <motion.svg viewBox="0 0 24 24" className="h-10 w-10" fill="none">
+            <motion.path
+              d="M4 12.5L9.5 18L20 6"
+              stroke="#22d3ee"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.5, delay: 0.15, ease: "easeInOut" }}
+            />
+          </motion.svg>
+        </motion.div>
+      </div>
       <motion.p
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}

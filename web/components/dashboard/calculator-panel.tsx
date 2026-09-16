@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { Gauge, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useAnimation } from "framer-motion";
+import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 
 import { computeMarginEstimate } from "@/lib/margin-estimate";
+import { CircularGauge } from "@/components/ui/circular-gauge";
+import { CountUp } from "@/components/ui/count-up";
 
 function parseEuro(value: string): number {
   const n = Number(value.replace(",", "."));
@@ -121,6 +123,18 @@ export function CalculatorPanel() {
   }, [purchase, shipping, importTax, salePrice]);
 
   const isProfitable = estimate.margin > 0;
+  const warnControls = useAnimation();
+  const wasProfitable = useRef(isProfitable);
+
+  useEffect(() => {
+    if (!isProfitable && wasProfitable.current) {
+      warnControls.start({
+        x: [0, -6, 6, -4, 4, 0],
+        transition: { duration: 0.4 },
+      });
+    }
+    wasProfitable.current = isProfitable;
+  }, [isProfitable, warnControls]);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -180,7 +194,14 @@ export function CalculatorPanel() {
         </div>
 
         {/* Resultat du prix de vente manuel */}
-        <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-5 sm:grid-cols-4">
+        <motion.div
+          animate={warnControls}
+          className={`mt-6 grid grid-cols-2 gap-4 rounded-xl border p-5 transition-colors duration-300 sm:grid-cols-4 ${
+            isProfitable
+              ? "border-white/10 bg-white/[0.02]"
+              : "animate-pulse border-pink-500/40 bg-pink-500/[0.04] shadow-[0_0_24px_-6px_rgba(244,63,94,0.5)]"
+          }`}
+        >
           <div>
             <p className="text-xs text-white/40">Coût total</p>
             <AnimatedNumber
@@ -213,7 +234,7 @@ export function CalculatorPanel() {
               className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]"
             />
           </div>
-        </div>
+        </motion.div>
 
         {!isProfitable && (
           <p className="mt-3 text-center text-xs text-pink-300">
@@ -270,15 +291,11 @@ export function CalculatorPanel() {
                   <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
                   Prix de vente recommandé estimé
                 </p>
-                <AnimatedNumber
-                  value={formatEuro(estimate.recommendedPrice)}
-                  className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]"
-                />
+                <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
+                  <CountUp value={estimate.recommendedPrice} format={formatEuro} />
+                </p>
               </div>
-              <span className="flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1.5 text-xs font-semibold text-green-300 shadow-[0_0_16px_-4px_rgba(74,222,128,0.7)]">
-                <Gauge className="h-3.5 w-3.5" />
-                Indice de fiabilité : {estimate.reliability} %
-              </span>
+              <CircularGauge value={estimate.reliability} size={64} strokeWidth={5} label="fiabilité" />
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">

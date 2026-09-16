@@ -14,6 +14,15 @@ import {
 } from "lucide-react";
 
 import { ProductThumbnail } from "@/components/ui/product-thumbnail";
+import { CountUp } from "@/components/ui/count-up";
+
+function formatEuro(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+function formatPct(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
 
 const PRODUCT_URL = "https://fr.aliexpress.com/item/1005006478208156.html";
 
@@ -77,7 +86,7 @@ function MacDemoWindow() {
           <div className="space-y-5 p-6 text-left">
             <div className="flex items-center gap-4">
               <ProductThumbnail
-                src={null}
+                src="/images/product-charger.jpg"
                 alt="Station de charge sans fil 3-en-1 pliable"
               />
               <div>
@@ -110,7 +119,7 @@ function MacDemoWindow() {
                   Total réel checkout
                 </span>
                 <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                  18,09 €
+                  <CountUp value={18.09} format={formatEuro} />
                 </span>
               </div>
             </div>
@@ -153,7 +162,7 @@ function MacDemoWindow() {
               <div>
                 <p className="text-xs text-white/40">Marge nette</p>
                 <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-                  21,81 €
+                  <CountUp value={21.81} format={formatEuro} />
                 </p>
                 <p className="text-xs text-white/40">54,7 %</p>
               </div>
@@ -162,7 +171,7 @@ function MacDemoWindow() {
                   <TrendingUp className="h-3.5 w-3.5" /> ROI
                 </p>
                 <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-                  120,5 %
+                  <CountUp value={120.5} format={formatPct} />
                 </p>
                 <p className="text-xs text-white/40">
                   Prix de vente conseillé : 39,90 €

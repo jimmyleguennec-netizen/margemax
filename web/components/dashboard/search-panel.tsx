@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   ExternalLink,
-  Gauge,
   Link2,
   Search,
+  Send,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -17,6 +18,8 @@ import {
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { ProductThumbnail } from "@/components/ui/product-thumbnail";
+import { CircularGauge } from "@/components/ui/circular-gauge";
+import { CountUp } from "@/components/ui/count-up";
 import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 type Status = "idle" | "loading" | "result" | "error";
@@ -63,20 +66,17 @@ function EstimateBlock({
 
   return (
     <div className="border-t border-cyan-400/20 bg-cyan-400/[0.05] p-5">
-      <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
         <div>
           <p className="flex items-center gap-1.5 text-xs text-white/40">
             <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
             Prix de vente recommandé estimé
           </p>
           <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
-            {formatEuro(estimate.recommendedPrice)}
+            <CountUp value={estimate.recommendedPrice} format={formatEuro} />
           </p>
         </div>
-        <span className="flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1.5 text-xs font-semibold text-green-300 shadow-[0_0_16px_-4px_rgba(74,222,128,0.7)]">
-          <Gauge className="h-3.5 w-3.5" />
-          Indice de fiabilité : {estimate.reliability} %
-        </span>
+        <CircularGauge value={estimate.reliability} size={64} strokeWidth={5} label="fiabilité" />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -86,7 +86,7 @@ function EstimateBlock({
             Marge basse (fourchette prudente)
           </p>
           <p className="mt-1 text-lg font-bold text-white">
-            {formatEuro(estimate.lowPrice)}
+            <CountUp value={estimate.lowPrice} format={formatEuro} />
           </p>
           <p className="mt-1 text-xs text-white/40">
             Marge {formatEuro(estimate.marginLow)} ·{" "}
@@ -99,7 +99,7 @@ function EstimateBlock({
             Marge haute (fourchette premium)
           </p>
           <p className="mt-1 text-lg font-bold text-white">
-            {formatEuro(estimate.highPrice)}
+            <CountUp value={estimate.highPrice} format={formatEuro} />
           </p>
           <p className="mt-1 text-xs text-white/40">
             Marge {formatEuro(estimate.marginHigh)} ·{" "}
@@ -132,6 +132,18 @@ export function SearchPanel({
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<ApiResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showPlane, setShowPlane] = useState(false);
+  const [justSucceeded, setJustSucceeded] = useState(false);
+  const shakeControls = useAnimation();
+
+  useEffect(() => {
+    if (status === "error") {
+      shakeControls.start({
+        x: [0, -8, 8, -6, 6, -2, 2, 0],
+        transition: { duration: 0.45 },
+      });
+    }
+  }, [status, shakeControls]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -140,6 +152,8 @@ export function SearchPanel({
 
     setStatus("loading");
     setErrorMessage(null);
+    setShowPlane(true);
+    window.setTimeout(() => setShowPlane(false), 550);
 
     try {
       const response = await fetch("/api/search", {
@@ -161,6 +175,8 @@ export function SearchPanel({
       const apiResult = data as ApiResult;
       setResult(apiResult);
       setStatus("result");
+      setJustSucceeded(true);
+      window.setTimeout(() => setJustSucceeded(false), 1400);
 
       onResult?.({
         id: `${Date.now()}`,
@@ -191,7 +207,7 @@ export function SearchPanel({
         >
           Mots-clés ou lien AliExpress
         </label>
-        <div className="relative mt-2 flex items-center gap-2">
+        <motion.div animate={shakeControls} className="relative mt-2 flex items-center gap-2">
           <div className="relative flex flex-1 items-center">
             <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
             <input
@@ -199,18 +215,75 @@ export function SearchPanel({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="ex : chargeur induction iphone -- ou -- aliexpress.com/item/..."
-              className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+              className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
+                status === "error"
+                  ? "border-pink-500/60 shadow-[0_0_20px_-2px_rgba(244,63,94,0.6)]"
+                  : "border-cyan-400/20 focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+              }`}
             />
           </div>
           <button
             type="submit"
             disabled={status === "loading" || !query.trim()}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="relative flex min-w-[128px] items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {status === "loading" ? <RgbLoader size={16} /> : <Search className="h-4 w-4" />}
-            Analyser
+            <AnimatePresence mode="wait" initial={false}>
+              {showPlane ? (
+                <motion.span
+                  key="flying"
+                  initial={{ x: 0, opacity: 1, rotate: 0 }}
+                  animate={{ x: 40, opacity: 0, rotate: 20 }}
+                  transition={{ duration: 0.5, ease: "easeIn" }}
+                  className="flex items-center gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  Analyser
+                </motion.span>
+              ) : justSucceeded ? (
+                <motion.span
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 18 }}
+                  className="flex items-center gap-2"
+                >
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0, 1.3, 1] }}
+                    transition={{ duration: 0.4 }}
+                    className="flex"
+                  >
+                    <Check className="h-4 w-4" />
+                  </motion.span>
+                  Analysé
+                </motion.span>
+              ) : status === "loading" ? (
+                <motion.span
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <RgbLoader size={16} />
+                  Analyse...
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Analyser
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
-        </div>
+        </motion.div>
         <p className="mt-2 text-xs text-white/30">
           Entrez des mots-clés ou collez l&apos;URL d&apos;une annonce
           AliExpress pour lancer l&apos;analyse complète.
@@ -235,10 +308,10 @@ export function SearchPanel({
         {status === "result" && result && (
           <motion.div
             key="result"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.3 }}
+            transition={{ type: "spring", stiffness: 280, damping: 24 }}
             className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] backdrop-blur-sm"
           >
             <div className="flex items-center gap-4 border-b border-white/10 p-5">
@@ -282,7 +355,11 @@ export function SearchPanel({
                       {formatEuro(result.importFee)}
                     </td>
                     <td className="px-5 py-4 font-semibold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                      {formatEuro(result.total)}
+                      {result.total !== null ? (
+                        <CountUp value={result.total} format={formatEuro} />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <Link
