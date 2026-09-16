@@ -108,6 +108,13 @@ function EstimateBlock({
         </div>
       </div>
 
+      <div className="mt-4 flex items-center justify-between rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
+        <span className="text-white/50">CPA Max Pub (budget TikTok/Meta max par vente)</span>
+        <span className="font-bold text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.6)]">
+          <CountUp value={Math.max(0, estimate.marginHigh)} format={formatEuro} />
+        </span>
+      </div>
+
       <p className="mt-4 text-center text-[11px] text-white/30">
         Estimation calculée à partir du coût réel de cette annonce -- pas
         une donnée de marché garantie.

@@ -10,6 +10,7 @@ import { login, signup, type AuthActionState } from "@/lib/actions/auth";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 type Mode = "login" | "signup";
 type FormDispatch = (payload: FormData) => void;
@@ -118,6 +119,7 @@ function LoginForm({
           Accédez à votre espace MargeMax.
         </p>
       </div>
+      <OAuthButtons />
       <NeonField
         id={`${idPrefix}-login-email`}
         name="email"
@@ -160,6 +162,7 @@ function SignupForm({
           Commencez à calculer vos marges en quelques secondes.
         </p>
       </div>
+      <OAuthButtons />
       <NeonField
         id={`${idPrefix}-signup-email`}
         name="email"

@@ -1,32 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Smartphone, Sparkles, ShieldCheck, Zap } from "lucide-react";
-
-const badges = [
-  {
-    icon: Zap,
-    stat: "< 3s",
-    label: "Temps de calcul",
-    accent: "text-cyan-300",
-    glow: "rgba(34,211,238,0.6)",
-  },
-  {
-    icon: ShieldCheck,
-    stat: "100 %",
-    label: "Données réelles sans estimation",
-    accent: "text-fuchsia-300",
-    glow: "rgba(232,121,249,0.6)",
-  },
-  {
-    icon: Smartphone,
-    stat: "24/7",
-    label: "Disponible sur mobile & PC",
-    accent: "text-pink-300",
-    glow: "rgba(244,114,182,0.6)",
-  },
-];
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 const container = {
   hidden: {},
@@ -39,6 +16,13 @@ const item = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 };
+
+const bullets = [
+  "Le prix réel payé au checkout (Produit + Port + TVA/Douane)",
+  "L'offre AliExpress la moins chère parmi des milliers d'annonces",
+  "Le CPA Max Pub (budget TikTok/Meta à ne pas dépasser par vente)",
+  "Une Fiche Produit IA prête à l'emploi (titre SEO & description Shopify)",
+];
 
 export function Hero() {
   return (
@@ -60,48 +44,32 @@ export function Hero() {
         animate="show"
         className="container flex flex-col items-center gap-6 py-24 text-center sm:py-32"
       >
-        <motion.div
-          variants={item}
-          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-cyan-100 backdrop-blur-sm"
-        >
-          <Sparkles className="h-4 w-4 text-cyan-400" />
-          Marge{" "}
-          <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
-            réelle
-          </span>{" "}
-          vérifiée, pas estimée
-        </motion.div>
-
         <motion.h1
           variants={item}
-          className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl"
+          className="max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-6xl"
         >
-          Trouvez le produit AliExpress{" "}
-          <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(217,70,239,0.4)]">
-            le moins cher au coût total réel
-          </span>
+          Tu veux lancer ta boutique e-commerce, mais tu galères à dénicher
+          des produits vraiment rentables ?
         </motion.h1>
 
-        <motion.p variants={item} className="max-w-xl text-lg text-white/60">
-          Produit + livraison + taxes — calculés sur le checkout réel de
-          l&apos;annonce la moins chère, pas une estimation.
+        <motion.p variants={item} className="max-w-2xl text-lg text-white/60">
+          Marre des marges théoriques qui s&apos;effondrent au moment de
+          payer la livraison et les taxes ? Bienvenue sur MargeMax.
         </motion.p>
 
-        <motion.p
+        <motion.div
           variants={item}
-          className="max-w-2xl text-sm text-white/40"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1.5 text-sm font-medium text-cyan-100 shadow-[0_0_20px_-4px_rgba(34,211,238,0.6)] backdrop-blur-sm"
         >
-          Scan global des annonces AliExpress{" "}
-          <span className="text-cyan-400">→</span> extraction des prix de
-          checkout réels <span className="text-cyan-400">→</span> sélection
-          de l&apos;offre la moins chère avec la meilleure marge.
-        </motion.p>
+          <CheckCircle2 className="h-4 w-4 text-cyan-300" />
+          Zéro mauvaise surprise au checkout : calcul des frais de port et
+          taxes réels
+        </motion.div>
 
         <motion.div
           variants={item}
           className="flex flex-wrap items-center justify-center gap-4"
         >
-          {/* CTA principal -- bordure lumineuse animee (border beam) */}
           <span className="relative inline-flex overflow-hidden rounded-full p-[1.5px]">
             <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#22d3ee_0%,#d946ef_50%,#22d3ee_100%)]" />
             <Link
@@ -123,25 +91,38 @@ export function Hero() {
 
         <motion.div
           variants={item}
-          className="mt-4 flex flex-wrap items-center justify-center gap-4"
+          className="mt-6 w-full max-w-2xl rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 text-left shadow-[0_0_30px_rgba(0,240,255,0.15)] backdrop-blur-xl"
         >
-          {badges.map((badge) => (
-            <div
-              key={badge.label}
-              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 backdrop-blur-sm transition-all duration-300 hover:border-white/20"
-            >
-              <badge.icon className={`h-5 w-5 shrink-0 ${badge.accent}`} />
-              <div className="text-left">
-                <p
-                  className={`text-lg font-bold leading-none ${badge.accent}`}
-                  style={{ textShadow: `0 0 12px ${badge.glow}` }}
-                >
-                  {badge.stat}
-                </p>
-                <p className="mt-1 text-xs text-white/40">{badge.label}</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <Image
+              src="/images/product-charger.jpg"
+              alt="Aperçu produit analysé par MargeMax"
+              width={80}
+              height={80}
+              className="rounded-xl border border-cyan-500/40 object-cover shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+            />
+            <div>
+              <h2 className="text-xl font-bold text-cyan-400">
+                C&apos;est quoi, MargeMax ?
+              </h2>
+              <p className="mt-1 text-sm text-white/60">
+                MargeMax est ton assistant robotisé intelligent connecté à
+                AliExpress. En quelques secondes, il scanne le marché et
+                déniche pour toi :
+              </p>
             </div>
-          ))}
+          </div>
+          <ul className="mt-5 space-y-2.5">
+            {bullets.map((bullet) => (
+              <li
+                key={bullet}
+                className="flex items-start gap-2 text-sm text-white/70"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                {bullet}
+              </li>
+            ))}
+          </ul>
         </motion.div>
       </motion.div>
     </section>

@@ -243,6 +243,17 @@ export function CalculatorPanel() {
           </p>
         )}
 
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
+          <span className="text-white/50">CPA Max Pub (budget TikTok/Meta max par vente)</span>
+          <span
+            className={`font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.6)] ${
+              isProfitable ? "text-fuchsia-300" : "text-pink-400"
+            }`}
+          >
+            {formatEuro(Math.max(0, estimate.margin))}
+          </span>
+        </div>
+
         {/* Bloc 1 : Couts reels */}
         <div className="mt-8">
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
+export const dynamic = "force-dynamic";
+
 function isNextRedirectError(error: unknown): boolean {
   return (
     typeof error === "object" &&
