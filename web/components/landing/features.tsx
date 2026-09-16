@@ -114,7 +114,7 @@ export function Features() {
               <TiltCard
                 glowColor={accent.tilt}
                 className={cn(
-                  "group h-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300",
+                  "group h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300",
                   accent.border,
                   accent.glow
                 )}

@@ -140,13 +140,13 @@ export function Hero() {
               </p>
             </div>
           </div>
-          <ul className="mt-5 space-y-2.5">
+          <ul className="mt-5 flex flex-col gap-2">
             {bullets.map((bullet) => (
               <li
                 key={bullet}
-                className="flex items-start gap-2 text-sm text-white/70"
+                className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3.5 py-2 text-sm text-white/70 transition-colors duration-300 hover:border-cyan-400/40"
               >
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-cyan-400" />
                 {bullet}
               </li>
             ))}

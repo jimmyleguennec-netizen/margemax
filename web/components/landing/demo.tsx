@@ -72,7 +72,21 @@ function MacDemoWindow() {
 
       {/* Bordure neon degradee, style carte de login */}
       <div className="rounded-2xl bg-gradient-to-r from-cyan-400/60 via-fuchsia-500/60 to-pink-500/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(217,70,239,0.5)] transition-shadow duration-500 group-hover:shadow-[0_0_60px_-10px_rgba(34,211,238,0.6)]">
-        <div className="overflow-hidden rounded-2xl bg-[#0a0a14]">
+        <div className="relative overflow-hidden rounded-2xl bg-[#0a0a14]">
+          {/* Scanner laser -- balayage vertical simulant l'analyse IA */}
+          <motion.div
+            aria-hidden
+            animate={{ top: ["0%", "100%", "0%"] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute inset-x-0 z-20 h-12 bg-gradient-to-b from-transparent via-cyan-400/25 to-transparent"
+          />
+          <motion.div
+            aria-hidden
+            animate={{ top: ["0%", "100%", "0%"] }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute inset-x-0 z-20 h-px bg-cyan-300 shadow-[0_0_12px_3px_rgba(34,211,238,0.9)]"
+          />
+
           {/* Barre de titre style macOS */}
           <div className="flex items-center gap-1.5 border-b border-white/10 bg-white/[0.03] px-4 py-3">
             <span className="h-2.5 w-2.5 rounded-full bg-pink-500/70" />
