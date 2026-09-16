@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
@@ -12,15 +12,24 @@ import {
 } from "lucide-react";
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
+
+function formatEuro(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+function formatPct(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
 
 const steps = [
   {
     id: 1,
     icon: Link2,
-    title: "Collez l'URL AliExpress",
+    title: "Entrez un mot-clé ou une URL AliExpress",
     description:
-      "Ajoutez le lien du produit (ou un mot-clé) -- MargeMax récupère prix, livraison et variantes automatiquement.",
+      "Tapez un mot-clé ou collez le lien du produit -- MargeMax récupère prix, livraison et variantes automatiquement.",
   },
   {
     id: 2,
@@ -72,24 +81,37 @@ function StepOneMockup() {
       transition={{ duration: 0.35 }}
       className="flex h-full flex-col justify-center gap-4"
     >
-      <p className="text-sm text-white/40">Lien produit</p>
+      <p className="text-sm text-white/40">Mot-clé ou URL AliExpress</p>
       <div className="flex items-center gap-3 rounded-lg border border-cyan-400/30 bg-white/5 px-4 py-3 shadow-[0_0_20px_-4px_rgba(34,211,238,0.5)]">
         <Link2 className="h-4 w-4 shrink-0 text-cyan-300" />
         <span className="truncate text-sm text-white/70">
-          aliexpress.com/item/1005010664344065.html
+          fr.aliexpress.com/item/1005006478208156.html
         </span>
         <Clipboard className="ml-auto h-4 w-4 shrink-0 text-white/30" />
       </div>
       <p className="text-xs text-white/30">
-        Fonctionne aussi par mot-clé si vous n&apos;avez pas encore de lien
-        précis.
+        Fonctionne aussi bien avec un simple mot-clé (ex : « chargeur
+        induction iphone ») qu&apos;avec un lien produit direct.
       </p>
     </motion.div>
   );
 }
 
+const CHECKOUT_ROWS = [
+  { label: "Sous-total", value: 14.49 },
+  { label: "Port", value: 0 },
+  { label: "Taxes", value: 3.6 },
+];
+
 function StepTwoMockup() {
-  const rows = ["Prix produit", "Livraison", "Frais d'importation"];
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    setRevealed(false);
+    const timer = window.setTimeout(() => setRevealed(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <motion.div
       key="step-2"
@@ -100,28 +122,38 @@ function StepTwoMockup() {
       className="flex h-full flex-col justify-center gap-4"
     >
       <div className="flex items-center gap-3">
-        <RgbLoader size={22} />
-        <p className="text-sm text-white/60">Analyse en cours...</p>
+        {!revealed && <RgbLoader size={22} />}
+        <p className="text-sm text-white/60">
+          {revealed ? "Décompte réel du checkout" : "Analyse en cours..."}
+        </p>
       </div>
-      <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm">
-        {rows.map((row, i) => (
+      <AnimatePresence mode="wait">
+        {revealed && (
           <motion.div
-            key={row}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15 + i * 0.15, duration: 0.3 }}
-            className="flex items-center justify-between text-white/50"
+            key="rows"
+            className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
           >
-            <span>{row}</span>
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 + i * 0.15 }}
-              className="h-3 w-16 rounded bg-cyan-400/20"
-            />
+            {CHECKOUT_ROWS.map((row, i) => (
+              <motion.div
+                key={row.label}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.15, duration: 0.3 }}
+                className="flex items-center justify-between text-white/50"
+              >
+                <span>{row.label}</span>
+                <span className="font-medium text-white">
+                  {row.value === 0 ? (
+                    "Gratuit (0,00 €)"
+                  ) : (
+                    <CountUp value={row.value} format={formatEuro} duration={0.6} />
+                  )}
+                </span>
+              </motion.div>
+            ))}
           </motion.div>
-        ))}
-      </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -136,24 +168,41 @@ function StepThreeMockup() {
       transition={{ duration: 0.35 }}
       className="flex h-full flex-col justify-center gap-4"
     >
-      <div className="inline-flex w-fit items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        Coût vérifié
+      <div>
+        <p className="font-medium leading-tight text-white">
+          Station de charge 3-en-1
+        </p>
+        <div className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Coût vérifié
+        </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4">
         <div>
-          <p className="text-xs text-white/40">Marge nette</p>
-          <p className="text-2xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-            14,20 €
+          <p className="text-xs text-white/40">Total checkout</p>
+          <p className="text-xl font-bold text-white">
+            <CountUp value={18.09} format={formatEuro} />
           </p>
-          <p className="text-xs text-white/40">35,6 %</p>
+        </div>
+        <div>
+          <p className="text-xs text-white/40">Marge nette</p>
+          <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
+            <CountUp value={21.81} format={formatEuro} />
+          </p>
         </div>
         <div>
           <p className="flex items-center gap-1 text-xs text-white/40">
             <TrendingUp className="h-3.5 w-3.5" /> ROI
           </p>
-          <p className="text-2xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-            55,3 %
+          <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
+            <CountUp value={120.5} format={formatPct} />
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-white/40">Prix conseillé</p>
+          <p className="text-xl font-bold text-white">
+            <CountUp value={39.9} format={formatEuro} />
           </p>
         </div>
       </div>

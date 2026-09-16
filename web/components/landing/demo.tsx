@@ -88,6 +88,7 @@ function MacDemoWindow() {
               <ProductThumbnail
                 src="/images/product-charger.jpg"
                 alt="Station de charge sans fil 3-en-1 pliable"
+                className="h-16 w-16"
               />
               <div>
                 <p className="font-medium leading-tight text-white">
