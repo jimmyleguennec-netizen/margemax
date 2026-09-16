@@ -8,7 +8,7 @@ import { CreditCalculator } from "@/components/landing/credit-calculator";
 import { Pricing } from "@/components/landing/pricing";
 import { Faq } from "@/components/landing/faq";
 import { Contact } from "@/components/landing/contact";
-import { CtaFooter } from "@/components/landing/cta-footer";
+import { Footer } from "@/components/landing/footer";
 import { LiveActivityToast } from "@/components/landing/live-activity-toast";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 
@@ -36,7 +36,7 @@ export default function HomePage() {
           <Pricing />
           <Faq />
           <Contact />
-          <CtaFooter />
+          <Footer />
         </main>
 
         <LiveActivityToast />
