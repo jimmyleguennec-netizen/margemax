@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { CountUp } from "@/components/ui/count-up";
+import { TiltCard } from "@/components/ui/tilt-card";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -80,9 +81,14 @@ export function Pricing() {
               </span>
             )}
 
-            <div
+            <TiltCard
+              glowColor={
+                pack.popular
+                  ? "rgba(217,70,239,0.4)"
+                  : "rgba(34,211,238,0.35)"
+              }
               className={cn(
-                "relative h-full rounded-2xl p-[1.5px] transition-all duration-300",
+                "h-full rounded-2xl p-[1.5px] transition-all duration-300",
                 pack.popular
                   ? "bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-purple-500 shadow-[0_0_50px_-10px_rgba(217,70,239,0.6)] sm:scale-105 group-hover:shadow-[0_0_90px_-10px_rgba(217,70,239,0.95)]"
                   : "bg-white/10 group-hover:bg-gradient-to-b group-hover:from-cyan-400/80 group-hover:via-fuchsia-500/70 group-hover:to-purple-500/80 group-hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.8)]"
@@ -90,7 +96,7 @@ export function Pricing() {
             >
               <div
                 className={cn(
-                  "flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6",
+                  "relative z-0 flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6",
                   pack.popular && "bg-[#0d0a16]"
                 )}
               >
@@ -113,7 +119,7 @@ export function Pricing() {
                   className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
               </div>
-            </div>
+            </TiltCard>
           </motion.div>
         ))}
       </motion.div>

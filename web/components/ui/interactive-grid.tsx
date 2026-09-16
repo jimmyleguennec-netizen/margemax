@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,9 @@ export function InteractiveGrid({
   const nextId = useRef(0);
   const lastKeyRef = useRef<string | null>(null);
 
+  const { scrollYProgress } = useScroll();
+  const gridY = useTransform(scrollYProgress, [0, 1], [0, -150]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // Le calque visuel est fixed inset-0 (= plein viewport), donc les
     // coordonnees ecran (clientX/clientY) correspondent deja directement
@@ -76,15 +80,26 @@ export function InteractiveGrid({
       onMouseMove={handleMouseMove}
       className={cn("pointer-events-auto relative", className)}
     >
-      <div
+      {/* Motif de grille decoratif, avec un leger parallaxe vertical au
+          defilement -- deborde de 150px en haut/bas pour ne jamais laisser
+          de vide pendant la translation. */}
+      <motion.div
         aria-hidden
-        className="pointer-events-none fixed inset-0 z-0 h-full w-full overflow-hidden"
+        className="pointer-events-none fixed inset-x-0 z-0 w-full overflow-hidden"
         style={{
+          top: -150,
+          bottom: -150,
+          y: gridY,
           backgroundImage:
             "linear-gradient(rgba(139,92,246,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.1) 1px, transparent 1px)",
           backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
         }}
-      >
+      />
+
+      {/* Calque des cases allumees, aligne sur le viewport (coordonnees
+          clientX/clientY) -- jamais transforme, pour rester pile sous le
+          curseur independamment du parallaxe du motif ci-dessus. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 h-full w-full overflow-hidden">
         {cells.map((cell) => (
           <div
             key={cell.id}
