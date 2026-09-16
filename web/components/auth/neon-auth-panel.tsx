@@ -9,6 +9,7 @@ import { Mail, ShieldCheck } from "lucide-react";
 import { login, signup, type AuthActionState } from "@/lib/actions/auth";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { PasswordInput } from "@/components/ui/password-input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Mode = "login" | "signup";
 type FormDispatch = (payload: FormData) => void;
@@ -131,6 +132,11 @@ function LoginForm({
         label="Mot de passe"
         autoComplete="current-password"
       />
+      <Checkbox
+        id={`${idPrefix}-login-remember`}
+        name="remember"
+        label="Se souvenir de moi"
+      />
       <NeonMessage state={state} />
       <NeonSubmitButton>Se connecter</NeonSubmitButton>
     </form>
@@ -175,6 +181,11 @@ function SignupForm({
         label="Confirmer le mot de passe"
         autoComplete="new-password"
         minLength={6}
+      />
+      <Checkbox
+        id={`${idPrefix}-signup-remember`}
+        name="remember"
+        label="Se souvenir de moi"
       />
       <NeonMessage state={state} />
       <NeonSubmitButton>Créer mon compte</NeonSubmitButton>
