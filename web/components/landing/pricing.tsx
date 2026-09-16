@@ -8,6 +8,7 @@ import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { CountUp } from "@/components/ui/count-up";
 import { TiltCard } from "@/components/ui/tilt-card";
+import { SectionGlow } from "@/components/ui/section-glow";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -40,14 +41,16 @@ const item = {
 
 export function Pricing() {
   return (
-    <section id="pricing" className="container scroll-mt-20 py-20 sm:py-28">
+    <section id="pricing" className="container relative scroll-mt-20 py-20 sm:py-28">
+      <SectionGlow />
       <div className="mx-auto mb-8 max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
           Des crédits, pas un abonnement
         </h2>
         <p className="mt-3 text-white/50">
-          3 crédits offerts à l&apos;inscription. Achetez uniquement ce dont
-          vous avez besoin, sans engagement, sans date de renouvellement.
+          <span className="font-bold text-amber-300">3 crédits offerts</span>{" "}
+          à l&apos;inscription. Achetez uniquement ce dont vous avez besoin,
+          sans engagement, sans date de renouvellement.
         </p>
       </div>
 

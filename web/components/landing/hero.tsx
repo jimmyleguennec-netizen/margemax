@@ -58,8 +58,11 @@ export function Hero() {
           variants={item}
           className="max-w-3xl text-4xl font-extrabold tracking-tight text-white sm:text-6xl"
         >
-          Tu veux lancer ta boutique e-commerce, mais tu galères à dénicher
-          des produits vraiment rentables ?
+          Tu veux lancer ta boutique e-commerce, mais tu galères à dénicher des{" "}
+          <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-indigo-400 bg-clip-text font-black text-transparent drop-shadow-[0_0_25px_rgba(0,240,255,0.4)]">
+            produits vraiment rentables
+          </span>{" "}
+          ?
         </motion.h1>
 
         <motion.p
@@ -109,7 +112,7 @@ export function Hero() {
           <div className="flex items-center gap-4">
             <MIconBadge />
             <div>
-              <h2 className="text-xl font-bold text-cyan-400">
+              <h2 className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-xl font-bold text-transparent drop-shadow-[0_0_16px_rgba(52,211,153,0.35)]">
                 C&apos;est quoi, MargeMax ?
               </h2>
               <p className="mt-1 text-sm text-white/60">

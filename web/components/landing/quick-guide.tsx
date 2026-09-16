@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CircularGauge } from "@/components/ui/circular-gauge";
 import { CountUp } from "@/components/ui/count-up";
+import { SectionGlow } from "@/components/ui/section-glow";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -190,9 +191,10 @@ export function QuickGuide() {
   const ActiveVisual = visuals[activeStep.id];
 
   return (
-    <section id="guide" className="container scroll-mt-20 py-20 sm:py-28">
+    <section id="guide" className="container relative scroll-mt-20 py-20 sm:py-28">
+      <SectionGlow />
       <div className="mx-auto mb-14 max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
           Prenez en main l&apos;outil en 30 secondes
         </h2>
         <p className="mt-3 text-white/50">

@@ -90,13 +90,16 @@ export function Footer() {
             className="pointer-events-none absolute -inset-x-10 -bottom-24 -z-10 h-64 rounded-full bg-fuchsia-500/20 blur-[100px]"
           />
           <div className="flex flex-col items-center gap-6">
-            <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h2 className="max-w-2xl bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
               Prêt à dénicher tes vrais produits gagnants ?
             </h2>
             <p className="max-w-lg text-white/50">
               Rejoignez les e-commerçants qui analysent leurs coûts
-              d&apos;importation au centime près. 3 crédits offerts à
-              l&apos;inscription.
+              d&apos;importation au centime près.{" "}
+              <span className="font-bold text-amber-300">
+                3 crédits offerts
+              </span>{" "}
+              à l&apos;inscription.
             </p>
             <span className="relative inline-flex overflow-hidden rounded-full p-[1.5px]">
               <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#22d3ee_0%,#d946ef_50%,#22d3ee_100%)]" />

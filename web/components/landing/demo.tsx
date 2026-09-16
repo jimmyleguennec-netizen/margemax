@@ -302,7 +302,7 @@ export function Demo() {
   return (
     <section id="demo" className="container scroll-mt-20 pb-20 sm:pb-28">
       <div className="mx-auto mb-12 max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
           Une fiche claire, pas une estimation au doigt mouillé
         </h2>
         <p className="mt-3 text-white/50">

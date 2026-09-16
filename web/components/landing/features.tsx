@@ -5,6 +5,7 @@ import { Calculator, ShieldCheck, BookMarked, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { TiltCard } from "@/components/ui/tilt-card";
+import { SectionGlow } from "@/components/ui/section-glow";
 
 const features = [
   {
@@ -83,9 +84,10 @@ const item = {
 
 export function Features() {
   return (
-    <section id="features" className="container scroll-mt-20 py-20 sm:py-28">
+    <section id="features" className="container relative scroll-mt-20 py-20 sm:py-28">
+      <SectionGlow />
       <div className="mx-auto mb-14 max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
           Tout pour sourcer avec confiance
         </h2>
         <p className="mt-3 text-white/50">
