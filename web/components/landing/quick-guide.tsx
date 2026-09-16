@@ -14,6 +14,15 @@ import {
 
 import { cn } from "@/lib/utils";
 import { CircularGauge } from "@/components/ui/circular-gauge";
+import { CountUp } from "@/components/ui/count-up";
+
+function formatEuro(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+}
+
+function formatPct(n: number): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+}
 
 const guideSteps: {
   id: string;
@@ -58,26 +67,52 @@ const guideSteps: {
 
 function SearchVisual() {
   return (
-    <div className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/50">
-      <Link2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
-      <span className="truncate">chargeur induction iphone</span>
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/50">
+        <Link2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+        <span className="truncate">chargeur induction iphone</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-cyan-300/80">
+        <motion.span
+          animate={{ opacity: [1, 0.3, 1], scale: [1, 1.3, 1] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+          className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_2px_rgba(34,211,238,0.8)]"
+        />
+        Scan des annonces en direct
+      </div>
     </div>
   );
 }
 
+const ANALYZE_ROWS = [
+  { label: "Sous-total", value: 14.49 },
+  { label: "Livraison", value: 0 },
+  { label: "Taxes", value: 3.6 },
+];
+
 function AnalyzeVisual() {
-  const rows = [
-    { label: "Sous-total", value: "14,49 €" },
-    { label: "Livraison", value: "Gratuit" },
-    { label: "Taxes", value: "3,60 €" },
-  ];
   return (
-    <div className="mt-4 space-y-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs">
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between text-white/50">
+    <div className="mt-4 space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs">
+      <div className="relative h-1 overflow-hidden rounded-full bg-white/5">
+        <motion.div
+          animate={{ x: ["-100%", "220%"] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+        />
+      </div>
+      {ANALYZE_ROWS.map((row, i) => (
+        <motion.div
+          key={row.label}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.15 + i * 0.15, duration: 0.3 }}
+          className="flex items-center justify-between text-white/50"
+        >
           <span>{row.label}</span>
-          <span className="font-medium text-white">{row.value}</span>
-        </div>
+          <span className="font-medium text-white">
+            {row.value === 0 ? "Gratuit" : <CountUp value={row.value} format={formatEuro} duration={0.6} />}
+          </span>
+        </motion.div>
       ))}
     </div>
   );
@@ -85,14 +120,33 @@ function AnalyzeVisual() {
 
 function MarginVisual() {
   return (
-    <div className="mt-4 flex items-center gap-4 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
-      <CircularGauge value={94} size={52} strokeWidth={4} />
+    <div className="mt-4 space-y-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
+      <div className="flex items-center gap-4">
+        <CircularGauge value={94} size={52} strokeWidth={4} />
+        <div>
+          <p className="text-xs text-white/40">Marge nette</p>
+          <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+            <CountUp value={21.81} format={formatEuro} />
+          </p>
+          <p className="text-xs text-white/40">
+            ROI <CountUp value={120.5} format={formatPct} />
+          </p>
+        </div>
+      </div>
       <div>
-        <p className="text-xs text-white/40">Marge nette</p>
-        <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-          21,81 €
-        </p>
-        <p className="text-xs text-white/40">ROI 120,5 %</p>
+        <div className="flex items-center justify-between text-[11px] text-white/40">
+          <span>Indice de fiabilité</span>
+          <span className="font-medium text-cyan-300">94 %</span>
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/5">
+          <motion.div
+            initial={{ width: 0 }}
+            whileInView={{ width: "94%" }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]"
+          />
+        </div>
       </div>
     </div>
   );
@@ -105,6 +159,13 @@ function DecisionVisual() {
         <span className="flex items-center gap-1.5 text-white">
           <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />
           Offre N°1
+          <motion.span
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-300"
+          >
+            Meilleur choix
+          </motion.span>
         </span>
         <span className="font-medium text-cyan-300">120,5 % ROI</span>
       </div>
@@ -174,7 +235,7 @@ export function QuickGuide() {
           })}
         </div>
 
-        <div className="relative min-h-[280px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+        <div className="relative min-h-[320px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeStep.id}

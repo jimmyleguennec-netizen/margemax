@@ -61,7 +61,10 @@ export function Hero() {
           des produits vraiment rentables ?
         </motion.h1>
 
-        <motion.p variants={item} className="max-w-2xl text-lg text-white/60">
+        <motion.p
+          variants={item}
+          className="max-w-2xl text-lg font-medium text-slate-200"
+        >
           Marre des marges théoriques qui s&apos;effondrent au moment de
           payer la livraison et les taxes ? Bienvenue sur MargeMax.
         </motion.p>
@@ -132,6 +135,14 @@ export function Hero() {
               </li>
             ))}
           </ul>
+
+          <Link
+            href="/signup"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-cyan-300 shadow-[0_0_20px_-4px_rgba(34,211,238,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-cyan-400/20 hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.9)]"
+          >
+            [ Tester MargeMax Maintenant
+            <ArrowRight className="h-4 w-4" />]
+          </Link>
         </motion.div>
       </motion.div>
     </section>
