@@ -39,52 +39,67 @@ function AppleIcon({ className }: { className?: string }) {
 
 function GoogleButton() {
   const [clicked, setClicked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
     if (clicked) return;
     setClicked(true);
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (oauthError) throw oauthError;
+      // Succes : Supabase declenche deja la redirection navigateur --
+      // on laisse le loader tourner jusqu'a la navigation, pas de reset ici.
+    } catch (err) {
+      console.error("[oauth] Echec de connexion Google :", err);
+      setError("Connexion Google impossible. Réessayez.");
+      setClicked(false);
+    }
   }
 
   return (
-    <motion.button
-      type="button"
-      onClick={handleClick}
-      disabled={clicked}
-      whileHover={
-        !clicked
-          ? {
-              scale: 1.03,
-              boxShadow:
-                "0 0 24px -4px rgba(66,133,244,0.6), 0 0 24px -4px rgba(52,168,83,0.4), 0 0 24px -4px rgba(251,188,5,0.4)",
-            }
-          : undefined
-      }
-      transition={{ type: "spring", stiffness: 400, damping: 20 }}
-      className="relative flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
-    >
-      {clicked ? (
-        <RgbLoader size={16} />
-      ) : (
-        <motion.span
-          animate={clicked ? { rotateY: 180 } : { rotateY: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex"
-        >
-          <GoogleIcon className="h-4 w-4" />
-        </motion.span>
-      )}
-      Continuer avec Google
-    </motion.button>
+    <div>
+      <motion.button
+        type="button"
+        onClick={handleClick}
+        disabled={clicked}
+        whileHover={
+          !clicked
+            ? {
+                scale: 1.03,
+                boxShadow:
+                  "0 0 24px -4px rgba(66,133,244,0.6), 0 0 24px -4px rgba(52,168,83,0.4), 0 0 24px -4px rgba(251,188,5,0.4)",
+              }
+            : undefined
+        }
+        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+        className="relative flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {clicked ? (
+          <RgbLoader size={16} />
+        ) : (
+          <motion.span
+            animate={clicked ? { rotateY: 180 } : { rotateY: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex"
+          >
+            <GoogleIcon className="h-4 w-4" />
+          </motion.span>
+        )}
+        Continuer avec Google
+      </motion.button>
+      {error && <p className="mt-1.5 text-center text-xs text-pink-300">{error}</p>}
+    </div>
   );
 }
 
 function AppleButton() {
   const [clicked, setClicked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const springX = useSpring(x, { stiffness: 300, damping: 20 });
@@ -104,36 +119,49 @@ function AppleButton() {
   async function handleClick() {
     if (clicked) return;
     setClicked(true);
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (oauthError) throw oauthError;
+      // Succes : Supabase declenche deja la redirection navigateur --
+      // on laisse le loader tourner jusqu'a la navigation, pas de reset ici.
+    } catch (err) {
+      console.error("[oauth] Echec de connexion Apple :", err);
+      setError("Connexion Apple impossible. Réessayez.");
+      setClicked(false);
+    }
   }
 
   return (
-    <motion.button
-      type="button"
-      onClick={handleClick}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      disabled={clicked}
-      style={{ x: springX, y: springY }}
-      whileHover={
-        !clicked
-          ? {
-              boxShadow:
-                "0 0 20px -2px rgba(255,255,255,0.35), inset 0 0 12px rgba(255,255,255,0.08)",
-            }
-          : undefined
-      }
-      animate={clicked ? { scale: [1, 0.94, 1] } : { scale: 1 }}
-      transition={{ duration: 0.35 }}
-      className="relative flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-gradient-to-b from-white/10 to-white/[0.02] px-4 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-70"
-    >
-      {clicked ? <RgbLoader size={16} /> : <AppleIcon className="h-4 w-4" />}
-      Continuer avec Apple
-    </motion.button>
+    <div>
+      <motion.button
+        type="button"
+        onClick={handleClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        disabled={clicked}
+        style={{ x: springX, y: springY }}
+        whileHover={
+          !clicked
+            ? {
+                boxShadow:
+                  "0 0 20px -2px rgba(255,255,255,0.35), inset 0 0 12px rgba(255,255,255,0.08)",
+              }
+            : undefined
+        }
+        animate={clicked ? { scale: [1, 0.94, 1] } : { scale: 1 }}
+        transition={{ duration: 0.35 }}
+        className="relative flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/15 bg-gradient-to-b from-white/10 to-white/[0.02] px-4 py-2.5 text-sm font-medium text-white transition-colors duration-200 hover:border-white/30 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {clicked ? <RgbLoader size={16} /> : <AppleIcon className="h-4 w-4" />}
+        Continuer avec Apple
+      </motion.button>
+      {error && <p className="mt-1.5 text-center text-xs text-pink-300">{error}</p>}
+    </div>
   );
 }
 

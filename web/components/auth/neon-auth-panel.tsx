@@ -318,6 +318,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
     if (!isSuccess) return;
     const timer = setTimeout(() => {
       router.push("/dashboard");
+      router.refresh();
     }, 1400);
     return () => clearTimeout(timer);
   }, [isSuccess, router]);
