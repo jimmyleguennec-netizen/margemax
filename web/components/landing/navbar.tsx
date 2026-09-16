@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useScroll,
+} from "framer-motion";
 import { Facebook, Instagram, Twitter } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 
 const links = [
@@ -69,6 +75,12 @@ function TopBar() {
 
 export function Navbar() {
   const [hovered, setHovered] = useState<string | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setScrolled(latest > 20);
+  });
 
   return (
     <motion.header
@@ -77,12 +89,41 @@ export function Navbar() {
       transition={{ duration: 0.5 }}
       className="sticky top-0 z-50 w-full"
     >
-      <TopBar />
+      <AnimatePresence initial={false}>
+        {!scrolled && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <TopBar />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="w-full border-b border-white/10 bg-black/40 backdrop-blur-md">
-        <div className="container flex h-16 items-center justify-between">
+      <div
+        className={cn(
+          "w-full border-b backdrop-blur-xl transition-colors duration-300",
+          scrolled
+            ? "border-cyan-500/20 bg-slate-950/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+            : "border-white/10 bg-black/40"
+        )}
+      >
+        <div
+          className={cn(
+            "container flex items-center justify-between transition-[height] duration-300",
+            scrolled ? "h-12" : "h-16"
+          )}
+        >
           <Link href="/">
-            <Logo className="h-12 md:h-14" />
+            <Logo
+              className={cn(
+                "transition-all duration-300",
+                scrolled ? "h-9 md:h-10" : "h-12 md:h-14"
+              )}
+            />
           </Link>
 
           <nav
