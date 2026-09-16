@@ -21,7 +21,7 @@ export default function AuthLayout({
         />
 
         <Link href="/" className="relative z-10">
-          <Logo className="h-11" />
+          <Logo className="h-20 md:h-24" />
         </Link>
 
         <div className="relative z-10 pointer-events-auto w-full flex flex-col items-center">
