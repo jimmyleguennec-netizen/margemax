@@ -25,7 +25,7 @@ const CALLBACK_ERROR_MESSAGE =
   "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
 
 const ACCOUNT_NOT_FOUND_MESSAGE =
-  "Aucun compte MargeMax n'est associé à ce compte Google. Veuillez d'abord créer un compte.";
+  "Aucun compte MargeMax associé à cet e-mail. Veuillez d'abord vous inscrire.";
 
 function LoginForm({
   action,
