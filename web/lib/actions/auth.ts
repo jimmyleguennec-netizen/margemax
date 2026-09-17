@@ -8,6 +8,8 @@ export type AuthActionState = {
   error?: string;
   message?: string;
   success?: boolean;
+  /** Email en attente de confirmation par code OTP (voir signup ci-dessous). */
+  pendingEmail?: string;
 };
 
 function isNextRedirectError(error: unknown): boolean {
@@ -95,12 +97,13 @@ export async function signup(
     }
 
     // Si la confirmation par email est activée côté Supabase, aucune session
-    // n'est ouverte immédiatement : on prévient l'utilisateur au lieu de
-    // rediriger vers une zone protégée sans session.
+    // n'est ouverte immédiatement : on bascule vers la saisie du code OTP
+    // (email envoyé par signUp) plutôt que de rediriger vers une zone
+    // protégée sans session.
     if (data.user && !data.session) {
       return {
-        message:
-          "Compte créé. Vérifiez votre boîte mail pour confirmer votre adresse avant de vous connecter.",
+        message: "Compte créé ! Un code de confirmation vous a été envoyé par e-mail.",
+        pendingEmail: email,
       };
     }
 

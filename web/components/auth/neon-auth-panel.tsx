@@ -13,6 +13,7 @@ import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
+import { OtpVerifyForm } from "@/components/auth/otp-verify-form";
 import { NeonField, NeonMessage, NeonSubmitButton } from "@/components/auth/neon-form-fields";
 
 type Mode = "login" | "signup";
@@ -81,6 +82,13 @@ function SignupForm({
   state: AuthActionState;
   idPrefix: string;
 }) {
+  // Confirmation par email requise cote Supabase (signUp() sans session
+  // immediate) : bascule vers la saisie du code OTP plutot que d'afficher
+  // a nouveau le formulaire d'inscription.
+  if (state.pendingEmail) {
+    return <OtpVerifyForm email={state.pendingEmail} />;
+  }
+
   return (
     <form action={action} className="w-full max-w-sm space-y-4">
       <div>
