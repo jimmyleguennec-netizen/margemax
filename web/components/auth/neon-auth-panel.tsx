@@ -56,7 +56,7 @@ function LoginForm({
         id={`${idPrefix}-login-password`}
         name="password"
         label="Mot de passe"
-        autoComplete="current-password"
+        autoComplete="off"
       />
       <Link
         href="/forgot-password"

@@ -29,18 +29,25 @@ function readCredentials(formData: FormData) {
   };
 }
 
+/** Case a cocher HTML native, sans `value` explicite : "on" quand cochee,
+ * absente du FormData quand decochee. */
+function readRememberMe(formData: FormData): boolean {
+  return formData.get("remember") === "on";
+}
+
 export async function login(
   _prevState: AuthActionState | undefined,
   formData: FormData
 ): Promise<AuthActionState> {
   const { email, password } = readCredentials(formData);
+  const rememberMe = readRememberMe(formData);
 
   if (!email || !password) {
     return { error: "Merci de renseigner votre email et votre mot de passe." };
   }
 
   try {
-    const supabase = createClient();
+    const supabase = createClient({ rememberMe });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
