@@ -7,7 +7,12 @@ import { Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
-import { PACKS, formatEuro, recommendPackForVolume } from "@/lib/packs";
+import {
+  PACKS,
+  formatEuro,
+  recommendPackForVolume,
+  recommendPackCombinationForVolume,
+} from "@/lib/packs";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 
 const MIN_VOLUME = 1;
@@ -19,6 +24,10 @@ export function CreditCalculator() {
   const { pack: recommended, coversVolume } = useMemo(
     () => recommendPackForVolume(volume),
     [volume]
+  );
+  const combination = useMemo(
+    () => (coversVolume ? null : recommendPackCombinationForVolume(volume)),
+    [volume, coversVolume]
   );
   const progress = ((volume - MIN_VOLUME) / (MAX_VOLUME - MIN_VOLUME)) * 100;
 
@@ -112,44 +121,74 @@ export function CreditCalculator() {
           })}
         </div>
 
-        <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-          <p className="text-sm text-white/50">
-            {coversVolume ? (
-              <>
-                Avec <span className="text-white">{volume} analyses</span>,
-                le pack{" "}
-                <span className="font-semibold text-cyan-300">
-                  {recommended.label}
-                </span>{" "}
-                ({recommended.credits} crédits) couvre ce volume.
-              </>
-            ) : (
-              <>
+        {coversVolume ? (
+          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <p className="text-sm text-white/50">
+              Avec <span className="text-white">{volume} analyses</span>, le
+              pack{" "}
+              <span className="font-semibold text-cyan-300">
+                {recommended.label}
+              </span>{" "}
+              ({recommended.credits} crédits) couvre ce volume.
+            </p>
+            <AnimatedBuyButton
+              label={`Choisir ${recommended.label}`}
+              successLabel="C'est parti !"
+              href={buildPackCheckoutHref(recommended.key, user?.id)}
+              className="sm:w-auto sm:px-8"
+            />
+          </div>
+        ) : (
+          combination && (
+            <div className="mt-8 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-5">
+              <p className="text-sm text-white/50">
                 Aucun pack seul ne couvre{" "}
-                <span className="text-white">{volume} analyses</span> : le
-                pack{" "}
+                <span className="text-white">{volume} analyses</span> :
+                combine ces packs pour atteindre{" "}
                 <span className="font-semibold text-cyan-300">
-                  {recommended.label}
+                  {combination.totalCredits} crédits
                 </span>{" "}
-                ({recommended.credits} crédits) est le plus proche.
-                Combine plusieurs achats ou{" "}
-                <a
-                  href="#contact"
-                  className="font-semibold text-cyan-300 underline-offset-4 hover:underline"
-                >
-                  contacte-nous
-                </a>{" "}
-                pour un besoin plus important.
-              </>
-            )}
-          </p>
-          <AnimatedBuyButton
-            label={`Choisir ${recommended.label}`}
-            successLabel="C'est parti !"
-            href={buildPackCheckoutHref(recommended.key, user?.id)}
-            className="sm:w-auto sm:px-8"
-          />
-        </div>
+                au total.
+              </p>
+              <ul className="mt-4 space-y-2">
+                {combination.items.map((item) => (
+                  <li
+                    key={item.pack.key}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm"
+                  >
+                    <span className="text-white/70">
+                      {item.quantity > 1 ? `${item.quantity} × ` : ""}
+                      Pack {item.pack.label} ({item.pack.credits} crédits)
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white/40">
+                        {formatEuro(item.pack.priceEuros * item.quantity)}
+                      </span>
+                      <a
+                        href={buildPackCheckoutHref(item.pack.key, user?.id)}
+                        className="rounded-full border border-cyan-400/30 px-3 py-1 text-xs font-semibold text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_14px_-2px_rgba(34,211,238,0.6)]"
+                      >
+                        Choisir
+                      </a>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 flex items-center justify-between text-sm font-semibold text-white">
+                <span>Total</span>
+                <span>
+                  {combination.totalCredits} crédits ·{" "}
+                  {formatEuro(combination.totalPrice)}
+                </span>
+              </p>
+              <p className="mt-2 text-xs text-white/30">
+                Chaque pack s&apos;achète séparément (aucun panier
+                groupé pour l&apos;instant) : clique sur chaque
+                &laquo; Choisir &raquo; pour l&apos;acheter.
+              </p>
+            </div>
+          )
+        )}
       </div>
     </section>
   );

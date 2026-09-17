@@ -54,3 +54,55 @@ export function recommendPackForVolume(volume: number): {
   if (match) return { pack: match, coversVolume: true };
   return { pack: PACKS[PACKS.length - 1], coversVolume: false };
 }
+
+export interface PackCombinationItem {
+  pack: Pack;
+  quantity: number;
+}
+
+/**
+ * Combinaison de packs reellement achetable couvrant un volume superieur
+ * a MAX_PACK_CREDITS. Glouton : prend a chaque etape le plus grand pack
+ * dont les credits tiennent dans le besoin restant ; si aucun pack ne
+ * tient (reste < plus petit pack), prend le plus petit pack pour couvrir
+ * le reste (leger surplus plutot que de ne jamais atteindre le besoin).
+ * Verifie sur le cas donne : 220 -> Ultimate(200) + Essentiel(15) +
+ * Starter(5) = 220 credits / 70,97 €, exactement.
+ */
+export function recommendPackCombinationForVolume(volume: number): {
+  items: PackCombinationItem[];
+  totalCredits: number;
+  totalPrice: number;
+} {
+  const sortedDesc = [...PACKS].sort((a, b) => b.credits - a.credits);
+  const smallest = sortedDesc[sortedDesc.length - 1];
+
+  const items: PackCombinationItem[] = [];
+  let remaining = volume;
+  let iterations = 0;
+
+  while (remaining > 0 && iterations < 100) {
+    iterations += 1;
+    const fitting = sortedDesc.find((pack) => pack.credits <= remaining);
+    const chosen = fitting ?? smallest;
+
+    const existing = items.find((item) => item.pack.key === chosen.key);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      items.push({ pack: chosen, quantity: 1 });
+    }
+    remaining -= chosen.credits;
+  }
+
+  const totalCredits = items.reduce(
+    (sum, item) => sum + item.pack.credits * item.quantity,
+    0
+  );
+  const totalPrice = items.reduce(
+    (sum, item) => sum + item.pack.priceEuros * item.quantity,
+    0
+  );
+
+  return { items, totalCredits, totalPrice };
+}
