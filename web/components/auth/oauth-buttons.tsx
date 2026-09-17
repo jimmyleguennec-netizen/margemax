@@ -9,6 +9,15 @@ import { RgbLoader } from "@/components/ui/rgb-loader";
 const OAUTH_ERROR_MESSAGE =
   "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
 
+/**
+ * Desactive temporairement le bouton Apple tant que le provider Apple
+ * n'est pas confirme configure cote Supabase (Authentication ->
+ * Providers) -- evite de presenter comme fonctionnel un bouton qui ne
+ * peut pas aboutir. Remettre a `true` une fois le provider active et
+ * verifie.
+ */
+const APPLE_OAUTH_ENABLED = false;
+
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>
@@ -151,6 +160,25 @@ function AppleButton() {
   function handleMouseLeave() {
     x.set(0);
     y.set(0);
+  }
+
+  if (!APPLE_OAUTH_ENABLED) {
+    return (
+      <div>
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          className="relative flex w-full cursor-not-allowed items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/40"
+        >
+          <AppleIcon className="h-4 w-4" />
+          Continuer avec Apple
+          <span className="ml-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/30">
+            Bientôt
+          </span>
+        </button>
+      </div>
+    );
   }
 
   return (
