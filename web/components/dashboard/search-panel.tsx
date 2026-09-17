@@ -85,7 +85,7 @@ function EstimateBlock({
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
           <p className="flex items-center gap-1.5 text-xs text-white/40">
             <TrendingDown className="h-3.5 w-3.5 text-pink-300" />
-            Marge basse (fourchette prudente)
+            Prix de vente bas (fourchette prudente)
           </p>
           <p className="mt-1 text-lg font-bold text-white">
             <CountUp value={estimate.lowPrice} format={formatEuro} />
@@ -98,7 +98,7 @@ function EstimateBlock({
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
           <p className="flex items-center gap-1.5 text-xs text-white/40">
             <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
-            Marge haute (fourchette premium)
+            Prix de vente haut (fourchette premium)
           </p>
           <p className="mt-1 text-lg font-bold text-white">
             <CountUp value={estimate.highPrice} format={formatEuro} />

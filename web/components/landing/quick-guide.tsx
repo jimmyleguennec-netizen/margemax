@@ -125,12 +125,12 @@ function MarginVisual() {
       <div className="flex items-center gap-4">
         <CircularGauge value={94} size={52} strokeWidth={4} />
         <div>
-          <p className="text-xs text-white/40">Marge nette</p>
+          <p className="text-xs text-white/40">Marge avant pub</p>
           <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
             <CountUp value={21.81} format={formatEuro} />
           </p>
           <p className="text-xs text-white/40">
-            ROI <CountUp value={120.5} format={formatPct} />
+            ROI <CountUp value={120.6} format={formatPct} />
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ function DecisionVisual() {
             Meilleur choix
           </motion.span>
         </span>
-        <span className="font-medium text-cyan-300">120,5 % ROI</span>
+        <span className="font-medium text-cyan-300">120,6 % ROI</span>
       </div>
       <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/50">
         <span>Offre n° 2</span>

@@ -210,7 +210,7 @@ export function CalculatorPanel() {
             />
           </div>
           <div>
-            <p className="text-xs text-white/40">Marge nette</p>
+            <p className="text-xs text-white/40">Marge avant publicité et autres frais</p>
             <AnimatedNumber
               value={formatEuro(estimate.margin)}
               className={`mt-1 text-lg font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] ${
@@ -313,7 +313,7 @@ export function CalculatorPanel() {
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                 <p className="flex items-center gap-1.5 text-xs text-white/40">
                   <TrendingDown className="h-3.5 w-3.5 text-pink-300" />
-                  Marge basse (fourchette prudente)
+                  Prix de vente bas (fourchette prudente)
                 </p>
                 <AnimatedNumber
                   value={formatEuro(estimate.lowPrice)}
@@ -327,7 +327,7 @@ export function CalculatorPanel() {
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                 <p className="flex items-center gap-1.5 text-xs text-white/40">
                   <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
-                  Marge haute (fourchette premium)
+                  Prix de vente haut (fourchette premium)
                 </p>
                 <AnimatedNumber
                   value={formatEuro(estimate.highPrice)}

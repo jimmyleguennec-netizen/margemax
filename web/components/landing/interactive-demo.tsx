@@ -186,7 +186,7 @@ function StepThreeMockup() {
           </p>
         </div>
         <div>
-          <p className="text-xs text-white/40">Marge nette</p>
+          <p className="text-xs text-white/40">Marge avant pub</p>
           <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
             <CountUp value={21.81} format={formatEuro} />
           </p>
@@ -196,7 +196,7 @@ function StepThreeMockup() {
             <TrendingUp className="h-3.5 w-3.5" /> ROI
           </p>
           <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-            <CountUp value={120.5} format={formatPct} />
+            <CountUp value={120.6} format={formatPct} />
           </p>
         </div>
         <div>
@@ -220,7 +220,7 @@ export function InteractiveDemo() {
           Trois clics, une marge vérifiée
         </h2>
         <p className="mt-3 text-white/50">
-          Suivez le parcours complet, étape par étape.
+          Suis le parcours complet, étape par étape.
         </p>
       </div>
 

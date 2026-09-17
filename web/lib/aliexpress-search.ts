@@ -49,10 +49,45 @@ function buildSearchUrl(keyword: string): string {
   return url.toString();
 }
 
+/**
+ * Marqueurs de blocage anti-bot/CAPTCHA couramment renvoyes par
+ * AliExpress a un scraper (page "Access Denied", verification humaine,
+ * etc.). Une page ainsi bloquee ne contient jamais de veritable resultat
+ * de recherche -- la confondre avec "0 resultat" masquerait une panne
+ * fournisseur derriere un message qui dit le contraire de la realite.
+ */
+const BOT_BLOCK_MARKERS = [
+  /access denied/i,
+  /captcha/i,
+  /verify you are human/i,
+  /unusual traffic/i,
+  /punish/i, // page anti-bot AliExpress connue ("_______x_______punish")
+];
+
+function looksLikeBotBlock(html: string): boolean {
+  // Une vraie page de resultats AliExpress fait plusieurs dizaines de Ko ;
+  // une page de blocage/erreur est generalement tres courte.
+  if (html.length < 2000) return true;
+  return BOT_BLOCK_MARKERS.some((marker) => marker.test(html));
+}
+
 async function findFirstProductIdFromKeyword(
   keyword: string
 ): Promise<string | null> {
   const searchHtml = await fetchHtmlViaScraperApi(buildSearchUrl(keyword));
+
+  if (looksLikeBotBlock(searchHtml)) {
+    // Distinct de "0 resultat" : le fournisseur a bloque/limite la
+    // requete, ce n'est pas une absence reelle de resultats.
+    throw new AliExpressSearchError(
+      "AliExpress a limité ou bloqué cette recherche pour le moment -- réessaie dans quelques instants, ou colle directement le lien de l'annonce.",
+      503
+    );
+  }
+
+  // Formes rencontrees dans le HTML de résultats AliExpress : lien absolu
+  // (https://...item/ID.html), protocol-relative (//...item/ID.html) ou
+  // simple chemin (/item/ID.html) selon la page/le rendu.
   const match = searchHtml.match(/item\/(\d{9,15})\.html/);
   return match ? match[1] : null;
 }
@@ -163,20 +198,28 @@ export async function performAliExpressSearch(
 
   if (!productId) {
     throw new AliExpressSearchError(
-      "Aucune annonce trouvée pour ce mot-clé sur AliExpress -- essayez un terme plus précis ou collez un lien produit direct.",
+      "Aucune annonce trouvée pour ce mot-clé sur AliExpress. Essaie un terme plus précis ou colle un lien produit direct.",
       404
     );
   }
 
   const targetUrl = buildProductUrl(productId);
   const html = await fetchHtmlViaScraperApi(targetUrl);
+
+  if (looksLikeBotBlock(html)) {
+    throw new AliExpressSearchError(
+      "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment. Réessaie dans quelques instants.",
+      503
+    );
+  }
+
   const { title, price, currency, imageUrl } = extractFromJsonLd(html);
   const { shipping, importFee } = extractShippingAndImportFee(html);
   const productImageUrl = imageUrl ?? extractOgImage(html) ?? null;
 
   if (price === undefined || Number.isNaN(price)) {
     throw new AliExpressSearchError(
-      "Impossible d'extraire le prix réel de cette annonce -- la page n'a peut-être pas été rendue correctement par ScraperAPI, ou sa structure a changé.",
+      "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifie le lien, ou réessaie dans quelques instants.",
       502
     );
   }

@@ -68,12 +68,12 @@ export function Hero() {
         <motion.div variants={item} className="relative max-w-3xl">
           <div className="pointer-events-none absolute inset-y-0 -left-44 hidden w-36 items-center lg:flex">
             <div className="rounded-xl border border-cyan-400/30 bg-slate-900/90 px-3 py-2 text-left text-xs font-medium text-cyan-200 shadow-[0_0_15px_rgba(0,240,255,0.2)] backdrop-blur-sm">
-              📊 +10 000 produits analysés
+              ✓ Sans abonnement, crédits à l&apos;usage
             </div>
           </div>
           <div className="pointer-events-none absolute inset-y-0 -right-44 hidden w-36 items-center lg:flex">
             <div className="rounded-xl border border-fuchsia-400/30 bg-slate-900/90 px-3 py-2 text-left text-xs font-medium text-fuchsia-200 shadow-[0_0_15px_rgba(217,70,239,0.2)] backdrop-blur-sm">
-              🎯 0 surprise au checkout
+              🎯 Consulte le détail des coûts avant d&apos;acheter
             </div>
           </div>
 

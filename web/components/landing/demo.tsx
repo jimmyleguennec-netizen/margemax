@@ -42,7 +42,7 @@ const offers = [
     name: "Offre n° 1 — Sélection MargeMax",
     price: "18,09 €",
     marge: "21,81 €",
-    margePct: "120,5 % ROI",
+    margePct: "120,6 % ROI",
     best: true,
   },
   {
@@ -144,7 +144,7 @@ function MacDemoWindow() {
                 className="inline-flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Coût 100 % vérifié
+                Exemple de résultat
               </motion.div>
             </div>
 
@@ -171,7 +171,7 @@ function MacDemoWindow() {
               className="grid grid-cols-2 gap-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4"
             >
               <div>
-                <p className="text-xs text-white/40">Marge nette</p>
+                <p className="text-xs text-white/40">Marge avant publicité et autres frais</p>
                 <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
                   <CountUp value={21.81} format={formatEuro} />
                 </p>
@@ -182,7 +182,7 @@ function MacDemoWindow() {
                   <TrendingUp className="h-3.5 w-3.5" /> ROI
                 </p>
                 <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-                  <CountUp value={120.5} format={formatPct} />
+                  <CountUp value={120.6} format={formatPct} />
                 </p>
                 <p className="text-xs text-white/40">
                   Prix de vente conseillé : 39,90 €
@@ -288,7 +288,7 @@ function WindowsDemoWindow() {
                     <span className="text-white/50">{s.price}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-white/40">Marge nette</span>
+                    <span className="text-xs text-white/40">Marge avant pub</span>
                     <span
                       className={
                         s.best

@@ -29,7 +29,7 @@ export function Contact() {
     <section id="contact" className="container scroll-mt-20 py-20 sm:py-28">
       <div className="mx-auto mb-10 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Une question ? Écrivez-nous
+          Une question ? Écris-nous
         </h2>
         <p className="mt-3 text-white/50">
           Réponse sous 24 h ouvrées, ou écris-nous directement à{" "}

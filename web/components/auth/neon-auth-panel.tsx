@@ -230,7 +230,7 @@ function SuccessOverlay() {
         transition={{ delay: 0.35 }}
         className="text-lg font-bold uppercase tracking-[0.3em] text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]"
       >
-        Connected
+        Connexion réussie
       </motion.p>
       <motion.p
         initial={{ opacity: 0 }}
