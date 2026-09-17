@@ -33,6 +33,8 @@ type ApiResult = {
   importFee: number | null;
   total: number | null;
   currency: string;
+  creditsDebited?: boolean;
+  credits?: number;
 };
 
 function formatEuro(n: number | null): string {
@@ -124,8 +126,12 @@ function EstimateBlock({
 }
 
 export function SearchPanel({
+  credits,
+  onCreditsChange,
   onResult,
 }: {
+  credits?: number | null;
+  onCreditsChange?: (credits: number) => void;
   onResult?: (entry: {
     id: string;
     query: string;
@@ -163,7 +169,7 @@ export function SearchPanel({
     window.setTimeout(() => setShowPlane(false), 550);
 
     try {
-      const response = await fetch("/api/search", {
+      const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: trimmed }),
@@ -173,9 +179,15 @@ export function SearchPanel({
 
       if (!response.ok) {
         setErrorMessage(
-          data?.error ?? "La recherche a échoué -- réessayez dans un instant."
+          response.status === 402
+            ? data?.error ?? "Solde de crédits insuffisant."
+            : data?.error ?? "L'analyse a échoué -- réessayez dans un instant."
         );
         setStatus("error");
+        // Aucun credit debite sur un echec (garanti cote serveur) -- mais
+        // si le serveur precise le solde exact (ex. 402), on le reflete
+        // quand meme pour rester coherent avec l'affichage.
+        if (typeof data?.credits === "number") onCreditsChange?.(data.credits);
         return;
       }
 
@@ -184,6 +196,10 @@ export function SearchPanel({
       setStatus("result");
       setJustSucceeded(true);
       window.setTimeout(() => setJustSucceeded(false), 1400);
+
+      if (typeof apiResult.credits === "number") {
+        onCreditsChange?.(apiResult.credits);
+      }
 
       onResult?.({
         id: `${Date.now()}`,
@@ -194,9 +210,9 @@ export function SearchPanel({
         timestamp: Date.now(),
       });
     } catch (err) {
-      console.error("[SearchPanel] Échec de l'appel /api/search :", err);
+      console.error("[SearchPanel] Échec de l'appel /api/analyze :", err);
       setErrorMessage(
-        "Impossible de contacter le service de recherche -- réessayez dans un instant."
+        "Impossible de contacter le service d'analyse -- réessayez dans un instant."
       );
       setStatus("error");
     }
@@ -231,7 +247,7 @@ export function SearchPanel({
           </div>
           <button
             type="submit"
-            disabled={status === "loading" || !query.trim()}
+            disabled={status === "loading" || !query.trim() || credits === 0}
             className="relative flex min-w-[128px] origin-center items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-x-100"
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -291,10 +307,21 @@ export function SearchPanel({
             </AnimatePresence>
           </button>
         </motion.div>
-        <p className="mt-2 text-xs text-white/30">
-          Entrez des mots-clés ou collez l&apos;URL d&apos;une annonce
-          AliExpress pour lancer l&apos;analyse complète.
-        </p>
+        {credits === 0 ? (
+          <p className="mt-2 text-xs text-pink-300">
+            Solde de crédits épuisé.{" "}
+            <Link href="/#pricing" className="font-medium underline-offset-4 hover:underline">
+              Achète un pack
+            </Link>{" "}
+            pour continuer à analyser des produits.
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-white/30">
+            Entrez des mots-clés ou collez l&apos;URL d&apos;une annonce
+            AliExpress pour lancer l&apos;analyse complète (1 crédit par
+            analyse réussie).
+          </p>
+        )}
       </form>
 
       <AnimatePresence mode="wait">

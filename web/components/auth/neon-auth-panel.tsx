@@ -8,6 +8,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Mail, ShieldCheck } from "lucide-react";
 
 import { login, signup, type AuthActionState } from "@/lib/actions/auth";
+import { createClient } from "@/lib/supabase/client";
+import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
@@ -243,15 +245,30 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
   const router = useRouter();
 
   const isSuccess = Boolean(loginState.success || signupState.success);
+  const pendingPack = searchParams.get("pack");
 
   useEffect(() => {
     if (!isSuccess) return;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      // Achat de pack demarre avant connexion (?pack=<cle>) : on reprend
+      // exactement ce parcours au lieu d'atterrir sur /dashboard, avec
+      // l'utilisateur maintenant connu pour lier le paiement au bon
+      // compte (client_reference_id du Payment Link Stripe).
+      if (pendingPack) {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          router.push(buildPackCheckoutHref(pendingPack, user.id));
+          return;
+        }
+      }
       router.push("/dashboard");
       router.refresh();
     }, 1400);
     return () => clearTimeout(timer);
-  }, [isSuccess, router]);
+  }, [isSuccess, pendingPack, router]);
 
   return (
     <div className="relative w-full max-w-3xl">

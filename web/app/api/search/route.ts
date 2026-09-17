@@ -1,166 +1,24 @@
 import { NextResponse } from "next/server";
-import { createHmac } from "crypto";
 
-// Route Node.js (pas Edge) : necessaire pour le module crypto utilise par
-// la signature HMAC de l'API officielle AliExpress (voir signTopRest
-// plus bas).
+import {
+  AliExpressSearchError,
+  performAliExpressSearch,
+} from "@/lib/aliexpress-search";
+
+// Route Node.js (pas Edge) : le module partage utilise fetch + parsing
+// HTML, sans dependance Edge-incompatible, mais alignee sur le runtime
+// de app/api/analyze pour rester coherente.
 export const runtime = "nodejs";
 // Jamais mis en cache -- chaque recherche doit refleter le prix reel au
 // moment de l'appel.
 export const dynamic = "force-dynamic";
 
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
-const ALIEXPRESS_APP_KEY = process.env.ALIEXPRESS_APP_KEY;
-const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
-
-type SearchResult = {
-  title: string;
-  url: string;
-  product_image_url: string | null;
-  subtotal: number | null;
-  shipping: number | null;
-  importFee: number | null;
-  total: number | null;
-  currency: string;
-  source: "scraperapi";
-};
-
-function extractProductId(input: string): string | null {
-  const urlMatch = input.match(/item\/(\d{9,15})\.html/);
-  if (urlMatch) return urlMatch[1];
-  const bareId = input.match(/^\d{9,15}$/);
-  return bareId ? bareId[0] : null;
-}
-
-function buildProductUrl(productId: string): string {
-  return `https://www.aliexpress.com/item/${productId}.html`;
-}
-
-function buildSearchUrl(keyword: string): string {
-  const url = new URL("https://www.aliexpress.com/wholesale");
-  url.searchParams.set("SearchText", keyword);
-  return url.toString();
-}
-
-// Recherche par mot-cle : scrape la page de resultats AliExpress et prend
-// la premiere annonce trouvee comme candidate. Approche best-effort (pas de
-// classement/filtrage avance des resultats) -- consomme un second appel
-// ScraperAPI en plus de celui utilise pour recuperer la fiche produit.
-async function findFirstProductIdFromKeyword(
-  keyword: string
-): Promise<string | null> {
-  const searchHtml = await fetchHtmlViaScraperApi(buildSearchUrl(keyword));
-  const match = searchHtml.match(/item\/(\d{9,15})\.html/);
-  return match ? match[1] : null;
-}
-
-async function fetchHtmlViaScraperApi(targetUrl: string): Promise<string> {
-  if (!SCRAPER_API_KEY) {
-    throw new Error(
-      "SCRAPER_API_KEY absente -- configurez cette variable (Vercel -> Environment Variables) pour activer la recherche reelle."
-    );
-  }
-
-  const proxyUrl = new URL("https://api.scraperapi.com/");
-  proxyUrl.searchParams.set("api_key", SCRAPER_API_KEY);
-  proxyUrl.searchParams.set("url", targetUrl);
-  proxyUrl.searchParams.set("render", "true");
-
-  const response = await fetch(proxyUrl.toString(), {
-    signal: AbortSignal.timeout(25000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`ScraperAPI a repondu avec le statut ${response.status}.`);
-  }
-
-  return response.text();
-}
-
-function parseNumber(raw: string | undefined | null): number | null {
-  if (!raw) return null;
-  const cleaned = raw.replace(/[^\d,.-]/g, "").replace(",", ".");
-  const value = Number.parseFloat(cleaned);
-  return Number.isFinite(value) ? value : null;
-}
-
-function extractFromJsonLd(html: string): {
-  title?: string;
-  price?: number;
-  currency?: string;
-  imageUrl?: string;
-} {
-  const matches = html.matchAll(
-    /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi
-  );
-
-  for (const match of matches) {
-    try {
-      const data = JSON.parse(match[1]);
-      const nodes = Array.isArray(data) ? data : [data];
-      const product = nodes.find(
-        (node) => node && node["@type"] === "Product"
-      );
-      if (!product) continue;
-
-      const offer = Array.isArray(product.offers)
-        ? product.offers[0]
-        : product.offers;
-
-      const rawImage = Array.isArray(product.image)
-        ? product.image[0]
-        : product.image;
-
-      return {
-        title: typeof product.name === "string" ? product.name : undefined,
-        price:
-          offer?.price !== undefined
-            ? Number.parseFloat(String(offer.price))
-            : undefined,
-        currency:
-          typeof offer?.priceCurrency === "string"
-            ? offer.priceCurrency
-            : undefined,
-        imageUrl: typeof rawImage === "string" ? rawImage : undefined,
-      };
-    } catch {
-      // Bloc JSON-LD malforme ou absent sur cette page -- on l'ignore et
-      // on continue avec le bloc suivant plutot que de faire echouer toute
-      // l'extraction.
-      continue;
-    }
-  }
-
-  return {};
-}
-
-// Repli si le JSON-LD ne contient pas d'image : balise meta og:image,
-// presente sur la quasi-totalite des pages produit AliExpress.
-function extractOgImage(html: string): string | undefined {
-  const match = html.match(
-    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i
-  );
-  return match?.[1];
-}
-
-function extractShippingAndImportFee(html: string): {
-  shipping: number | null;
-  importFee: number | null;
-} {
-  const freeShipping = /(?:free shipping|livraison gratuite)/i.test(html);
-  const shippingMatch = html.match(
-    /(?:Shipping|Livraison)[^<{}]{0,40}?([\d]+[.,]\d{2})\s*(?:€|EUR)/i
-  );
-  const importFeeMatch = html.match(
-    /(?:Import (?:duty|fee|tax)|Frais? d[’']import|Taxe)[^<{}]{0,60}?([\d]+[.,]\d{2})\s*(?:€|EUR)/i
-  );
-
-  return {
-    shipping: freeShipping ? 0 : parseNumber(shippingMatch?.[1]),
-    importFee: parseNumber(importFeeMatch?.[1]),
-  };
-}
-
+/**
+ * Recherche libre, non authentifiee, non credite -- utilisee par la
+ * demo publique de la landing page uniquement. Le parcours reel du
+ * Dashboard (authentifie, avec debit de credit) passe par
+ * app/api/analyze, pas par cette route.
+ */
 export async function POST(request: Request) {
   let body: { query?: string };
   try {
@@ -180,102 +38,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const directProductId = extractProductId(query);
-
   try {
-    const productId =
-      directProductId ?? (await findFirstProductIdFromKeyword(query));
-
-    if (!productId) {
-      return NextResponse.json(
-        {
-          error:
-            "Aucune annonce trouvée pour ce mot-clé sur AliExpress -- essayez un terme plus précis ou collez un lien produit direct.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const targetUrl = buildProductUrl(productId);
-    const html = await fetchHtmlViaScraperApi(targetUrl);
-    const { title, price, currency, imageUrl } = extractFromJsonLd(html);
-    const { shipping, importFee } = extractShippingAndImportFee(html);
-    const productImageUrl = imageUrl ?? extractOgImage(html) ?? null;
-
-    if (price === undefined || Number.isNaN(price)) {
-      return NextResponse.json(
-        {
-          error:
-            "Impossible d'extraire le prix réel de cette annonce -- la page n'a peut-être pas été rendue correctement par ScraperAPI, ou sa structure a changé.",
-        },
-        { status: 502 }
-      );
-    }
-
-    const subtotal = price;
-    const total = subtotal + (shipping ?? 0) + (importFee ?? 0);
-
-    const result: SearchResult = {
-      title: title ?? "Titre indisponible",
-      url: targetUrl,
-      product_image_url: productImageUrl,
-      subtotal,
-      shipping,
-      importFee,
-      total,
-      currency: currency ?? "EUR",
-      source: "scraperapi",
-    };
-
+    const result = await performAliExpressSearch(query);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[api/search] Échec de l'extraction :", error);
+    const status = error instanceof AliExpressSearchError ? error.status : 502;
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erreur inconnue pendant la recherche.",
+        error: error instanceof Error ? error.message : "Erreur inconnue pendant la recherche.",
       },
-      { status: 502 }
+      { status }
     );
   }
 }
-
-/**
- * Signature HMAC-SHA256 pour l'API produit officielle AliExpress Open
- * Platform (aliexpress.ds.product.get), portee depuis l'implementation
- * validee dans l'app Streamlit d'origine (concatenation triee des
- * parametres, HMAC-SHA256, hex majuscule).
- *
- * NON appelee dans cette route pour l'instant : cette methode necessite en
- * plus un jeton OAuth utilisateur (ALIEXPRESS_ACCESS_TOKEN), qui n'a pas
- * ete fourni avec les identifiants de cette passe -- seul ALIEXPRESS_APP_KEY
- * (identifiant public) et ALIEXPRESS_APP_SECRET ont ete configures.
- * Conservee ici, prete a etre branchee, une fois le flux OAuth reconstruit
- * cote Next.js. D'ici la, ScraperAPI est le seul chemin reellement
- * fonctionnel de cette route.
- */
-function signTopRest(
-  path: string,
-  params: Record<string, string>,
-  secret: string
-): string {
-  const sortedKeys = Object.keys(params).sort();
-  const concatenated =
-    path + sortedKeys.map((key) => `${key}${params[key]}`).join("");
-  return createHmac("sha256", secret)
-    .update(concatenated, "utf8")
-    .digest("hex")
-    .toUpperCase();
-}
-
-function isAliExpressApiConfigured(): boolean {
-  return Boolean(ALIEXPRESS_APP_KEY && ALIEXPRESS_APP_SECRET);
-}
-
-// References volontairement conservees (fonctions ci-dessus) pour une
-// future integration -- evite un avertissement "declare mais jamais lu"
-// sans les supprimer.
-void signTopRest;
-void isAliExpressApiConfigured;

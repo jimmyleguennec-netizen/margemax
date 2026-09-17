@@ -8,12 +8,14 @@ import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { PACKS, formatEuro, recommendPackForVolume } from "@/lib/packs";
+import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 
 const MIN_VOLUME = 1;
 const MAX_VOLUME = 220;
 
 export function CreditCalculator() {
   const [volume, setVolume] = useState(20);
+  const { user } = useSupabaseUser();
   const { pack: recommended, coversVolume } = useMemo(
     () => recommendPackForVolume(volume),
     [volume]
@@ -144,7 +146,7 @@ export function CreditCalculator() {
           <AnimatedBuyButton
             label={`Choisir ${recommended.label}`}
             successLabel="C'est parti !"
-            href={buildPackCheckoutHref(recommended.key)}
+            href={buildPackCheckoutHref(recommended.key, user?.id)}
             className="sm:w-auto sm:px-8"
           />
         </div>

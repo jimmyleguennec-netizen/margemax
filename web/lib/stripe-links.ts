@@ -10,21 +10,27 @@ const STRIPE_LINKS: Record<string, string | undefined> = {
 };
 
 /**
- * URL de destination du bouton "Choisir ce pack" : le Payment Link Stripe
- * reel du pack (avec client_reference_id pour tracer quel pack a ete
- * achete) si la variable d'environnement correspondante est configuree,
- * sinon un repli vers /login?pack=<cle> (aucun paiement direct possible
- * sans lien Stripe configure).
+ * URL de destination du bouton "Choisir ce pack".
+ *
+ * Sans `userId` connu (visiteur non connecte), impossible de lier un
+ * paiement a un compte -- on force systematiquement /login?pack=<cle>
+ * AVANT tout lien Stripe, meme si le Payment Link du pack est configure.
+ * NeonAuthPanel reprend ce parcours apres connexion/inscription reussie
+ * en rappelant cette fonction avec l'utilisateur desormais connu.
+ *
+ * Avec un `userId`, encode <packKey>:<userId> dans client_reference_id
+ * (seul champ disponible sur un Payment Link statique) : le webhook
+ * Stripe separe les deux pour savoir QUOI crediter et A QUI.
  */
-export function buildPackCheckoutHref(packKey: string): string {
+export function buildPackCheckoutHref(packKey: string, userId?: string): string {
   const base = STRIPE_LINKS[packKey];
-  if (!base) {
+  if (!base || !userId) {
     return `/login?pack=${encodeURIComponent(packKey)}`;
   }
 
   try {
     const url = new URL(base);
-    url.searchParams.set("client_reference_id", packKey);
+    url.searchParams.set("client_reference_id", `${packKey}:${userId}`);
     return url.toString();
   } catch {
     return base;

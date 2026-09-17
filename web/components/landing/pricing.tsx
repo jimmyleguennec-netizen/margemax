@@ -8,6 +8,7 @@ import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { TiltCard } from "@/components/ui/tilt-card";
 import { SectionGlow } from "@/components/ui/section-glow";
 import { PACKS, formatEuro, formatPricePerCredit } from "@/lib/packs";
+import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
@@ -27,6 +28,8 @@ const item = {
 };
 
 export function Pricing() {
+  const { user } = useSupabaseUser();
+
   return (
     <section id="pricing" className="container relative scroll-mt-20 py-20 sm:py-28">
       <SectionGlow />
@@ -85,7 +88,7 @@ export function Pricing() {
                 <AnimatedBuyButton
                   label="Choisir ce pack"
                   successLabel="C'est parti !"
-                  href={buildPackCheckoutHref(pack.key)}
+                  href={buildPackCheckoutHref(pack.key, user?.id)}
                   className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
               </div>
