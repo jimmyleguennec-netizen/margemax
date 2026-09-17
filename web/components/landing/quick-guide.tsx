@@ -71,7 +71,7 @@ function SearchVisual() {
     <div className="mt-4 space-y-2">
       <div className="flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/50">
         <Link2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
-        <span className="truncate">chargeur induction iphone</span>
+        <span className="truncate">chargeur à induction pour iPhone</span>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-cyan-300/80">
         <motion.span
@@ -159,7 +159,7 @@ function DecisionVisual() {
       <div className="flex items-center justify-between rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] px-3 py-2 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
         <span className="flex items-center gap-1.5 text-white">
           <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />
-          Offre N°1
+          Offre n° 1
           <motion.span
             animate={{ opacity: [1, 0.5, 1] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
@@ -171,7 +171,7 @@ function DecisionVisual() {
         <span className="font-medium text-cyan-300">120,5 % ROI</span>
       </div>
       <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/50">
-        <span>Offre N°2</span>
+        <span>Offre n° 2</span>
         <span>60,2 % ROI</span>
       </div>
     </div>

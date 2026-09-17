@@ -109,7 +109,7 @@ function EstimateBlock({
       </div>
 
       <div className="mt-4 flex items-center justify-between rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
-        <span className="text-white/50">CPA Max Pub (budget TikTok/Meta max par vente)</span>
+        <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
         <span className="font-bold text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.6)]">
           <CountUp value={Math.max(0, estimate.marginHigh)} format={formatEuro} />
         </span>
@@ -221,7 +221,7 @@ export function SearchPanel({
               id="search-query"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ex : chargeur induction iphone -- ou -- aliexpress.com/item/..."
+              placeholder="ex : chargeur à induction pour iPhone, ou aliexpress.com/item/..."
               className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
                 status === "error"
                   ? "border-pink-500/60 shadow-[0_0_20px_-2px_rgba(244,63,94,0.6)]"

@@ -3,30 +3,17 @@
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
-import { CountUp } from "@/components/ui/count-up";
 import { TiltCard } from "@/components/ui/tilt-card";
 import { SectionGlow } from "@/components/ui/section-glow";
-
-function formatEuro(n: number): string {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
-}
+import { PACKS, formatEuro, formatPricePerCredit } from "@/lib/packs";
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
-  "Déclinaisons & options complètes (couleurs, tailles, modèles)",
+  "Variantes disponibles : couleurs, tailles et modèles",
   "Analyse de sourcing avec calcul de marge automatique",
   "Générateur de fiche produit IA",
-];
-
-const packs = [
-  { key: "starter", label: "Starter", credits: 5, priceValue: 2.99, perCredit: "0,60 €/crédit", popular: false },
-  { key: "essentiel", label: "Essentiel", credits: 15, priceValue: 7.99, perCredit: "0,53 €/crédit", popular: false },
-  { key: "avance", label: "Avancé", credits: 35, priceValue: 14.99, perCredit: "0,42 €/crédit", popular: true },
-  { key: "pro", label: "Pro", credits: 80, priceValue: 29.99, perCredit: "0,37 €/crédit", popular: false },
-  { key: "ultimate", label: "Ultimate", credits: 200, priceValue: 59.99, perCredit: "0,30 €/crédit", popular: false },
 ];
 
 const container = {
@@ -70,47 +57,27 @@ export function Pricing() {
         viewport={{ once: true, amount: 0.2 }}
         className="grid items-start gap-6 sm:grid-cols-2 lg:grid-cols-5"
       >
-        {packs.map((pack) => (
+        {PACKS.map((pack) => (
           <motion.div
             key={pack.key}
             variants={item}
-            whileHover={{ scale: 1.08, zIndex: 30 }}
+            whileHover={{ scale: 1.05, zIndex: 30 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="group relative h-full"
           >
-            {pack.popular && (
-              <span className="absolute -top-3 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-3 py-1 text-xs font-semibold text-white shadow-[0_0_16px_-2px_rgba(34,211,238,0.8)]">
-                Le plus populaire
-              </span>
-            )}
-
             <TiltCard
-              glowColor={
-                pack.popular
-                  ? "rgba(217,70,239,0.4)"
-                  : "rgba(34,211,238,0.35)"
-              }
-              className={cn(
-                "h-full rounded-2xl p-[1.5px] transition-all duration-300",
-                pack.popular
-                  ? "bg-gradient-to-b from-cyan-400 via-fuchsia-500 to-purple-500 shadow-[0_0_50px_-10px_rgba(217,70,239,0.6)] sm:scale-105 group-hover:shadow-[0_0_90px_-10px_rgba(217,70,239,0.95)]"
-                  : "bg-white/10 group-hover:bg-gradient-to-b group-hover:from-cyan-400/80 group-hover:via-fuchsia-500/70 group-hover:to-purple-500/80 group-hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.8)]"
-              )}
+              glowColor="rgba(34,211,238,0.35)"
+              className="h-full rounded-2xl border border-white/10 bg-white/10 p-[1.5px] transition-all duration-300 group-hover:bg-gradient-to-b group-hover:from-cyan-400/80 group-hover:via-fuchsia-500/70 group-hover:to-purple-500/80 group-hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.8)]"
             >
-              <div
-                className={cn(
-                  "relative z-0 flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6",
-                  pack.popular && "bg-[#0d0a16]"
-                )}
-              >
+              <div className="relative z-0 flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6">
                 <p className="text-sm font-medium text-white/50">
                   Pack {pack.label}
                 </p>
                 <p className="mt-1 text-3xl font-bold text-white">
-                  <CountUp value={pack.priceValue} format={formatEuro} />
+                  {formatEuro(pack.priceEuros)}
                 </p>
                 <p className="mt-1 text-sm text-white/40">
-                  {pack.credits} crédits · {pack.perCredit}
+                  {pack.credits} crédits · {formatPricePerCredit(pack)}
                 </p>
 
                 <div className="flex-1" />

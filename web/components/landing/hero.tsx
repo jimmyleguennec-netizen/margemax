@@ -20,10 +20,10 @@ const item = {
 };
 
 const bullets = [
-  "Le prix réel payé au checkout (Produit + Port + TVA/Douane)",
-  "L'offre AliExpress la moins chère parmi des milliers d'annonces",
-  "Le CPA Max Pub (budget TikTok/Meta à ne pas dépasser par vente)",
-  "Une Fiche Produit IA prête à l'emploi (titre SEO & description Shopify)",
+  "Le coût d'achat détaillé (Produit + Port + TVA/Douane)",
+  "L'offre AliExpress la moins chère parmi des annonces effectivement comparées",
+  "Le budget pub maximum par vente (TikTok/Meta)",
+  "Une fiche produit rédigée par IA, avec un titre et une description pour Shopify",
 ];
 
 export function Hero() {
@@ -62,7 +62,7 @@ export function Hero() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           </span>
-          ⚡ SOURCING AUTOMATISÉ ALIEXPRESS — CALCUL DE MARGE REELLE
+          ⚡ SOURCING AUTOMATISÉ ALIEXPRESS — CALCUL DE MARGE RÉELLE
         </motion.div>
 
         <motion.div variants={item} className="relative max-w-3xl">
@@ -82,11 +82,11 @@ export function Hero() {
               Marre de perdre de l&apos;argent avec de fausses marges ?
             </span>
             <span className="block text-4xl font-extrabold text-white sm:text-6xl">
-              Déniche des{" "}
+              Compare les offres AliExpress et{" "}
               <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-indigo-400 bg-clip-text font-black text-transparent drop-shadow-[0_0_30px_rgba(0,240,255,0.5)]">
-                produits gagnants 100% rentables
-              </span>{" "}
-              pour ta boutique.
+                estime ta marge avant de vendre
+              </span>
+              .
             </span>
           </h1>
         </motion.div>
@@ -96,8 +96,7 @@ export function Hero() {
           className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1.5 text-sm font-medium text-cyan-100 shadow-[0_0_20px_-4px_rgba(34,211,238,0.6)] backdrop-blur-sm"
         >
           <CheckCircle2 className="h-4 w-4 text-cyan-300" />
-          Zéro mauvaise surprise au checkout : calcul des frais de port et
-          taxes réels
+          Comprends les coûts avant de choisir un produit.
         </motion.div>
 
         <motion.div
@@ -134,7 +133,7 @@ export function Hero() {
                 C&apos;est quoi, MargeMax ?
               </h2>
               <p className="mt-1 text-sm text-white/60">
-                MargeMax est ton assistant robotisé intelligent connecté à
+                MargeMax est ton assistant intelligent connecté à
                 AliExpress. En quelques secondes, il scanne le marché et
                 déniche pour toi :
               </p>
@@ -156,8 +155,8 @@ export function Hero() {
             href="/signup"
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-cyan-300 shadow-[0_0_20px_-4px_rgba(34,211,238,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-cyan-400/20 hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.9)]"
           >
-            [ Tester MargeMax Maintenant
-            <ArrowRight className="h-4 w-4" />]
+            Tester MargeMax maintenant
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </motion.div>
       </motion.div>

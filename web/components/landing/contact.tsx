@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Mail, MessageSquare, ShieldCheck, User } from "lucide-react";
 
 const CONTACT_EMAIL =
-  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@margemax.app";
+  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@autoutilshop.com";
 
 export function Contact() {
   const [name, setName] = useState("");
@@ -19,10 +19,8 @@ export function Contact() {
     e.preventDefault();
     if (!canSend) return;
 
-    const subject = encodeURIComponent(`Contact MargeMax -- ${name || "Visiteur"}`);
-    const body = encodeURIComponent(
-      `${message}\n\n--\n${name}\n${email}`
-    );
+    const subject = encodeURIComponent(`Contact MargeMax : ${name || "Visiteur"}`);
+    const body = encodeURIComponent(`${message}\n\n${name}\n${email}`);
     window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
     setSent(true);
   }
@@ -34,7 +32,14 @@ export function Contact() {
           Une question ? Écrivez-nous
         </h2>
         <p className="mt-3 text-white/50">
-          Réponse sous 24h ouvrées.
+          Réponse sous 24 h ouvrées, ou écris-nous directement à{" "}
+          <a
+            href={`mailto:${CONTACT_EMAIL}`}
+            className="text-cyan-300 hover:underline"
+          >
+            {CONTACT_EMAIL}
+          </a>
+          .
         </p>
       </div>
 
@@ -124,8 +129,11 @@ export function Contact() {
             className="flex items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200"
           >
             <ShieldCheck className="h-3.5 w-3.5" />
-            Votre client mail s&apos;est ouvert avec le message pré-rempli --
-            confirmez l&apos;envoi depuis celui-ci.
+            Ton application e-mail devrait s&apos;être ouverte avec le
+            message pré-rempli : vérifie qu&apos;elle s&apos;est bien
+            ouverte, puis confirme l&apos;envoi depuis celle-ci. Rien n&apos;est
+            transmis tant que tu n&apos;as pas cliqué sur envoyer dans ton
+            application e-mail.
           </motion.p>
         )}
       </motion.form>

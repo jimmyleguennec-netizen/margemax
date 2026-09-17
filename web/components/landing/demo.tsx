@@ -39,14 +39,14 @@ const reliability = [
 
 const offers = [
   {
-    name: "Offre N°1 — Sélection MargeMax",
+    name: "Offre n° 1 — Sélection MargeMax",
     price: "18,09 €",
     marge: "21,81 €",
     margePct: "120,5 % ROI",
     best: true,
   },
   {
-    name: "Offre N°2 — Annonce alternative",
+    name: "Offre n° 2 — Annonce alternative",
     price: "24,90 €",
     marge: "15,00 €",
     margePct: "60,2 % ROI",

@@ -46,24 +46,37 @@ export default function CgvPage() {
 
       <LegalSection title="Droit de rétractation">
         <p>
-          Conformément à l&apos;article L.221-28 du Code de la consommation,
-          le droit de rétractation ne peut être exercé pour les contrats de
-          fourniture d&apos;un service pleinement exécuté avant la fin du
-          délai de rétractation et dont l&apos;exécution a commencé après
-          accord préalable exprès du consommateur et renoncement exprès à
-          son droit de rétractation.
+          MargeMax est une prestation de services (analyse de sourcing à la
+          demande), et non un contenu numérique au sens du Code de la
+          consommation. Le client consommateur dispose donc, par défaut,
+          d&apos;un délai de rétractation de 14 jours à compter de la date
+          de la commande, conformément à l&apos;article L.221-18 du Code de
+          la consommation.
         </p>
         <p>
-          En conséquence, le client reconnaît et accepte expressément que
-          son droit de rétractation ne pourra plus être exercé dès lors que
-          l&apos;exécution du service a commencé, c&apos;est-à-dire dès
-          qu&apos;au moins un crédit du pack acheté a été consommé pour
-          réaliser une analyse.
+          Ce droit peut être perdu par exception, mais uniquement dans les
+          conditions strictes prévues par l&apos;article L.221-28 : le
+          client doit avoir demandé expressément, avant la fin du délai de
+          14 jours, que l&apos;exécution du service commence immédiatement,
+          et avoir expressément renoncé à son droit de rétractation pour
+          cet achat précis. Cette demande et cette renonciation doivent
+          chacune résulter d&apos;une action distincte et non précochée du
+          client au moment de la commande -- elles ne peuvent pas résulter
+          de la seule acceptation générale des présentes CGV/CGU.
+        </p>
+        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
+          À finaliser : le parcours de commande doit effectivement proposer
+          cette demande d&apos;exécution immédiate et cette renonciation
+          comme deux cases à cocher séparées, non précochées, avec
+          enregistrement côté serveur de l&apos;horodatage et de la version
+          du texte acceptée. Tant que ce parcours n&apos;est pas en place,
+          aucune renonciation ne doit être considérée comme acquise et le
+          délai de rétractation de 14 jours s&apos;applique pleinement à
+          toute commande.
         </p>
         <p>
-          Si aucun crédit du pack acheté n&apos;a été consommé, le client
-          peut demander le remboursement intégral de son achat dans un délai
-          de 14 jours à compter de la date de la commande, en écrivant à{" "}
+          Pour exercer ce droit ou pour toute question, le client peut
+          écrire à{" "}
           <a
             href="mailto:contact@autoutilshop.com"
             className="text-cyan-300 hover:underline"
@@ -96,15 +109,14 @@ export default function CgvPage() {
           Conformément aux articles L.616-1 et R.616-1 du Code de la
           consommation, tout client consommateur dispose du droit de
           recourir gratuitement à un médiateur de la consommation en vue de
-          la résolution amiable d&apos;un litige. Les coordonnées du
-          médiateur compétent sont communiquées sur simple demande à{" "}
-          <a
-            href="mailto:contact@autoutilshop.com"
-            className="text-cyan-300 hover:underline"
-          >
-            contact@autoutilshop.com
-          </a>
-          .
+          la résolution amiable d&apos;un litige, après une réclamation
+          écrite préalable restée infructueuse auprès d&apos;AutOutilShop
+          SAS.
+        </p>
+        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
+          À compléter (médiateur non encore désigné, ne pas inventer une
+          adhésion) : nom, adresse postale et site internet du médiateur de
+          la consommation effectivement désigné par AutOutilShop SAS.
         </p>
       </LegalSection>
 

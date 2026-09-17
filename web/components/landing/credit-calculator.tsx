@@ -7,25 +7,17 @@ import { Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
-
-const packs = [
-  { key: "starter", label: "Starter", credits: 5, price: "2,99 €" },
-  { key: "essentiel", label: "Essentiel", credits: 15, price: "7,99 €" },
-  { key: "avance", label: "Avancé", credits: 35, price: "14,99 €" },
-  { key: "pro", label: "Pro", credits: 80, price: "29,99 €" },
-  { key: "ultimate", label: "Ultimate", credits: 200, price: "59,99 €" },
-] as const;
+import { PACKS, formatEuro, recommendPackForVolume } from "@/lib/packs";
 
 const MIN_VOLUME = 1;
 const MAX_VOLUME = 220;
 
-function recommendPack(volume: number) {
-  return packs.find((pack) => volume <= pack.credits) ?? packs[packs.length - 1];
-}
-
 export function CreditCalculator() {
   const [volume, setVolume] = useState(20);
-  const recommended = useMemo(() => recommendPack(volume), [volume]);
+  const { pack: recommended, coversVolume } = useMemo(
+    () => recommendPackForVolume(volume),
+    [volume]
+  );
   const progress = ((volume - MIN_VOLUME) / (MAX_VOLUME - MIN_VOLUME)) * 100;
 
   return (
@@ -35,8 +27,9 @@ export function CreditCalculator() {
           Quel pack vous correspond ?
         </h2>
         <p className="mt-3 text-white/50">
-          Estimez votre volume d&apos;analyses par mois, on vous indique le
-          pack le plus adapté.
+          Une estimation d&apos;usage pour t&apos;orienter vers un pack :
+          les crédits n&apos;expirent pas et ne sont liés à aucun
+          abonnement.
         </p>
       </div>
 
@@ -44,7 +37,7 @@ export function CreditCalculator() {
         <div className="flex items-center justify-between gap-4">
           <span className="flex items-center gap-2 text-sm font-medium text-white/60">
             <Gauge className="h-4 w-4 text-cyan-300" />
-            Analyses par mois
+            Combien d&apos;analyses prévois-tu ?
           </span>
           <span className="text-2xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
             {volume}
@@ -70,7 +63,7 @@ export function CreditCalculator() {
         </div>
 
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {packs.map((pack) => {
+          {PACKS.map((pack) => {
             const isMatch = pack.key === recommended.key;
             return (
               <motion.div
@@ -90,7 +83,7 @@ export function CreditCalculator() {
               >
                 {isMatch && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-[0_0_10px_-1px_rgba(34,211,238,0.9)]">
-                    Pour vous
+                    Pour toi
                   </span>
                 )}
                 <p
@@ -109,7 +102,9 @@ export function CreditCalculator() {
                 >
                   {pack.credits} crédits
                 </p>
-                <p className="mt-1 text-xs text-white/30">{pack.price}</p>
+                <p className="mt-1 text-xs text-white/30">
+                  {formatEuro(pack.priceEuros)}
+                </p>
               </motion.div>
             );
           })}
@@ -117,12 +112,34 @@ export function CreditCalculator() {
 
         <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
           <p className="text-sm text-white/50">
-            Avec <span className="text-white">{volume} analyses/mois</span>,
-            le pack{" "}
-            <span className="font-semibold text-cyan-300">
-              {recommended.label}
-            </span>{" "}
-            ({recommended.credits} crédits) couvre votre besoin.
+            {coversVolume ? (
+              <>
+                Avec <span className="text-white">{volume} analyses</span>,
+                le pack{" "}
+                <span className="font-semibold text-cyan-300">
+                  {recommended.label}
+                </span>{" "}
+                ({recommended.credits} crédits) couvre ce volume.
+              </>
+            ) : (
+              <>
+                Aucun pack seul ne couvre{" "}
+                <span className="text-white">{volume} analyses</span> : le
+                pack{" "}
+                <span className="font-semibold text-cyan-300">
+                  {recommended.label}
+                </span>{" "}
+                ({recommended.credits} crédits) est le plus proche.
+                Combine plusieurs achats ou{" "}
+                <a
+                  href="#contact"
+                  className="font-semibold text-cyan-300 underline-offset-4 hover:underline"
+                >
+                  contacte-nous
+                </a>{" "}
+                pour un besoin plus important.
+              </>
+            )}
           </p>
           <AnimatedBuyButton
             label={`Choisir ${recommended.label}`}

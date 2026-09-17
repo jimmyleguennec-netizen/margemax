@@ -4,37 +4,31 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Calculator,
-  Facebook,
   FileText,
-  Instagram,
-  NotebookPen,
+  Mail,
   ScrollText,
-  ShieldCheck,
   Ship,
-  Sparkles,
-  Twitter,
   type LucideIcon,
 } from "lucide-react";
 
 import { Logo } from "@/components/ui/logo";
 
-const socials = [
-  { icon: Instagram, href: "#", label: "Instagram" },
-  { icon: Facebook, href: "#", label: "Facebook" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-];
+const CONTACT_EMAIL = "contact@autoutilshop.com";
 
+// "Générateur de fiche IA" et "Carnet de notes" retirés : ces
+// fonctionnalités sont mentionnées dans les textes marketing mais
+// n'ont pas de destination reelle dans le produit actuel -- pas de
+// lien vers une page qui n'existe pas.
 const toolLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Calculateur de marge", href: "/dashboard", icon: Calculator },
-  { label: "Générateur de fiche IA", href: "#features", icon: Sparkles },
-  { label: "Analyseur de port réels", href: "#demo", icon: Ship },
-  { label: "Carnet de notes", href: "#features", icon: NotebookPen },
+  { label: "Calcul des frais de livraison", href: "#demo", icon: Ship },
 ];
 
 const resourceLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Guide sourcing", href: "#guide", icon: ScrollText },
+  { label: "Guide pour trouver des fournisseurs", href: "#guide", icon: ScrollText },
   { label: "Mentions légales", href: "/mentions-legales", icon: FileText },
-  { label: "CGV / CGU (AutOutilShop SAS)", href: "/cgv", icon: FileText },
+  { label: "CGV / CGU", href: "/cgv", icon: FileText },
+  { label: "Confidentialité", href: "/confidentialite", icon: FileText },
 ];
 
 function FooterColumn({
@@ -119,13 +113,9 @@ export function Footer() {
           <div>
             <Logo className="h-14 w-auto" />
             <p className="mt-4 max-w-xs text-sm text-white/50">
-              Ton assistant de sourcing AliExpress -- coûts réels, marges
-              vérifiées, aucune approximation.
+              Ton assistant de sourcing AliExpress : coûts réels et marges
+              estimées, sans donnée inventée.
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 shadow-[0_0_8px_2px_rgba(74,222,128,0.8)]" />
-              Scraper AliExpress : Opérationnel
-            </div>
           </div>
 
           <FooterColumn title="Outil" items={toolLinks} />
@@ -133,31 +123,23 @@ export function Footer() {
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-200/70">
-              Communauté
+              Contact
             </h3>
-            <div className="mt-4 flex items-center gap-3">
-              {socials.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/50 transition-all duration-300 hover:border-cyan-400/40 hover:text-cyan-300 hover:shadow-[0_0_16px_-2px_rgba(34,211,238,0.7)]"
-                >
-                  <social.icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="mt-4 flex items-center gap-2 text-sm text-white/50 transition-colors hover:text-cyan-300"
+            >
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              {CONTACT_EMAIL}
+            </a>
           </div>
         </div>
       </div>
 
       <div className="border-t border-white/5 py-6">
-        <div className="container flex flex-col items-center justify-between gap-3 text-xs text-white/30 sm:flex-row">
+        <div className="container flex flex-col items-center justify-between gap-3 text-center text-xs text-white/30 sm:flex-row sm:text-left">
           <p>© {new Date().getFullYear()} MargeMax. Tous droits réservés.</p>
-          <p className="flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Connexion sécurisée via Supabase
-          </p>
+          <p>MargeMax est un service édité par AutOutilShop SAS.</p>
         </div>
       </div>
     </footer>

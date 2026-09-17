@@ -9,7 +9,6 @@ import { Pricing } from "@/components/landing/pricing";
 import { Faq } from "@/components/landing/faq";
 import { Contact } from "@/components/landing/contact";
 import { Footer } from "@/components/landing/footer";
-import { LiveActivityToast } from "@/components/landing/live-activity-toast";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 
 export default function HomePage() {
@@ -38,8 +37,6 @@ export default function HomePage() {
           <Contact />
           <Footer />
         </main>
-
-        <LiveActivityToast />
       </InteractiveGrid>
     </div>
   );

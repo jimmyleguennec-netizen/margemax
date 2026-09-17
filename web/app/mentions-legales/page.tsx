@@ -13,9 +13,13 @@ export default function MentionsLegalesPage() {
         <p>
           Le site et le service MargeMax sont édités par la société{" "}
           <strong className="text-white">AutOutilShop SAS</strong>, société
-          par actions simplifiée immatriculée au Registre du Commerce et des
-          Sociétés (RCS) de Narbonne, dont le siège social est situé au 4 rue
+          par actions simplifiée dont le siège social est situé au 4 rue
           Gustave Delory, 11100 Narbonne, France.
+        </p>
+        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
+          À compléter (informations non fournies, ne pas inventer) : numéro
+          SIREN et ville d&apos;immatriculation RCS, montant du capital
+          social, numéro de TVA intracommunautaire, numéro de téléphone.
         </p>
         <p>
           Contact :{" "}
@@ -30,8 +34,12 @@ export default function MentionsLegalesPage() {
 
       <LegalSection title="Directeur de la publication">
         <p>
-          Le directeur de la publication est le Président de la société
-          AutOutilShop SAS.
+          Le directeur de la publication est le représentant légal de la
+          société AutOutilShop SAS.
+        </p>
+        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
+          À compléter : nom et prénom du directeur de la publication (le
+          Président de la société, nommément désigné).
         </p>
       </LegalSection>
 
