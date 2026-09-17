@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 
 import { createClient } from "@/lib/supabase/client";
 import { RgbLoader } from "@/components/ui/rgb-loader";
+
+const OAUTH_ERROR_MESSAGE =
+  "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -37,35 +40,70 @@ function AppleIcon({ className }: { className?: string }) {
   );
 }
 
-function GoogleButton() {
+/**
+ * Etat partage Google/Apple : gere le loader, l'erreur, la protection
+ * anti-double-clic et surtout la restauration Safari depuis le
+ * bfcache -- quand l'utilisateur revient en arriere apres avoir quitte
+ * la page pour l'ecran d'authentification du provider, Safari peut
+ * restaurer la page EXACTEMENT dans l'etat ou elle etait (bouton
+ * "clicked=true", loader fige) sans jamais relancer notre code. Sans
+ * l'ecouteur pageshow ci-dessous, le bouton resterait bloque en
+ * chargement indefiniment -- c'est le symptome exact signale.
+ */
+function useOAuthSignIn(provider: "google" | "apple") {
   const [clicked, setClicked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleClick() {
+  useEffect(() => {
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        setClicked(false);
+      }
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  async function signIn() {
     if (clicked) return;
     setClicked(true);
     setError(null);
     try {
       const supabase = createClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider,
         options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
-      if (oauthError) throw oauthError;
-      // Succes : Supabase declenche deja la redirection navigateur --
-      // on laisse le loader tourner jusqu'a la navigation, pas de reset ici.
+      if (oauthError) {
+        // Erreur retournee explicitement par Supabase (provider desactive,
+        // config manquante...) -- distincte d'une exception reseau.
+        console.error(`[oauth] ${provider} a renvoye une erreur :`, oauthError);
+        setError(OAUTH_ERROR_MESSAGE);
+        setClicked(false);
+        return;
+      }
+      // Succes : Supabase declenche deja la redirection navigateur -- on
+      // laisse le loader tourner jusqu'a la navigation, pas de reset ici.
     } catch (err) {
-      console.error("[oauth] Echec de connexion Google :", err);
-      setError("Connexion Google impossible. Réessayez.");
+      // Exception reseau (domaine Supabase injoignable, DNS, etc.) plutot
+      // qu'un refus applicatif -- logguee separement pour le diagnostic.
+      console.error(`[oauth] Exception reseau pendant la connexion ${provider} :`, err);
+      setError(OAUTH_ERROR_MESSAGE);
       setClicked(false);
     }
   }
+
+  return { clicked, error, signIn };
+}
+
+function GoogleButton() {
+  const { clicked, error, signIn } = useOAuthSignIn("google");
 
   return (
     <div>
       <motion.button
         type="button"
-        onClick={handleClick}
+        onClick={signIn}
         disabled={clicked}
         whileHover={
           !clicked
@@ -98,8 +136,7 @@ function GoogleButton() {
 }
 
 function AppleButton() {
-  const [clicked, setClicked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { clicked, error, signIn } = useOAuthSignIn("apple");
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const springX = useSpring(x, { stiffness: 300, damping: 20 });
@@ -116,31 +153,11 @@ function AppleButton() {
     y.set(0);
   }
 
-  async function handleClick() {
-    if (clicked) return;
-    setClicked(true);
-    setError(null);
-    try {
-      const supabase = createClient();
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      if (oauthError) throw oauthError;
-      // Succes : Supabase declenche deja la redirection navigateur --
-      // on laisse le loader tourner jusqu'a la navigation, pas de reset ici.
-    } catch (err) {
-      console.error("[oauth] Echec de connexion Apple :", err);
-      setError("Connexion Apple impossible. Réessayez.");
-      setClicked(false);
-    }
-  }
-
   return (
     <div>
       <motion.button
         type="button"
-        onClick={handleClick}
+        onClick={signIn}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         disabled={clicked}
