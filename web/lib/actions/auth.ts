@@ -92,14 +92,26 @@ export async function signup(
       },
     });
 
+    // Bascule vers la saisie du code OTP dans tous les cas ou Supabase ne
+    // renvoie pas de session immediate -- y compris une erreur "User
+    // already registered" ou un rate limit ("delai d'attente") renvoyes
+    // PAR signUp() lui-meme. C'est deliberement une protection anti-
+    // enumeration : ne jamais reveler via l'interface si l'adresse
+    // existait deja. Seules les validations faites AVANT l'appel a
+    // signUp() ci-dessus (champs manquants, mot de passe trop court, mots
+    // de passe qui ne correspondent pas) renvoient encore une erreur
+    // directe, puisqu'elles ne dependent d'aucune information sur le
+    // compte cote serveur.
     if (error) {
-      return { error: error.message };
+      console.error("[auth] signUp a renvoyé une erreur :", error);
+      return {
+        message: "Compte créé ! Un code de confirmation vous a été envoyé par e-mail.",
+        pendingEmail: email,
+      };
     }
 
     // Si la confirmation par email est activée côté Supabase, aucune session
-    // n'est ouverte immédiatement : on bascule vers la saisie du code OTP
-    // (email envoyé par signUp) plutôt que de rediriger vers une zone
-    // protégée sans session.
+    // n'est ouverte immédiatement : meme bascule vers l'OTP.
     if (data.user && !data.session) {
       return {
         message: "Compte créé ! Un code de confirmation vous a été envoyé par e-mail.",

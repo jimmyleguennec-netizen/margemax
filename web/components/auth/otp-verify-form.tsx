@@ -9,6 +9,14 @@ import { createClient } from "@/lib/supabase/client";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 
 const RESEND_COOLDOWN_S = 30;
+/**
+ * Doit correspondre exactement a la longueur de code configuree cote
+ * Supabase (Authentication -> Settings -> OTP length). Si le projet
+ * envoie toujours des codes a 6 chiffres, ce composant refusera de
+ * soumettre un code de 6 chiffres valide -- verifier la config Supabase
+ * avant de considerer ce changement comme fonctionnel.
+ */
+const OTP_LENGTH = 8;
 
 type Status = "idle" | "verifying" | "verified" | "error";
 
@@ -38,7 +46,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const token = code.trim();
-    if (token.length !== 6 || status === "verifying") return;
+    if (token.length !== OTP_LENGTH || status === "verifying") return;
 
     setStatus("verifying");
     setErrorMessage(null);
@@ -54,7 +62,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       if (error) {
         console.error("[otp] verifyOtp a renvoyé une erreur :", error);
         setErrorMessage(
-          "Code incorrect ou expiré. Vérifie les 6 chiffres, ou demande un nouveau code."
+          `Code incorrect ou expiré. Vérifie les ${OTP_LENGTH} chiffres, ou demande un nouveau code.`
         );
         setStatus("error");
         return;
@@ -106,7 +114,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       <div>
         <h2 className="text-2xl font-bold text-white">Vérifie ton e-mail</h2>
         <p className="mt-1 text-sm text-white/50">
-          Entre le code à 6 chiffres envoyé à{" "}
+          Entre le code à {OTP_LENGTH} chiffres envoyé à{" "}
           <span className="text-cyan-300">{email}</span>.
         </p>
       </div>
@@ -121,11 +129,13 @@ export function OtpVerifyForm({ email }: { email: string }) {
         <input
           id="otp-code"
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          onChange={(e) =>
+            setCode(e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH))
+          }
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={6}
-          placeholder="123456"
+          maxLength={OTP_LENGTH}
+          placeholder="12345678"
           className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-white/20 outline-none backdrop-blur-sm transition-all duration-200 focus:border-cyan-400/60 focus:bg-white/[0.07] focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
         />
       </div>
@@ -142,7 +152,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
 
       <button
         type="submit"
-        disabled={code.length !== 6 || status === "verifying"}
+        disabled={code.length !== OTP_LENGTH || status === "verifying"}
         className="group relative flex w-full origin-center items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold uppercase tracking-wide text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.8)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-x-100"
       >
         {status === "verifying" && <RgbLoader size={16} />}
