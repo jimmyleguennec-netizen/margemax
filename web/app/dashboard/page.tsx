@@ -37,11 +37,24 @@ export default async function DashboardPage() {
       .eq("id", user.id)
       .maybeSingle();
 
+    // Historique d'achats reel (table public.credit_purchases, remplie
+    // uniquement par le webhook Stripe apres paiement confirme -- voir
+    // schema_margemax.sql et app/api/webhooks/stripe/route.ts). Jamais
+    // un achat simule : une ligne ici correspond a un paiement reellement
+    // traite.
+    const { data: purchaseRows } = await supabase
+      .from("credit_purchases")
+      .select("id, pack_key, credits, amount_total, currency, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
     return (
       <DashboardShell
         email={user.email ?? ""}
         credits={profile?.credits ?? null}
         creditsMax={profile?.credits_gauge_max ?? null}
+        purchases={purchaseRows ?? []}
       />
     );
   } catch (err) {

@@ -3,16 +3,33 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Calculator, History, LogOut, Search, Settings, Zap } from "lucide-react";
+import {
+  Calculator,
+  CreditCard,
+  History,
+  LogOut,
+  Search,
+  Settings,
+  Zap,
+} from "lucide-react";
 
 import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
-import { CreditCardInput } from "@/components/ui/credit-card-input";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 import { Logo } from "@/components/ui/logo";
 import { SearchPanel } from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
+import { formatEuro } from "@/lib/packs";
+
+export type PurchaseEntry = {
+  id: number;
+  pack_key: string;
+  credits: number;
+  amount_total: number;
+  currency: string;
+  created_at: string;
+};
 
 const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
@@ -26,11 +43,13 @@ function ParametresPanel({
   isDemo,
   credits,
   creditsMax,
+  purchases,
 }: {
   email: string;
   isDemo: boolean;
   credits: number | null;
   creditsMax: number | null;
+  purchases: PurchaseEntry[];
 }) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -70,14 +89,55 @@ function ParametresPanel({
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
-        <h3 className="mb-1 text-center text-sm font-medium uppercase tracking-wider text-cyan-200/70">
-          Moyen de paiement
-        </h3>
-        <p className="mb-6 text-center text-xs text-white/40">
-          Aperçu visuel de la carte -- l&apos;achat de crédits se fait
-          aujourd&apos;hui via Stripe Checkout.
-        </p>
-        <CreditCardInput />
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h3 className="text-sm font-medium uppercase tracking-wider text-cyan-200/70">
+            Crédits
+          </h3>
+          <p className="flex items-center gap-1.5 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
+            <Zap className="h-5 w-5" />
+            {credits ?? "--"}
+            {creditsMax !== null ? ` / ${creditsMax}` : ""}
+          </p>
+          <Link
+            href="/#pricing"
+            className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)] transition-all hover:scale-105"
+          >
+            Acheter des crédits
+          </Link>
+        </div>
+
+        <div className="mt-8 border-t border-white/10 pt-6">
+          <h3 className="mb-4 text-center text-sm font-medium uppercase tracking-wider text-cyan-200/70">
+            Achats
+          </h3>
+          {purchases.length === 0 ? (
+            <p className="text-center text-sm text-white/40">
+              Aucun achat pour le moment.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {purchases.map((purchase) => (
+                <li
+                  key={purchase.id}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm"
+                >
+                  <span className="flex items-center gap-2 text-white/70">
+                    <CreditCard className="h-3.5 w-3.5 text-cyan-300" />
+                    Pack {purchase.pack_key} · {purchase.credits} crédits
+                  </span>
+                  <span className="text-right text-white/40">
+                    <span className="block font-medium text-white">
+                      {formatEuro(purchase.amount_total / 100)}
+                    </span>
+                    <span className="block text-xs">
+                      {new Date(purchase.created_at).toLocaleDateString("fr-FR")}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -88,11 +148,13 @@ export function DashboardShell({
   isDemo = false,
   credits = null,
   creditsMax = null,
+  purchases = [],
 }: {
   email: string;
   isDemo?: boolean;
   credits?: number | null;
   creditsMax?: number | null;
+  purchases?: PurchaseEntry[];
 }) {
   const [active, setActive] = useState("recherche");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -171,6 +233,7 @@ export function DashboardShell({
                   isDemo={isDemo}
                   credits={liveCredits}
                   creditsMax={creditsMax}
+                  purchases={purchases}
                 />
               )}
             </motion.div>
