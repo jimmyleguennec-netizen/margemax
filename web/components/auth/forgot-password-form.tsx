@@ -29,7 +29,7 @@ export function ForgotPasswordForm() {
           autoComplete="email"
         />
         <NeonMessage state={state} />
-        <NeonSubmitButton>Envoyer le lien</NeonSubmitButton>
+        <NeonSubmitButton loadingLabel="Envoi en cours...">Envoyer le lien</NeonSubmitButton>
       </form>
 
       <Link

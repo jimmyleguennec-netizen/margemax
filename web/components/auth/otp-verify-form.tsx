@@ -146,7 +146,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
         className="group relative flex w-full origin-center items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold uppercase tracking-wide text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.8)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-x-100"
       >
         {status === "verifying" && <RgbLoader size={16} />}
-        Valider le code
+        {status === "verifying" ? "Vérification..." : "Valider le code"}
       </button>
 
       <button

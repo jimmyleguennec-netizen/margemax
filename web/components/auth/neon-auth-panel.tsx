@@ -70,7 +70,7 @@ function LoginForm({
         label="Se souvenir de moi"
       />
       <NeonMessage state={state} />
-      <NeonSubmitButton>Se connecter</NeonSubmitButton>
+      <NeonSubmitButton loadingLabel="Connexion en cours...">Se connecter</NeonSubmitButton>
       <OAuthButtons mode="login" />
     </form>
   );
@@ -128,7 +128,7 @@ function SignupForm({
         label="Se souvenir de moi"
       />
       <NeonMessage state={state} />
-      <NeonSubmitButton>Créer mon compte</NeonSubmitButton>
+      <NeonSubmitButton loadingLabel="Envoi en cours...">Créer mon compte</NeonSubmitButton>
       <OAuthButtons mode="signup" />
     </form>
   );

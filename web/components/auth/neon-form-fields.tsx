@@ -48,7 +48,16 @@ export function NeonField({
   );
 }
 
-export function NeonSubmitButton({ children }: { children: React.ReactNode }) {
+export function NeonSubmitButton({
+  children,
+  loadingLabel,
+}: {
+  children: React.ReactNode;
+  /** Texte affiché a la place de `children` pendant l'envoi (ex. "Envoi
+   * en cours...") -- en plus du spinner deja affiche, pour que
+   * l'utilisateur voie un changement de texte, pas seulement une icone. */
+  loadingLabel?: string;
+}) {
   const { pending } = useFormStatus();
 
   return (
@@ -58,7 +67,7 @@ export function NeonSubmitButton({ children }: { children: React.ReactNode }) {
       className="group relative mt-2 flex w-full origin-center items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold uppercase tracking-wide text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.8)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-x-100"
     >
       {pending && <RgbLoader size={16} />}
-      {children}
+      {pending && loadingLabel ? loadingLabel : children}
     </button>
   );
 }

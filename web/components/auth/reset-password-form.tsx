@@ -58,7 +58,7 @@ export function ResetPasswordForm() {
             minLength={6}
           />
           <NeonMessage state={state} />
-          <NeonSubmitButton>Mettre à jour</NeonSubmitButton>
+          <NeonSubmitButton loadingLabel="Mise à jour...">Mettre à jour</NeonSubmitButton>
         </form>
       )}
     </div>
