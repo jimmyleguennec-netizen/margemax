@@ -42,7 +42,7 @@ function GoogleIcon({ className }: { className?: string }) {
  * bouton resterait bloque en chargement indefiniment -- c'est le
  * symptome exact signale.
  */
-function useGoogleSignIn() {
+function useGoogleSignIn(mode: "login" | "signup") {
   const [clicked, setClicked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,9 +62,14 @@ function useGoogleSignIn() {
     setError(null);
     try {
       const supabase = createClient();
+      // "intent" indique a /auth/callback s'il doit refuser un compte tout
+      // juste cree (mode "login" : on ne veut PAS creer de compte via
+      // Google depuis l'ecran de connexion, seulement s'y reconnecter).
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?intent=${mode}`,
+        },
       });
       if (oauthError) {
         // Erreur retournee explicitement par Supabase (provider desactive,
@@ -88,8 +93,8 @@ function useGoogleSignIn() {
   return { clicked, error, signIn };
 }
 
-function GoogleButton() {
-  const { clicked, error, signIn } = useGoogleSignIn();
+function GoogleButton({ mode }: { mode: "login" | "signup" }) {
+  const { clicked, error, signIn } = useGoogleSignIn(mode);
 
   return (
     <div>
@@ -127,7 +132,7 @@ function GoogleButton() {
   );
 }
 
-export function OAuthButtons() {
+export function OAuthButtons({ mode }: { mode: "login" | "signup" }) {
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-3">
@@ -137,7 +142,7 @@ export function OAuthButtons() {
         </span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
-      <GoogleButton />
+      <GoogleButton mode={mode} />
     </div>
   );
 }

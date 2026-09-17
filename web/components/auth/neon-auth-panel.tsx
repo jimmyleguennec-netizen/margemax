@@ -24,6 +24,9 @@ const initialState: AuthActionState = {};
 const CALLBACK_ERROR_MESSAGE =
   "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
 
+const ACCOUNT_NOT_FOUND_MESSAGE =
+  "Aucun compte MargeMax n'est associé à ce compte Google. Veuillez d'abord créer un compte.";
+
 function LoginForm({
   action,
   state,
@@ -68,7 +71,7 @@ function LoginForm({
       />
       <NeonMessage state={state} />
       <NeonSubmitButton>Se connecter</NeonSubmitButton>
-      <OAuthButtons />
+      <OAuthButtons mode="login" />
     </form>
   );
 }
@@ -126,7 +129,7 @@ function SignupForm({
       />
       <NeonMessage state={state} />
       <NeonSubmitButton>Créer mon compte</NeonSubmitButton>
-      <OAuthButtons />
+      <OAuthButtons mode="signup" />
     </form>
   );
 }
@@ -244,11 +247,14 @@ function SuccessOverlay() {
 export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const searchParams = useSearchParams();
-  const callbackFailed = searchParams.get("error") === "confirmation";
-  const [loginState, loginActionFn] = useFormState(
-    login,
-    callbackFailed ? { error: CALLBACK_ERROR_MESSAGE } : initialState
-  );
+  const callbackError = searchParams.get("error");
+  const initialLoginState: AuthActionState =
+    callbackError === "account_not_found"
+      ? { error: ACCOUNT_NOT_FOUND_MESSAGE }
+      : callbackError === "confirmation"
+        ? { error: CALLBACK_ERROR_MESSAGE }
+        : initialState;
+  const [loginState, loginActionFn] = useFormState(login, initialLoginState);
   const [signupState, signupActionFn] = useFormState(signup, initialState);
   const router = useRouter();
 
