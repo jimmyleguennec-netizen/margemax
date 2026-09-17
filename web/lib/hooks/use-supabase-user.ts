@@ -18,14 +18,34 @@ export function useSupabaseUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
     let active = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      setUser(data.user);
+    // Ce hook est monte sans interaction utilisateur sur des sections
+    // publiques (Pricing, CreditCalculator) : createClient() peut lever
+    // une exception synchrone si la config Supabase est absente. Sans ce
+    // try/catch, ça ferait planter toute la Landing Page pour un visiteur
+    // meme pas connecte -- on degrade plutot vers "non connecte".
+    let supabase;
+    try {
+      supabase = createClient();
+    } catch (err) {
+      console.error("[useSupabaseUser] Client Supabase indisponible :", err);
       setLoading(false);
-    });
+      return;
+    }
+
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (!active) return;
+        setUser(data.user);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("[useSupabaseUser] Échec de getUser() :", err);
+        if (!active) return;
+        setLoading(false);
+      });
 
     const {
       data: { subscription },

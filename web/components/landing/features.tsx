@@ -74,11 +74,11 @@ const accentStyles: Record<
 
 const container = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.12 } },
+  show: { transition: { staggerChildren: 0.1 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 30 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 };
 
@@ -100,7 +100,7 @@ export function Features() {
         variants={container}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: true, amount: 0.2 }}
+        viewport={{ once: true, margin: "-50px" }}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         {features.map((feature) => {
@@ -109,6 +109,8 @@ export function Features() {
             <motion.div
               key={feature.title}
               variants={item}
+              whileHover={{ scale: 1.02, y: -4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 22 }}
               className={cn(feature.span)}
             >
               <TiltCard
