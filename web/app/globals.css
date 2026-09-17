@@ -76,6 +76,29 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Garantit une reaction tactile immediate sur tous les boutons/liens du
+     site (pas de delai navigateur de 300ms sur mobile, pas de curseur
+     texte accidentel). */
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Fond degrade anime -- overlay coulissant de la page d'authentification
