@@ -19,6 +19,7 @@ export function AnimatedBuyButton({
   packId,
   onConfirm,
   className,
+  onIntercept,
 }: {
   label: string;
   successLabel?: string;
@@ -29,6 +30,13 @@ export function AnimatedBuyButton({
   /** Mode "autonome" (pas de href) : appele juste avant la reinitialisation. */
   onConfirm?: () => void;
   className?: string;
+  /**
+   * Quand fourni, le clic n'anime/ne redirige plus lui-meme : il delegue
+   * entierement au parent (ex. ouvrir la case a cocher de consentement
+   * "execution immediate + renonciation retractation" avant un vrai
+   * paiement Stripe). Le bouton reste en etat "idle" jusqu'au prochain clic.
+   */
+  onIntercept?: () => void;
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const router = useRouter();
@@ -44,6 +52,12 @@ export function AnimatedBuyButton({
 
   function handleClick() {
     if (status !== "idle") return;
+
+    if (onIntercept) {
+      onIntercept();
+      return;
+    }
+
     setStatus("success");
 
     if (href) {

@@ -13,9 +13,13 @@ MargeMax est une SaaS de sourcing/calcul de marge pour l'e-commerce AliExpress :
 
 ## Dernières modifications apportées
 
-Dernier commit poussé : `097c347` — "fix(landing+auth+legal): honest copy, vouvoiement, vaporware removal, a11y" (27 fichiers).
+Dernier commit poussé : voir git log — session du 2026-09-18 : nettoyage
+d'un dossier parasite (page AliExpress enregistrée par erreur dans le repo),
+renommage `assets/margemax_logo.png` → `assets/logo.png`, et ajout de la
+case à cocher "exécution immédiate + renonciation au droit de rétractation"
+(art. L.221-28) dans le parcours d'achat (voir section suivante).
 
-Résumé des lots livrés dans cette session (du plus ancien au plus récent) :
+Résumé des lots livrés dans la session précédente (du plus ancien au plus récent) :
 
 1. **`b5b9418`** — distinction des vrais modes d'échec de recherche AliExpress (blocage anti-bot vs vraie absence de résultat), correction du bug d'arrondi ROI 120,5 % → 120,6 %, première passe de tutoiement.
 2. **`728a20f`** — suppression du faux formulaire de carte bancaire décoratif dans Paramètres, remplacé par le solde réel + historique d'achats réel (table `credit_purchases`).
@@ -31,6 +35,11 @@ Résumé des lots livrés dans cette session (du plus ancien au plus récent) :
 
 ## Fichiers clés travaillés
 
+- `migration_checkout_consent.sql` — **nouveau, non encore exécuté** : crée `public.checkout_consents` (preuve de consentement "exécution immédiate + renonciation rétractation"). À exécuter une fois dans Supabase SQL Editor avant que la case à cocher fonctionne en production (voir Prochaines étapes).
+- `web/lib/legal-consent.ts` — nouveau : source unique de vérité du texte de consentement (`IMMEDIATE_EXECUTION_WAIVER_LABEL`) et de sa version (`CGV_CONSENT_VERSION`), partagée entre le dialogue et la route API.
+- `web/app/api/consent/checkout/route.ts` — nouveau : enregistre le consentement côté serveur (auth Supabase + insert `checkout_consents`) AVANT toute redirection Stripe ; `cgv_version` vient uniquement de la constante serveur, jamais du client.
+- `web/components/purchase/checkout-consent-dialog.tsx` — nouveau : modale avec la case à cocher, appelée juste avant chaque redirection vers un Payment Link Stripe réel (jamais avant `/login?pack=...`, qui n'est pas encore un achat). POST `/api/consent/checkout` puis redirection ; si le POST échoue, la redirection est bloquée.
+- `web/components/ui/animated-buy-button.tsx` — ajout d'un prop `onIntercept` : quand fourni, le clic délègue entièrement au parent (ouverture de la modale de consentement) au lieu d'animer/rediriger lui-même.
 - `web/lib/packs.ts` — source unique de vérité des 5 packs (Starter/Essentiel/Avancé/Pro/Ultimate) + `recommendPackCombinationForVolume()`.
 - `web/lib/stripe-links.ts` — construit l'URL de checkout ; sans utilisateur connu, force systématiquement `/login?pack=<clé>` avant tout lien Stripe (conservation du pack à travers connexion/inscription).
 - `web/lib/margin-estimate.ts` — formules de marge/ROI/indice de fiabilité partagées entre le calculateur manuel et les résultats de recherche réels. **Le score de fiabilité est une heuristique** (`97 - importRatio*35`, borné 60–99), pas une donnée de marché — c'est explicité dans l'UI.
@@ -38,15 +47,15 @@ Résumé des lots livrés dans cette session (du plus ancien au plus récent) :
 - `web/lib/actions/auth.ts` — Server Actions login/signup/reset password, anti-énumération de comptes.
 - `web/app/api/analyze/route.ts` — parcours crédité réel : vérifie session → lit solde → lance l'analyse → débite 1 crédit atomiquement via RPC `consume_credit` (jamais si l'analyse échoue).
 - `web/app/api/webhooks/stripe/route.ts` — webhook Stripe idempotent, crédite via RPC.
-- `web/components/auth/neon-auth-panel.tsx` — panneau login/signup avec bascule overlay ; contient la logique de reprise du pack après connexion.
+- `web/components/auth/neon-auth-panel.tsx` — panneau login/signup avec bascule overlay ; contient la logique de reprise du pack après connexion, qui ouvre désormais la modale de consentement au lieu de rediriger directement vers Stripe.
 - `web/components/dashboard/search-panel.tsx` / `calculator-panel.tsx` — UI dashboard réelle (recherche créditée / calculateur manuel).
 - `web/components/landing/*` — toute la page d'accueil marketing (hero, features, pricing, credit-calculator, demo, interactive-demo, quick-guide, faq, contact, footer, navbar).
 - `web/app/mentions-legales/page.tsx`, `web/app/cgv/page.tsx` — pages légales, encore incomplètes sur des points factuels (voir Bugs).
 
 ## Problématiques/Bugs en cours à résoudre
 
-- **Paiement encore sur Stripe Payment Links, pas Stripe Checkout Sessions.** Le brief le plus récent demande explicitement une migration vers Stripe Checkout (sessions dynamiques créées côté serveur). L'architecture actuelle (Payment Links + webhook + RPC atomique) est fonctionnellement sûre côté serveur, mais ce n'est pas ce qui a été demandé littéralement. Non fait par prudence : gros changement d'architecture de paiement, impossible à tester en live dans cet environnement, risque de casser un parcours d'achat qui fonctionne.
-- **Cases à cocher légales manquantes au paiement.** Le parcours de commande ne propose pas encore les deux cases obligatoires (exécution immédiate du service / renonciation au droit de rétractation). La page CGV le dit maintenant honnêtement : tant que ces cases n'existent pas, le délai de rétractation de 14 jours s'applique pleinement à toute commande.
+- **Paiement encore sur Stripe Payment Links, pas Stripe Checkout Sessions.** Décision explicite de l'utilisateur (2026-09-18) : conserver les Payment Links pour l'instant, ne pas migrer vers Checkout Sessions dynamiques tout de suite.
+- **Case à cocher "exécution immédiate + renonciation rétractation" — codée cette session, mais migration SQL non exécutée.** La modale (`checkout-consent-dialog.tsx`) et la route API (`/api/consent/checkout`) sont en place et bloquent la redirection Stripe tant que la case n'est pas cochée. **Mais la table `public.checkout_consents` n'existe pas encore en base** : il faut exécuter `migration_checkout_consent.sql` dans Supabase SQL Editor, sinon la route API renverra une erreur 502 et aucun achat ne pourra aboutir. À faire avant le prochain déploiement/test réel. Choix produit fait par l'utilisateur : une seule case combinant les deux mentions (plutôt que deux cases séparées) — à valider avec un juriste si besoin, le texte exact est dans `web/lib/legal-consent.ts`.
 - **Mentions légales incomplètes.** SIREN, ville RCS, capital social, TVA intracommunautaire, téléphone, nom du Président, et l'identité du médiateur de la consommation sont absents — remplacés par des mentions "en cours de finalisation" (visibles publiquement mais honnêtes) au lieu d'inventer des valeurs. **Ces informations réelles doivent être fournies par l'utilisateur pour compléter la page.**
 - **Contradictions répétées entre briefs successifs sur tutoiement vs vouvoiement.** Le site est actuellement en vouvoiement partout (dernier état demandé), mais ce point a déjà fait plusieurs allers-retours dans la session — vérifier avec l'utilisateur avant de relancer une passe de style si un nouveau brief le redemande.
 - **Aucun test automatisé dans le dépôt** (pas de framework de test installé). Le brief demande des tests unitaires (calculs, arrondis, limites de packs, webhook répété, etc.) — jamais écrits faute de framework en place.
@@ -56,8 +65,8 @@ Résumé des lots livrés dans cette session (du plus ancien au plus récent) :
 
 ## Prochaines étapes prioritaires
 
-1. **Demander à l'utilisateur les informations légales réelles** (SIREN, RCS, capital social, TVA, téléphone, Président, médiateur de la consommation) pour compléter `mentions-legales` et `cgv` — actuellement bloqué par l'absence de ces données, jamais inventées.
-2. **Décider avec l'utilisateur** si la migration Stripe Payment Links → Checkout Sessions dynamiques doit être faite maintenant (gros chantier, nécessite un test réel en mode Stripe test, donc probablement hors de cet environnement).
-3. **Ajouter les deux cases à cocher obligatoires** (exécution immédiate / renonciation rétractation) dans le parcours d'achat, avec enregistrement serveur de l'horodatage et de la version du texte accepté.
-4. **Vérifier en conditions réelles** (déploiement Vercel + Supabase + Stripe live) : recherche "iphone", les 5 packs, le parcours OTP (longueur de code), le reset de mot de passe, le webhook Stripe en mode test avec replay.
-5. Si un futur brief redemande un changement de tutoiement/vouvoiement, **clarifier explicitement avec l'utilisateur** lequel est définitif avant de relancer une passe complète, pour éviter un nouvel aller-retour.
+1. **Exécuter `migration_checkout_consent.sql` dans Supabase SQL Editor** — bloquant : sans cette table, la case à cocher fait échouer tout achat (route API en erreur 502).
+2. **Demander à l'utilisateur les informations légales réelles** (SIREN, RCS, capital social, TVA, téléphone, Président, médiateur de la consommation) pour compléter `mentions-legales` et `cgv` — actuellement bloqué par l'absence de ces données, jamais inventées. L'utilisateur a dit les fournir plus tard.
+3. **Vérifier en conditions réelles** (déploiement Vercel + Supabase + Stripe live) : la nouvelle case à cocher de consentement sur les 3 parcours d'achat (pricing landing, calculateur de crédits, reprise après connexion), recherche "iphone", les 5 packs, le parcours OTP (longueur de code), le reset de mot de passe, le webhook Stripe en mode test avec replay.
+4. Si un futur brief redemande un changement de tutoiement/vouvoiement, **clarifier explicitement avec l'utilisateur** lequel est définitif avant de relancer une passe complète, pour éviter un nouvel aller-retour.
+5. Stripe Payment Links → Checkout Sessions : mis en pause sur décision explicite de l'utilisateur, ne pas relancer sans confirmation.

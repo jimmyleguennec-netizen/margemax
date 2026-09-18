@@ -9,12 +9,16 @@ import { Mail, ShieldCheck } from "lucide-react";
 
 import { login, signup, type AuthActionState } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/client";
-import { buildPackCheckoutHref } from "@/lib/stripe-links";
+import { PACKS } from "@/lib/packs";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { OtpVerifyForm } from "@/components/auth/otp-verify-form";
 import { NeonField, NeonMessage, NeonSubmitButton } from "@/components/auth/neon-form-fields";
+import {
+  CheckoutConsentDialog,
+  type ConsentPack,
+} from "@/components/purchase/checkout-consent-dialog";
 
 type Mode = "login" | "signup";
 type FormDispatch = (payload: FormData) => void;
@@ -170,7 +174,7 @@ function OverlayFace({
 
 const PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
-function SuccessOverlay() {
+function SuccessOverlay({ statusText }: { statusText: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -238,7 +242,7 @@ function SuccessOverlay() {
         transition={{ delay: 0.5 }}
         className="text-xs text-white/50"
       >
-        Redirection en cours...
+        {statusText}
       </motion.p>
     </motion.div>
   );
@@ -260,6 +264,8 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
 
   const isSuccess = Boolean(loginState.success || signupState.success);
   const pendingPack = searchParams.get("pack");
+  const [consentPack, setConsentPack] = useState<ConsentPack | null>(null);
+  const [consentUserId, setConsentUserId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!isSuccess) return;
@@ -267,15 +273,21 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
       // Achat de pack demarre avant connexion (?pack=<cle>) : on reprend
       // exactement ce parcours au lieu d'atterrir sur /dashboard, avec
       // l'utilisateur maintenant connu pour lier le paiement au bon
-      // compte (client_reference_id du Payment Link Stripe).
+      // compte (client_reference_id du Payment Link Stripe). Avant toute
+      // redirection vers Stripe, la case "execution immediate +
+      // renonciation retractation" (art. L.221-28) doit etre cochee.
       if (pendingPack) {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          router.push(buildPackCheckoutHref(pendingPack, user.id));
-          return;
+        const pack = PACKS.find((p) => p.key === pendingPack);
+        if (pack) {
+          const supabase = createClient();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            setConsentUserId(user.id);
+            setConsentPack({ key: pack.key, label: pack.label });
+            return;
+          }
         }
       }
       router.push("/dashboard");
@@ -283,6 +295,13 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
     }, 1400);
     return () => clearTimeout(timer);
   }, [isSuccess, pendingPack, router]);
+
+  function handleConsentCancel() {
+    setConsentPack(null);
+    setConsentUserId(undefined);
+    router.push("/dashboard");
+    router.refresh();
+  }
 
   return (
     <div className="relative w-full max-w-3xl">
@@ -389,10 +408,26 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
               </button>
             </div>
 
-            <AnimatePresence>{isSuccess && <SuccessOverlay />}</AnimatePresence>
+            <AnimatePresence>
+              {isSuccess && (
+                <SuccessOverlay
+                  statusText={
+                    consentPack
+                      ? "Finalisation de votre commande..."
+                      : "Redirection en cours..."
+                  }
+                />
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
+
+      <CheckoutConsentDialog
+        pack={consentPack}
+        userId={consentUserId}
+        onCancel={handleConsentCancel}
+      />
 
       <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-white/30">
         <ShieldCheck className="h-3.5 w-3.5" />

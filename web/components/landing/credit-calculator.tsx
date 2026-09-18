@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Gauge } from "lucide-react";
 
@@ -14,6 +15,10 @@ import {
   recommendPackCombinationForVolume,
 } from "@/lib/packs";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
+import {
+  CheckoutConsentDialog,
+  type ConsentPack,
+} from "@/components/purchase/checkout-consent-dialog";
 
 const MIN_VOLUME = 1;
 const MAX_VOLUME = 220;
@@ -25,6 +30,17 @@ function formatAnalyses(n: number): string {
 export function CreditCalculator() {
   const [volume, setVolume] = useState(20);
   const { user } = useSupabaseUser();
+  const [consentPack, setConsentPack] = useState<ConsentPack | null>(null);
+  const router = useRouter();
+
+  function handleChoosePack(packKey: string, packLabel: string) {
+    if (user?.id) {
+      setConsentPack({ key: packKey, label: packLabel });
+    } else {
+      router.push(buildPackCheckoutHref(packKey, undefined));
+    }
+  }
+
   const { pack: recommended, coversVolume } = useMemo(
     () => recommendPackForVolume(volume),
     [volume]
@@ -139,6 +155,11 @@ export function CreditCalculator() {
               label={`Choisir ${recommended.label}`}
               successLabel="C'est parti !"
               href={buildPackCheckoutHref(recommended.key, user?.id)}
+              onIntercept={
+                user?.id
+                  ? () => setConsentPack({ key: recommended.key, label: recommended.label })
+                  : undefined
+              }
               className="sm:w-auto sm:px-8"
             />
           </div>
@@ -176,12 +197,13 @@ export function CreditCalculator() {
                       <span className="text-white/40">
                         {formatEuro(item.pack.priceEuros * item.quantity)}
                       </span>
-                      <a
-                        href={buildPackCheckoutHref(item.pack.key, user?.id)}
+                      <button
+                        type="button"
+                        onClick={() => handleChoosePack(item.pack.key, item.pack.label)}
                         className="rounded-full border border-cyan-400/30 px-3 py-1 text-xs font-semibold text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_14px_-2px_rgba(34,211,238,0.6)]"
                       >
                         Choisir
-                      </a>
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -202,6 +224,12 @@ export function CreditCalculator() {
           )
         )}
       </div>
+
+      <CheckoutConsentDialog
+        pack={consentPack}
+        userId={user?.id}
+        onCancel={() => setConsentPack(null)}
+      />
     </section>
   );
 }

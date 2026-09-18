@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
@@ -9,6 +10,10 @@ import { TiltCard } from "@/components/ui/tilt-card";
 import { SectionGlow } from "@/components/ui/section-glow";
 import { PACKS, formatEuro, formatPricePerCredit } from "@/lib/packs";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
+import {
+  CheckoutConsentDialog,
+  type ConsentPack,
+} from "@/components/purchase/checkout-consent-dialog";
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
@@ -28,6 +33,7 @@ const item = {
 
 export function Pricing() {
   const { user } = useSupabaseUser();
+  const [consentPack, setConsentPack] = useState<ConsentPack | null>(null);
 
   return (
     <section id="pricing" className="container relative scroll-mt-20 py-20 sm:py-28">
@@ -88,6 +94,11 @@ export function Pricing() {
                   label="Choisir ce pack"
                   successLabel="C'est parti !"
                   href={buildPackCheckoutHref(pack.key, user?.id)}
+                  onIntercept={
+                    user?.id
+                      ? () => setConsentPack({ key: pack.key, label: pack.label })
+                      : undefined
+                  }
                   className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
                 />
               </div>
@@ -99,6 +110,12 @@ export function Pricing() {
       <p className="mt-8 text-center text-xs text-white/30">
         Paiement 100 % sécurisé via Stripe.
       </p>
+
+      <CheckoutConsentDialog
+        pack={consentPack}
+        userId={user?.id}
+        onCancel={() => setConsentPack(null)}
+      />
     </section>
   );
 }

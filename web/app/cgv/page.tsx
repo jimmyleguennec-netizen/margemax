@@ -10,7 +10,7 @@ export default function CgvPage() {
   return (
     <LegalPage
       title="Conditions générales de vente et d'utilisation"
-      updatedAt="15 septembre 2026"
+      updatedAt="18 septembre 2026"
     >
       <LegalSection title="Objet">
         <p>
@@ -61,16 +61,20 @@ export default function CgvPage() {
           14 jours, que l&apos;exécution du service commence immédiatement,
           et avoir expressément renoncé à son droit de rétractation pour
           cet achat précis. Cette demande et cette renonciation doivent
-          chacune résulter d&apos;une action distincte et non précochée du
-          client au moment de la commande — elles ne peuvent pas résulter
-          de la seule acceptation générale des présentes CGV/CGU.
+          résulter d&apos;une action distincte et non précochée du client au
+          moment de la commande — elles ne peuvent pas résulter de la seule
+          acceptation générale des présentes CGV/CGU.
         </p>
         <p>
-          Le parcours de commande actuel ne propose pas encore ces deux
-          cases à cocher séparées. En conséquence, aucune renonciation
-          n&apos;est considérée comme acquise et le délai de rétractation de
-          14 jours s&apos;applique pleinement à toute commande passée sur
-          MargeMax à ce jour.
+          Depuis le 18 septembre 2026, cette action distincte est demandée
+          au client sous la forme d&apos;une case à cocher dédiée,
+          non précochée, affichée juste avant chaque paiement, associant
+          explicitement la demande d&apos;exécution immédiate et la
+          renonciation au droit de rétractation pour l&apos;achat en cours.
+          Le consentement est horodaté et conservé. Pour toute commande
+          passée avant cette date, aucune renonciation n&apos;a été
+          recueillie et le délai de rétractation de 14 jours s&apos;est
+          appliqué pleinement.
         </p>
         <p>
           Pour exercer ce droit ou pour toute question, le client peut
