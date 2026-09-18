@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -57,29 +57,28 @@ const tabs: AnimatedTabItem[] = [
 ];
 
 // Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
-// ActiveTabHint ci-dessous. Tutoiement DELIBERE, distinct du vouvoiement
-// utilise partout ailleurs sur le site (formulaires, CGV, boutons...) :
-// fourni deux fois de suite en tutoiement pour ce bandeau precis dans deux
-// briefs consecutifs -- traite ici comme un choix de ton assume pour cette
-// astuce contextuelle courte, pas comme une repasse globale (voir
-// passation.md, qui documente les allers-retours tutoiement/vouvoiement
-// passes : signale explicitement a l'utilisateur si ce n'etait pas voulu).
+// ActiveTabHint ci-dessous. Vouvoiement, comme partout ailleurs sur le
+// site -- une session precedente avait delibere-ment garde ce bandeau en
+// tutoiement (choix de ton assume, documente dans une version anterieure
+// de ce commentaire), mais l'audit du 2026-09-18 demande explicitement
+// une seule forme d'adresse sur tout le site, sans melange : uniformise
+// ici en vouvoiement (voir passation.md).
 const TAB_HELP: Record<string, { title: string; body: string }> = {
   recherche: {
     title: "Recherche & Sourcing",
-    body: "Entre un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit par analyse réussie).",
+    body: "Entrez un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit par analyse réussie).",
   },
   calculateur: {
     title: "Calculateur de Marge",
-    body: "Simule tes coûts et marges en temps réel. Utilisable à volonté sans consommer de crédit.",
+    body: "Simulez vos coûts et marges en temps réel. Utilisable à volonté sans consommer de crédit.",
   },
   historique: {
     title: "Historique des analyses",
-    body: "Retrouve et réexamine les produits analysés lors de cette session.",
+    body: "Retrouvez et réexaminez les produits analysés lors de cette session.",
   },
   account: {
     title: "Mon compte",
-    body: "Gère ton compte, consulte ton solde et recharge tes crédits d'analyse.",
+    body: "Gérez votre compte, consultez votre solde et rechargez vos crédits d'analyse.",
   },
 };
 
@@ -331,6 +330,36 @@ export function DashboardShell({
     return isTabValue(fromUrl) ? fromUrl : "recherche";
   });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // false tant qu'on n'a pas confirmé que l'historique lu vient vraiment
+  // de Supabase (migration_search_history_details.sql exécutée) -- pilote
+  // l'avertissement "non sauvegardé" dans HistoryPanel. Chargé une seule
+  // fois au montage ; les analyses de CETTE session continuent d'être
+  // ajoutées localement en temps réel (voir onResult plus bas), qu'elles
+  // soient persistées ou non côté serveur.
+  const [historyPersisted, setHistoryPersisted] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/history")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { entries?: HistoryEntry[]; migrationApplied?: boolean } | null) => {
+        if (cancelled || !data) return;
+        setHistoryPersisted(Boolean(data.migrationApplied));
+        if (data.entries?.length) {
+          setHistory((prev) => {
+            const knownIds = new Set(prev.map((e) => e.id));
+            const fromServer = data.entries!.filter((e) => !knownIds.has(e.id));
+            return [...prev, ...fromServer].sort((a, b) => b.timestamp - a.timestamp);
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn("[dashboard] échec du chargement de l'historique persisté :", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Solde de credits affiche : initialise depuis la valeur lue au chargement
   // de la page, puis mis a jour en direct par SearchPanel apres chaque
   // debit reussi (voir app/api/analyze), sans recharger toute la page.
@@ -478,6 +507,7 @@ export function DashboardShell({
                 <HistoryPanel
                   entries={history}
                   onGoToSearch={() => setActive("recherche")}
+                  persisted={historyPersisted}
                 />
               )}
               {active === "account" && (

@@ -104,6 +104,40 @@ export async function POST(request: Request) {
     );
   }
 
+  // Persistance best-effort de l'historique lié au compte (colonnes
+  // ajoutées par migration_search_history_details.sql à la table
+  // public.search_history déjà existante). Ne doit JAMAIS faire échouer
+  // la reponse : si la migration n'a pas encore été exécutée (colonnes
+  // absentes) ou toute autre panne, on logue et on continue -- l'analyse
+  // elle-même a déjà réussi et coûté un crédit, elle ne doit pas être
+  // perdue pour autant. Voir app/api/history/route.ts (lecture) et
+  // components/dashboard/history-panel.tsx (dégradation visible côté UI
+  // si la persistance n'est pas disponible).
+  const { error: historyError } = await supabase.from("search_history").insert({
+    user_id: user.id,
+    query,
+    result_count: 1,
+    status: "succes",
+    title: result.title,
+    product_url: result.url,
+    subtotal: result.subtotal,
+    shipping: result.shipping,
+    shipping_status: result.shippingStatus,
+    import_fee: result.importFee,
+    import_fee_status: result.importFeeStatus,
+    variant_status: result.variantStatus,
+    total: result.total,
+    partial_total: result.partialTotal,
+    is_complete: result.isComplete,
+    currency: result.currency,
+  });
+  if (historyError) {
+    console.warn(
+      "[api/analyze] Historique non persisté (migration_search_history_details.sql peut-être pas encore exécutée) :",
+      historyError.message
+    );
+  }
+
   const { data: newBalance, error: consumeError } = await supabase.rpc(
     "consume_credit",
     { p_user_id: user.id }
