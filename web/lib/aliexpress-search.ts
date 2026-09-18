@@ -61,10 +61,36 @@ function buildProductUrl(productId: string): string {
   return `https://fr.aliexpress.com/item/${productId}.html`;
 }
 
+// "Slug" mot-clé -> URL de recherche "jolie" (/w/wholesale-<slug>.html),
+// celle vers laquelle https://fr.aliexpress.com/wholesale?SearchText=...
+// redirige cote client (JS) dans un vrai navigateur -- un scraper qui ne
+// declenche pas cette redirection JS restait bloque sur l'ancienne forme,
+// qui renvoie plus souvent une page de verification anti-bot.
+// Plage Unicode des diacritiques combinants (accents) apres decomposition
+// NFD, U+0300 a U+036F -- construite via String.fromCharCode plutot qu'un
+// litteral regex avec sequences d'echappement directes (ambigu a l'edition),
+// et sans la syntaxe de propriete Unicode \p{...} qui exigerait une target
+// TypeScript ES2018+ (ce projet compile en ES2017).
+const COMBINING_DIACRITICS_RANGE = new RegExp(
+  `[${String.fromCharCode(0x0300)}-${String.fromCharCode(0x036f)}]`,
+  "g"
+);
+
+function slugifyKeyword(keyword: string): string {
+  return keyword
+    .normalize("NFD")
+    // Enleve les accents apres decomposition NFD (e.g. "chargeur" reste
+    // identique, "câble" -> "cable").
+    .replace(COMBINING_DIACRITICS_RANGE, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function buildSearchUrl(keyword: string): string {
-  const url = new URL("https://fr.aliexpress.com/wholesale");
-  url.searchParams.set("SearchText", keyword);
-  return url.toString();
+  const slug = slugifyKeyword(keyword);
+  return `https://fr.aliexpress.com/w/wholesale-${slug}.html`;
 }
 
 /**
@@ -118,8 +144,11 @@ async function findFirstProductIdFromKeyword(
 // Doit laisser de la marge sous maxDuration (voir app/api/search/route.ts
 // et app/api/analyze/route.ts) : une recherche par mot-clé peut enchainer
 // DEUX appels Firecrawl (page de résultats puis page produit) --
-// 2 x 20 s = 40 s, sous le maxDuration=60 configuré sur les deux routes.
-const FIRECRAWL_TIMEOUT_MS = 20000;
+// 2 x 25 s = 50 s, sous le maxDuration=60 configuré sur les deux routes
+// (marge plus courte qu'avant : waitFor + proxy "auto" ci-dessous rendent
+// chaque appel plus lent, mais necessaires pour contourner le blocage
+// anti-bot constate en conditions reelles).
+const FIRECRAWL_TIMEOUT_MS = 25000;
 
 type FirecrawlScrapeResponse = {
   success: boolean;
@@ -147,12 +176,25 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
         url: targetUrl,
         // "rawHtml" (pas "html", qui est nettoye par Firecrawl et peut
         // retirer les <script type="application/ld+json"> dont dependent
-        // extractFromJsonLd/extractOgImage ci-dessous). location force une
-        // IP/langue France, coherent avec fr.aliexpress.com ci-dessus, au
-        // lieu de laisser Firecrawl choisir un pays de sortie arbitraire.
+        // extractFromJsonLd/extractOpenGraphFallback ci-dessous). location
+        // force une IP/langue France, coherent avec fr.aliexpress.com
+        // ci-dessus, au lieu de laisser Firecrawl choisir un pays de
+        // sortie arbitraire.
         formats: ["rawHtml"],
         location: { country: "FR", languages: ["fr"] },
-        timeout: 18000,
+        // AliExpress rend son contenu (prix, JSON-LD) cote client en React
+        // -- sans attendre, Firecrawl peut capturer une coquille HTML
+        // encore vide. "auto" n'escalade vers un proxy anti-detection
+        // (plus lent/couteux) que si la premiere tentative se heurte a un
+        // blocage -- jamais systematiquement, pour ne pas payer ce cout
+        // sur chaque recherche qui passe deja sans probleme.
+        waitFor: 3000,
+        proxy: "auto",
+        // Doit rester sous FIRECRAWL_TIMEOUT_MS (l'AbortSignal ci-dessous) :
+        // sinon notre propre abort coupe la requete avant que Firecrawl
+        // n'ait la chance de renvoyer sa propre erreur de timeout, geree
+        // plus proprement (voir !payload.success plus bas).
+        timeout: 22000,
       }),
       signal: AbortSignal.timeout(FIRECRAWL_TIMEOUT_MS),
     });
@@ -279,9 +321,50 @@ function extractFromJsonLd(html: string): {
   return {};
 }
 
-function extractOgImage(html: string): string | undefined {
-  const match = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
-  return match?.[1];
+function decodeHtmlEntities(raw: string): string {
+  return raw
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'");
+}
+
+function metaContent(html: string, property: string): string | undefined {
+  const match = html.match(
+    new RegExp(`<meta[^>]+property="${property}"[^>]+content="([^"]+)"`, "i")
+  );
+  return match ? decodeHtmlEntities(match[1]) : undefined;
+}
+
+/**
+ * Repli sur les balises OpenGraph/meta basiques (title/image/price),
+ * presentes sur des pages qu'un blocage anti-bot "doux" ou une reponse
+ * partielle laisse encore dans le HTML alors que le JSON-LD complet est
+ * absent ou coupe. Utilise uniquement pour construire une fiche produit
+ * quand extractFromJsonLd n'a pas suffi -- jamais pour inventer une
+ * valeur : chaque champ reste absent si sa balise ne l'est pas.
+ */
+function extractOpenGraphFallback(html: string): {
+  title?: string;
+  price?: number;
+  currency?: string;
+  imageUrl?: string;
+} {
+  const title = metaContent(html, "og:title");
+  const imageUrl = metaContent(html, "og:image");
+  const priceRaw =
+    metaContent(html, "product:price:amount") ?? metaContent(html, "og:price:amount");
+  const currency =
+    metaContent(html, "product:price:currency") ?? metaContent(html, "og:price:currency");
+  const price = priceRaw ? Number.parseFloat(priceRaw.replace(",", ".")) : undefined;
+
+  return {
+    title,
+    imageUrl,
+    currency,
+    price: price !== undefined && Number.isFinite(price) ? price : undefined,
+  };
 }
 
 function extractShippingAndImportFee(html: string): {
@@ -324,24 +407,52 @@ export async function performAliExpressSearch(
   const targetUrl = buildProductUrl(productId);
   const html = await fetchHtmlViaFirecrawl(targetUrl);
 
-  if (looksLikeBotBlock(html)) {
-    throw new AliExpressSearchError(
-      "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment. Réessayez dans quelques instants.",
-      503
-    );
-  }
+  // La page peut etre veritablement bloquee (verification anti-bot,
+  // longueur quasi nulle) OU seulement partiellement rendue -- dans les
+  // deux cas, on ne rejette plus immediatement : le JSON-LD peut manquer
+  // tout en laissant les balises OpenGraph/meta de base exploitables (voir
+  // extractOpenGraphFallback). Seule l'absence totale de donnees
+  // utilisables (ni JSON-LD, ni repli OG) declenche une vraie erreur plus
+  // bas -- jamais une fiche avec un prix invente. extractFromJsonLd()
+  // reste sans danger a appeler meme sur une page bloquee : elle ne
+  // trouve simplement aucun <script type="application/ld+json"> a
+  // parser et renvoie {}.
+  const blocked = looksLikeBotBlock(html);
+  const fromJsonLd = extractFromJsonLd(html);
 
-  const { title, price, currency, imageUrl, variant, rating, reviewCount } =
-    extractFromJsonLd(html);
-  const { shipping, importFee } = extractShippingAndImportFee(html);
-  const productImageUrl = imageUrl ?? extractOgImage(html) ?? null;
+  let title = fromJsonLd.title;
+  let price = fromJsonLd.price;
+  let currency = fromJsonLd.currency;
+  let imageUrl = fromJsonLd.imageUrl;
+  const variant = fromJsonLd.variant;
+  const rating = fromJsonLd.rating;
+  const reviewCount = fromJsonLd.reviewCount;
+
+  if (price === undefined || Number.isNaN(price)) {
+    // On entre ici uniquement quand JSON-LD n'a pas donne de prix
+    // exploitable -- price vaut donc deja undefined/NaN, le repli le
+    // remplace purement et simplement (jamais l'inverse : jamais ecraser
+    // un prix JSON-LD valide par une valeur OpenGraph moins fiable).
+    const fallback = extractOpenGraphFallback(html);
+    title = title ?? fallback.title;
+    price = fallback.price;
+    currency = currency ?? fallback.currency;
+    imageUrl = imageUrl ?? fallback.imageUrl;
+  }
 
   if (price === undefined || Number.isNaN(price)) {
     throw new AliExpressSearchError(
-      "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifiez le lien, ou réessayez dans quelques instants.",
-      502
+      blocked
+        ? "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment, et aucune donnée de secours n'a pu être récupérée. Réessayez dans quelques instants."
+        : "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifiez le lien, ou réessayez dans quelques instants.",
+      blocked ? 503 : 502
     );
   }
+
+  // Meme logique que fromJsonLd ci-dessus : sans danger a tenter meme sur
+  // une page partiellement bloquee, se degrade simplement en null si rien
+  // n'est trouve plutot que d'echouer.
+  const { shipping, importFee } = extractShippingAndImportFee(html);
 
   const subtotal = price;
   const total = subtotal + (shipping ?? 0) + (importFee ?? 0);
@@ -350,7 +461,7 @@ export async function performAliExpressSearch(
     title: title ?? "Titre indisponible",
     variant: variant ?? null,
     url: targetUrl,
-    product_image_url: productImageUrl,
+    product_image_url: imageUrl ?? null,
     subtotal,
     shipping,
     importFee,

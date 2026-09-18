@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 // moment de l'appel.
 export const dynamic = "force-dynamic";
 // Une recherche par mot-cle peut enchainer 2 appels Firecrawl (recherche
-// + fiche produit) a 20 s chacun (voir FIRECRAWL_TIMEOUT_MS dans
+// + fiche produit) a 25 s chacun (voir FIRECRAWL_TIMEOUT_MS dans
 // lib/aliexpress-search.ts) -- sans ceci, Vercel tue la fonction par
 // defaut avant meme que notre propre delai interne se declenche, et le
 // client recoit une erreur de timeout brute au lieu d'un message clair.
