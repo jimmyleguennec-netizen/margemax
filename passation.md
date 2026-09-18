@@ -1,5 +1,50 @@
 # Passation — MargeMax
 
+## Sprint footer, humour formulaires & finitions (2026-09-18, session "footer & humour")
+
+**TikTok volontairement non ajouté.** Le brief demandait une icône TikTok
+pointant vers "le compte officiel" — aucune URL TikTok n'existe nulle part
+dans le code, et une session précédente avait explicitement retiré les
+autres icônes sociales (Instagram/Facebook/X) faute de comptes réels,
+justement pour ne jamais publier de lien mort ou faux. Question posée à
+l'utilisateur en cours de session : confirmé qu'il n'y a pas encore de
+compte réel, lien à ajouter plus tard. **Ne pas ajouter de lien TikKTok
+avant d'avoir l'URL réelle fournie explicitement.**
+
+**1. Champ "Entreprise" (inscription) — n'existait pas avant cette
+session**, ajouté avec le placeholder demandé, **facultatif** (jamais
+requis pour créer un compte). Stocké uniquement dans les métadonnées
+Supabase (`auth.users.raw_user_meta_data.company_name`, via
+`options.data` de `signUp()`) — **pas de colonne dans `public.profiles`**
+volontairement, pour ne jamais faire dépendre l'inscription d'une
+migration SQL non encore exécutée. Récupérable plus tard sans perte si
+une colonne dédiée est ajoutée un jour.
+
+**2. Sous-texte mot de passe — nombre corrigé de 8 à 6.** Le brief
+demandait "Minimum 8 caractères", mais la vraie validation (
+`lib/actions/auth.ts`, `password.length < 6`, et `minLength={6}` sur les
+deux champs) exige 6 depuis toujours. Gardé l'humour tel quel, corrigé le
+chiffre — la blague sur "123456" ne fonctionne d'ailleurs QUE si le
+minimum est 6 (123456 fait exactement 6 caractères ; à 8 le mot de passe
+de la blague ne serait même pas accepté).
+
+**3. Champ téléphone/fax — non ajouté.** N'existe nulle part dans le code
+(vérifié par recherche), et le brief lui-même le conditionnait ("si
+présent"). Rien à quoi accrocher ce placeholder.
+
+**4. Footer** : avertissement humoristique et rangée de badges "Moyens de
+paiement acceptés" (Apple Pay/Google Pay/Visa/Mastercard/CB/Stripe —
+réellement exacts, ce sont ceux que Stripe Checkout propose
+automatiquement) ajoutés. Badges texte avec une couleur d'accent par
+marque plutôt que des logos reconstitués à la main (aucune bibliothèque
+d'icônes de marque n'est installée dans ce projet).
+
+**5. Logique du menu déroulant / onglets dashboard** : confirmée déjà
+correcte depuis la session précédente (Aide → modale FAQ, Service client
+→ modale contact, Mon compte → `?tab=account`), et le bouton d'état vide
+de l'Historique est toujours en place — aucun changement de code
+nécessaire sur ce point, juste vérifié.
+
 ## Sprint de finalisation : extracteur, formulaire, UI compte (2026-09-18, session "finalisation")
 
 **⚠️ Deux actions manuelles bloquantes avant que tout fonctionne réellement :**
