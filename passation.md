@@ -1,5 +1,71 @@
 # Passation — MargeMax
 
+## Sprint de finalisation : extracteur, formulaire, UI compte (2026-09-18, session "finalisation")
+
+**⚠️ Deux actions manuelles bloquantes avant que tout fonctionne réellement :**
+
+1. **`RESEND_API_KEY` toujours absente de Vercel.** Le message d'erreur
+   "L'envoi de message n'est pas encore configuré" que l'utilisateur a vu
+   est EXACTEMENT le comportement codé pour ce cas (voir sessions
+   précédentes) — ce n'est pas un bug, c'est la variable d'environnement
+   qui manque encore. Rien à corriger côté code, juste à renseigner la clé.
+2. **Nouvelle migration `migration_stripe_customer.sql` à exécuter dans
+   Supabase SQL Editor** (ajoute `profiles.stripe_customer_id`), ET **le
+   portail client Stripe à activer une fois dans le Dashboard Stripe**
+   (Settings → Billing → Customer portal) — sans ça,
+   `stripe.billingPortal.sessions.create()` échoue avec une erreur Stripe
+   explicite. Les achats de crédits faits AVANT cette session n'ont pas
+   de `stripe_customer_id` (capturé uniquement à partir de maintenant par
+   le webhook) : le bouton "Gérer mes factures" ne fonctionnera pour un
+   utilisateur existant qu'après son PROCHAIN achat.
+
+**1. Extraction Firecrawl temps réel / pas de prix en dur** : re-vérifié
+(grep sur le chemin réel de recherche/calcul pour les prix d'exemple
+connus) — déjà entièrement traité lors d'une session précédente, aucun
+changement de code nécessaire.
+
+**2. Formulaire de contact** : voir le blocage RESEND_API_KEY ci-dessus.
+Code déjà correct et inchangé sur ce point.
+
+**3. Menu déroulant (engrenage header) — les 3 items menaient tous au
+même endroit avant cette session, corrigé :**
+- Onglet actif du dashboard maintenant reflété dans l'URL
+  (`?tab=recherche|calculateur|historique|account`, via
+  `history.replaceState`, relu au montage) — `/dashboard?tab=account`
+  fonctionne comme lien direct et survit à un rechargement. Clé interne
+  de l'onglet renommée `parametres` → `account` pour correspondre.
+- **"Aide et paramètres"** ouvre maintenant une vraie modale FAQ
+  (`help-modal.tsx`, nouveau) au lieu de basculer vers Mon compte —
+  réutilise le même contenu que la FAQ publique de la landing
+  (extrait dans `lib/faq.ts`, source unique désormais partagée par les
+  deux, pour ne plus jamais diverger).
+- **"Service client"** ouvre le formulaire de contact DANS le dashboard
+  (`contact-modal.tsx`, nouveau) au lieu de renvoyer un utilisateur
+  connecté vers `/#contact` sur la landing publique. Le formulaire
+  lui-même a été extrait de `contact.tsx` vers
+  `components/shared/contact-form.tsx`, réutilisé par la landing ET
+  cette modale (même logique d'envoi, jamais deux implémentations qui
+  divergent).
+
+**4. Pages du dashboard :**
+- Recherche : suggestions de mots-clés populaires cliquables ajoutées
+  (remplissent le champ, ne soumettent jamais automatiquement — une
+  analyse coûte un crédit, l'utilisateur garde le contrôle).
+- Historique : bouton d'état vide déjà en place depuis une session
+  précédente, rien à ajouter.
+- Mon compte : nouveau bloc "Moyen de paiement & factures" (bouton →
+  `POST /api/stripe/billing-portal` → `stripe.billingPortal.sessions.create`,
+  nouveau fichier + migration, voir ci-dessus) et un récapitulatif
+  d'usage (crédits achetés / nombre d'achats / montant dépensé total,
+  calculés uniquement à partir du tableau `purchases` réel).
+  **Décision délibérée : pas de statistique "crédits utilisés"** — ça
+  aurait supposé connaître le nombre de crédits offerts à l'inscription
+  comme une constante fixe non trackée nulle part dans le code (seulement
+  en dur dans des textes marketing), fragile si ce nombre change ou si un
+  solde est ajusté manuellement en base. Mieux valait ne rien afficher
+  que d'afficher un chiffre qui pourrait dériver silencieusement de la
+  réalité.
+
 ## Sprint correctifs finaux : contact, burger, textes (2026-09-18, session "correctifs finaux")
 
 **Nouvelle dépendance externe requise : Resend.** Le formulaire de contact
