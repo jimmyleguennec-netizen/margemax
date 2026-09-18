@@ -1,5 +1,254 @@
 # Passation — MargeMax
 
+## Audit global du dépôt (2026-09-18, session "audit global")
+
+Audit + corrections sur 8 chantiers demandés. Détail par chantier
+ci-dessous ; fichiers modifiés/tests listés à la toute fin.
+
+**⚠️ Blocage constant de cette session : aucun Node/npm/navigateur de test
+disponible dans cet environnement.** Impossible d'exécuter `npm run lint`,
+`npm run build` ou `npm run test` (vitest). Tous les changements ont été
+relus manuellement (cohérence des types, équilibre des accolades/parenthèses
+vérifié par script), mais **rien n'a été exécuté**. Le prochain `npm run
+build`/`npm run test` réel (Vercel au déploiement, ou localement) doit être
+considéré comme la première vraie vérification -- ne pas supposer que tout
+compile juste parce que le code a été relu.
+
+### 1. Analyse AliExpress -- refonte du modèle de complétude
+
+Changement structurel dans `lib/aliexpress-search.ts` et
+`components/dashboard/search-panel.tsx` : chaque champ (livraison, taxe,
+variante) porte désormais un statut explicite `"confirmed" | "estimated" |
+"missing"` (type `FieldStatus`), propagé jusqu'à l'UI.
+
+- **`total`** (le vrai "Coût total") est maintenant **`null`** dès qu'un
+  seul champ n'est pas confirmé (livraison manquante, taxe estimée, ou
+  variante non identifiée) -- **jamais** calculé en remplaçant un champ
+  manquant par 0.
+- **`partialTotal`** reste toujours calculable (frais inconnus comptés
+  pour 0 dans CE calcul précis) et s'affiche sous un libellé explicite
+  ("Coût partiel estimé" / bandeau "Total hors frais inconnus"), jamais
+  sous "Coût total".
+- **`isComplete`** pilote l'UI : badge "Vérifié"/"Partiellement vérifié",
+  et un bandeau "estimation incomplète" apparaît sur le bloc marge/ROI/
+  prix conseillé/budget pub (`EstimateBlock`) quand le total n'est pas
+  complet -- ces indicateurs restent **affichés, pas masqués** (l'analyse
+  a un coût réel côté fournisseur, l'utilisateur mérite le résultat même
+  partiel), mais clairement marqués "incomplet".
+- **Débit de crédit expliqué** : un nouveau message sous le résultat
+  explique explicitement pourquoi 1 crédit a été débité même quand le
+  résultat est incomplet ("l'analyse a eu lieu et a un coût réel côté
+  fournisseur, que le résultat soit complet ou non"), ou pourquoi aucun
+  crédit n'a été débité (incident technique).
+- Gestion des erreurs (bloqué, timeout, réseau, produit introuvable) déjà
+  bien différenciée depuis les sprints précédents de cette session --
+  revérifiée, inchangée.
+- Tests ajoutés : `lib/aliexpress-search.test.ts` (résultat complet,
+  livraison manquante jamais remplacée par 0, taxe estimée jamais
+  confirmée, arrondi TVA au centime, variante manquante bloquant
+  isComplete, livraison gratuite vs bandeau promo conditionnel, isolement
+  du bloc produit, et les 5 cas d'erreur : introuvable/bloqué/timeout/
+  réseau/mot-clé sans résultat).
+
+### 2. Historique -- persistance Supabase réelle
+
+La table `public.search_history` existait déjà dans `schema_margemax.sql`
+(query/status/user_id/created_at + RLS `history_select_own`/
+`history_insert_own` déjà correctes) mais sans les colonnes nécessaires
+pour reconstruire une carte d'historique utile.
+
+- **Nouvelle migration `migration_search_history_details.sql`** (non
+  destructive, `add column if not exists` uniquement) : ajoute
+  title/product_url/subtotal/shipping/shipping_status/import_fee/
+  import_fee_status/variant_status/total/partial_total/is_complete/
+  currency à la table existante. **⚠️ À exécuter manuellement dans
+  Supabase SQL Editor.**
+- `app/api/analyze/route.ts` : insertion best-effort dans
+  `search_history` après chaque analyse réussie (jamais bloquant --
+  échec de l'insertion juste loggé en warning).
+- **Nouvelle route `app/api/history/route.ts`** (GET) : lit l'historique
+  réel du compte connecté. Se dégrade proprement si la migration n'a pas
+  encore été exécutée (erreur Postgres 42703 "colonne inconnue" attrapée
+  -> renvoie une liste vide + `migrationApplied: false`, jamais une 500).
+- `dashboard-shell.tsx` : charge l'historique persisté au montage, fusionne
+  avec les entrées de la session en cours.
+- `history-panel.tsx` : le bandeau "historique non sauvegardé" s'affiche
+  désormais **avant toute analyse** (dans l'état vide aussi, pas
+  seulement après coup) tant que la persistance n'est pas confirmée ;
+  disparaît une fois la migration exécutée et confirmée par l'API.
+- **Non testé en conditions réelles** (pas de Supabase accessible depuis
+  cet environnement) : la logique de dégradation (colonne absente ->
+  liste vide) a été relue attentivement mais jamais exécutée contre une
+  vraie base. À vérifier après avoir exécuté la migration.
+
+### 3. Textes -- uniformisation et suppression des promesses absolues
+
+- **Tutoiement -> vouvoiement partout** (choix : vouvoiement, cohérent
+  avec le retrait de l'humour/du ton décontracté demandé par ailleurs
+  dans ce même audit) : `search-panel.tsx` ("Analysez votre prochain
+  produit"), `dashboard-shell.tsx` (bandeau d'aide contextuel TAB_HELP,
+  qui portait un commentaire documentant un choix tutoiement "délibéré"
+  d'une session antérieure -- explicitement annulé ici sur demande
+  actuelle), `demo.tsx` (titre principal). Balayage final effectué sur
+  tout `web/components` + `web/app` : plus aucune occurrence de
+  tu/ton/ta/tes/toi en tant que pronom (les faux positifs du mot "ton" =
+  teinte/couleur écartés).
+- **Promesses absolues remplacées** : "avec une précision exacte" ->
+  "à partir des données disponibles" (demo.tsx) ; "une marge vérifiée" ->
+  "une marge estimée" (interactive-demo.tsx) ; "au centime près" ->
+  "à partir des données réellement disponibles" (footer.tsx).
+- **Score fixe "94 %" supprimé** : `quick-guide.tsx` affichait un
+  "Indice de fiabilité : 94 %" avec une jauge circulaire animée, un
+  chiffre fixe sans méthode réelle derrière -- alors que la vraie
+  fiabilité de l'app est volontairement **qualitative** (palier élevé/
+  moyen/faible, jamais un pourcentage précis, voir
+  `reliabilityTierFromImportRatio` dans `lib/margin-estimate.ts`).
+  Remplacé par le même composant `ReliabilityBadge` que l'app réelle,
+  calculé via `computeMarginEstimate()` sur les mêmes chiffres d'exemple
+  que `demo.tsx`. Le composant `CircularGauge` (devenu inutilisé) a été
+  supprimé.
+  En creusant ce même bloc, découverte de chiffres également obsolètes
+  (marge 21,81 €/ROI 120,6 %, d'une ancienne formule de marge désynchronisée
+  de la vraie méthode 1,8×/2,3×/1,5×) dans **ce même fichier ET dans
+  `interactive-demo.tsx`** (StepThreeMockup) -- les deux corrigés pour
+  recalculer via `computeMarginEstimate()` au lieu de valeurs recopiées
+  à la main.
+- **Textes peu professionnels supprimés** : placeholder "Nom de ton
+  empire e-commerce (ou ton futur empire)" -> "Nom de votre entreprise
+  (facultatif)" ; indice mot de passe "123456 si tu aimes vivre
+  dangereusement" -> "Minimum 6 caractères." ; avertissement
+  humoristique du footer ("expérience époustouflante"...) entièrement
+  retiré (icône `PartyPopper` désormais inutilisée retirée aussi).
+- **"3 crédits offerts" harmonisé** partout (le bandeau défilant du
+  navbar disait "3 analyses offertes", désormais aligné avec le
+  vocabulaire réel du produit -- crédits, pas "analyses").
+
+### 4. Navigation
+
+- **Lien footer `#guide`** : en réalité un lien techniquement valide
+  (l'ancre `id="guide"` existe bien sur la page, `Footer` n'est rendu
+  que sur `app/page.tsx`) mais **mal étiqueté** -- "Voir la démo"
+  pointait vers `#guide` (le guide en 4 étapes) au lieu de `#demo` (la
+  vraie section de démonstration). Corrigé : "Voir la démo" -> `#demo`,
+  le guide en 4 étapes a son propre libellé distinct ("Comment ça
+  marche") -> `#guide`.
+- **Redirection utilisateur connecté vers `/dashboard`** : déjà
+  implémentée correctement sur `/login` et `/signup`
+  (`app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`, vérifié via
+  lecture -- garde `if (user) redirect(...)` déjà en place, avec
+  conservation du `?pack=` en attente). Aucun changement nécessaire.
+- CTA/ancres/routes directes non testées en conditions réelles (pas de
+  build/serveur local possible) -- revues par lecture de code uniquement.
+
+### 5. Paiement
+
+- **Les 5 packs vérifiés exacts** dans `lib/packs.ts` (source unique de
+  vérité) : Starter 5/2,99 €, Essentiel 15/7,99 €, Avancé 35/14,99 €, Pro
+  80/29,99 €, Ultimate 200/59,99 € -- déjà corrects, aucun changement.
+- **Webhook Stripe déjà solide** (`app/api/webhooks/stripe/route.ts`,
+  vérifié par lecture attentive, inchangé) : double filet d'idempotence
+  (contrainte unique sur `stripe_webhook_events.id` PUIS sur
+  `credit_purchases.stripe_session_id`), validation côté serveur du
+  montant réellement encaissé contre le prix réel du pack déclaré
+  (tolérance ±2 centimes pour l'arrondi Stripe, rejet strict sinon --
+  un commentaire dans le code documente même une faille de ce type déjà
+  corrigée par le passé). Crédits attribués toujours lus depuis
+  `PACKS`, jamais depuis une valeur transmise par le client.
+- Case de consentement déjà non précochée par défaut
+  (`checkout-consent-dialog.tsx`, `useState(false)`) -- vérifié, inchangé.
+- Tests ajoutés : `lib/packs.test.ts` (limites de volume : exactement au
+  seuil d'un pack, juste au-dessus, au-delà de MAX_PACK_CREDITS, volume
+  nul, cas documenté 220 crédits -> Ultimate+Essentiel+Starter) et
+  `app/api/webhooks/stripe/route.test.ts` (paiement conforme crédité une
+  fois, même `event.id` reçu deux fois -> crédité une seule fois, session
+  déjà vue dans `credit_purchases` -> pas re-créditée, montant incohérent
+  avec le pack déclaré -> crédit bloqué, écart d'arrondi ±2 centimes
+  accepté). **Non exécutés** (voir avertissement en tête de section).
+
+### 6. Légal et confiance
+
+- **Médiateur de la consommation : toujours pas désigné, et je n'ai
+  aucune coordonnée vérifiée à renseigner** -- conformément à la consigne
+  ("uniquement des coordonnées vérifiées"), rien n'a été inventé. Le
+  texte "en cours de finalisation" (vague) a été remplacé par un texte
+  explicite sur l'obligation légale réelle (article L.616-1) et l'absence
+  actuelle de désignation, avec la marche à suivre en attendant
+  (réclamation écrite directe). **⚠️ Reste un vrai manquement légal tant
+  qu'aucun médiateur n'est effectivement désigné -- à traiter par
+  l'utilisateur (adhésion à un médiateur agréé).**
+- **Droit de rétractation** (`app/cgv/page.tsx`) : relu intégralement,
+  déjà rédigé avec soin (articles L.221-18/L.221-25/L.221-28 cités,
+  case de renonciation non précochée documentée, distinction
+  paiement-des-crédits vs exécution-progressive-du-service) -- inchangé,
+  déjà conforme dans l'esprit. Le texte reconnaît lui-même ne pas avoir
+  été validé par un professionnel du droit ; cette réserve reste en
+  place (honnête, pas un blocage introduit par cette session).
+- **"Paiement sécurisé" n'est plus la seule preuve de confiance** en bas
+  des tarifs (`pricing.tsx`) : complété par un fait vérifiable
+  (MargeMax ne stocke aucune donnée de carte, tout passe par Stripe) et
+  des liens directs vers Mentions légales/CGV plutôt qu'un simple slogan.
+- Aucune occurrence de "en cours de finalisation" restante ailleurs sur
+  le site (recherche exhaustive).
+
+### 7. Contact
+
+`components/shared/contact-form.tsx` et `app/api/contact/route.ts`
+relus intégralement (déjà construits lors d'un sprint précédent de cette
+session) : validation avant envoi, état `sending` pendant l'appel,
+`sent` positionné **uniquement** après un `res.ok && data.ok` réellement
+reçu, erreurs réseau et erreurs serveur distinguées. Déjà conforme,
+aucun changement nécessaire. **Aucun message de test réel envoyé** durant
+cet audit, comme demandé.
+
+### 8. UI et accessibilité
+
+- `prefers-reduced-motion` **déjà présent** dans `app/globals.css`
+  (règle globale réduisant toutes les animations/transitions) -- vérifié,
+  inchangé.
+- Focus visible déjà géré sur les primitives shadcn (`focus-visible:ring`
+  sur `components/ui/input.tsx` par ex.).
+- **Non approfondi faute de temps/outils** : audit de contraste
+  systématique, halos/répétitions visuelles, responsive des 4 étapes de
+  démonstration sur mobile réel. Pas de build local possible (pas de
+  Node/npm) pour lancer un serveur de dev et tester visuellement ; un
+  test sur le site déployé ne couvrirait que l'état AVANT ce commit.
+  **À vérifier par l'utilisateur après déploiement**, notamment le
+  responsive mobile du guide en 4 étapes (`quick-guide.tsx`, modifié
+  dans cette session) et le nouveau bandeau d'historique.
+
+### Fichiers modifiés
+
+`lib/aliexpress-search.ts`, `components/dashboard/search-panel.tsx`,
+`components/dashboard/history-panel.tsx`, `components/dashboard/
+dashboard-shell.tsx`, `app/api/analyze/route.ts`,
+`components/auth/neon-auth-panel.tsx`, `components/landing/{demo,footer,
+interactive-demo,navbar,pricing,quick-guide}.tsx`, `app/cgv/page.tsx`,
+`vitest.config.ts` (ajout de l'alias `@/` -- absent auparavant, aucun
+test import ant du code applicatif via cet alias ne pouvait tourner).
+
+### Fichiers créés
+
+`app/api/history/route.ts`, `migration_search_history_details.sql`,
+`lib/aliexpress-search.test.ts`, `lib/packs.test.ts`,
+`app/api/webhooks/stripe/route.test.ts`.
+
+### Fichier supprimé
+
+`components/ui/circular-gauge.tsx` (devenu inutilisé après le retrait du
+faux score 94 %).
+
+### Actions manuelles requises par l'utilisateur
+
+1. Exécuter `migration_search_history_details.sql` dans Supabase SQL
+   Editor (sinon l'historique reste limité à la session, avec
+   avertissement visible -- pas cassé, juste non persistant).
+2. Désigner un vrai médiateur de la consommation et renseigner ses
+   coordonnées dans `app/cgv/page.tsx` (obligation légale réelle,
+   non résolue par cette session faute de coordonnées vérifiées).
+3. Lancer `npm run lint`, `npm run build` et `npm run test` en local ou
+   laisser Vercel les exécuter au déploiement -- **rien de tout cela n'a
+   pu être exécuté depuis cette session**.
+
 ## UI fix : vrais tracés SVG officiels pour les moyens de paiement (2026-09-18, session "official payment logos")
 
 **Les icônes du footer dessinées à la main lors du sprint précédent ont
