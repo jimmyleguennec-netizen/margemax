@@ -102,6 +102,13 @@ export async function signup(
 ): Promise<AuthActionState> {
   const { email, password } = readCredentials(formData);
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  // Facultatif -- "Entreprise" du formulaire d'inscription, jamais requis
+  // pour creer un compte. Non persiste dans public.profiles (aucune
+  // colonne pour ca a ce jour, et une migration a executer manuellement
+  // ne doit jamais etre un prealable silencieux a l'inscription) : stocke
+  // uniquement dans les metadonnees Supabase (raw_user_meta_data),
+  // recuperable plus tard sans perte si une colonne dediee est ajoutee.
+  const company = String(formData.get("company") ?? "").trim();
 
   if (!email || !password) {
     return { error: "Merci de renseigner votre email et votre mot de passe." };
@@ -130,6 +137,7 @@ export async function signup(
       password,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
+        ...(company ? { data: { company_name: company } } : {}),
       },
     });
 

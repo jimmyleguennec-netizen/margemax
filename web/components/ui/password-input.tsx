@@ -12,12 +12,17 @@ export function PasswordInput({
   label,
   autoComplete,
   minLength,
+  hint,
 }: {
   id: string;
   name: string;
   label: string;
   autoComplete?: string;
   minLength?: number;
+  /** Sous-texte affiche sous le champ (ex. rappel de la regle de longueur
+   * minimale) -- optionnel, n'affecte pas les usages existants qui ne le
+   * passent pas. */
+  hint?: string;
 }) {
   const [visible, setVisible] = useState(false);
   const [pulse, setPulse] = useState(false);
@@ -103,6 +108,7 @@ export function PasswordInput({
           </AnimatePresence>
         </button>
       </div>
+      {hint && <p className="text-xs text-white/40">{hint}</p>}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   Calculator,
   FileText,
   Mail,
+  PartyPopper,
   ScrollText,
   Ship,
   type LucideIcon,
@@ -14,6 +15,21 @@ import {
 import { Logo } from "@/components/ui/logo";
 
 const CONTACT_EMAIL = "contact@autoutilshop.fr";
+
+// Paiement traite via Stripe (Payment Links) -- ces moyens de paiement
+// sont proposes automatiquement par Stripe Checkout selon l'appareil/
+// navigateur du client, sans configuration supplementaire cote MargeMax.
+// Badges texte plutot que des logos de marque reconstitues a la main
+// (aucune bibliotheque d'icones de marque n'est installee ici) -- chaque
+// accent de couleur rappelle la marque sans en reproduire le logo exact.
+const PAYMENT_METHODS: { label: string; accent: string }[] = [
+  { label: "Apple Pay", accent: "border-white/20 text-white" },
+  { label: "Google Pay", accent: "border-blue-400/30 text-blue-300" },
+  { label: "Visa", accent: "border-indigo-400/30 text-indigo-300" },
+  { label: "Mastercard", accent: "border-orange-400/30 text-orange-300" },
+  { label: "CB", accent: "border-cyan-400/30 text-cyan-300" },
+  { label: "Stripe", accent: "border-violet-400/30 text-violet-300" },
+];
 
 // "Générateur de fiche IA" et "Carnet de notes" retirés : ces
 // fonctionnalités sont mentionnées dans les textes marketing mais
@@ -134,6 +150,38 @@ export function Footer() {
               {CONTACT_EMAIL}
             </a>
           </div>
+        </div>
+
+        <div className="mt-10 border-t border-white/10 pt-8">
+          <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-cyan-200/70 sm:text-left">
+            Moyens de paiement acceptés
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            {PAYMENT_METHODS.map((method) => (
+              <span
+                key={method.label}
+                className={`rounded-full border bg-white/[0.02] px-3 py-1.5 text-xs font-medium ${method.accent}`}
+              >
+                {method.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Avertissement humoristique -- ton volontairement decontracte,
+          distinct des mentions legales serieuses juste en dessous. */}
+      <div className="border-t border-white/5 bg-white/[0.02] py-5">
+        <div className="container flex items-start gap-2.5 text-xs text-white/40 sm:items-center">
+          <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300/70 sm:mt-0" />
+          <p>
+            <span className="font-semibold text-white/60">Avertissement :</span>{" "}
+            ce site a été connu pour provoquer une expérience époustouflante.
+            Nous vous recommandons de vous préparer mentalement et si
+            possible d&apos;être assis. Les effets secondaires peuvent
+            inclure l&apos;économie d&apos;argent, laisser échapper un rire
+            et un klaxon sporadique.
+          </p>
         </div>
       </div>
 

@@ -15,6 +15,8 @@ export function NeonField({
   icon: Icon,
   autoComplete,
   minLength,
+  placeholder,
+  required = true,
 }: {
   id: string;
   name: string;
@@ -23,6 +25,11 @@ export function NeonField({
   icon: typeof Mail;
   autoComplete?: string;
   minLength?: number;
+  placeholder?: string;
+  /** Par defaut true, pour ne rien changer au comportement des champs
+   * existants (email...) -- passe explicitement a false pour un champ
+   * facultatif (ex. nom d'entreprise). */
+  required?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
@@ -31,6 +38,7 @@ export function NeonField({
         className="text-xs font-medium uppercase tracking-wider text-cyan-200/70"
       >
         {label}
+        {!required && <span className="ml-1 normal-case text-white/30">(optionnel)</span>}
       </label>
       <div className="relative flex items-center">
         <Icon className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
@@ -38,9 +46,10 @@ export function NeonField({
           id={id}
           name={name}
           type={type}
-          required
+          required={required}
           autoComplete={autoComplete}
           minLength={minLength}
+          placeholder={placeholder}
           className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none backdrop-blur-sm transition-all duration-200 focus:border-cyan-400/60 focus:bg-white/[0.07] focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
         />
       </div>

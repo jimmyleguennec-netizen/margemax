@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFormState } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mail, ShieldCheck } from "lucide-react";
+import { Building2, Mail, ShieldCheck } from "lucide-react";
 
 import { login, signup, type AuthActionState } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/client";
@@ -146,12 +146,23 @@ function SignupForm({
         icon={Mail}
         autoComplete="email"
       />
+      <NeonField
+        id={`${idPrefix}-signup-company`}
+        name="company"
+        type="text"
+        label="Entreprise"
+        icon={Building2}
+        autoComplete="organization"
+        required={false}
+        placeholder="Nom de ton empire e-commerce (ou ton futur empire)"
+      />
       <PasswordInput
         id={`${idPrefix}-signup-password`}
         name="password"
         label="Mot de passe"
         autoComplete="new-password"
         minLength={6}
+        hint="Minimum 6 caractères (ou « 123456 » si tu aimes vivre dangereusement — non, évite quand même !)"
       />
       <PasswordInput
         id={`${idPrefix}-signup-confirm`}
