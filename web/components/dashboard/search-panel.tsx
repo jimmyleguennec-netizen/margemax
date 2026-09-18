@@ -34,6 +34,11 @@ type ApiResult = {
   subtotal: number | null;
   shipping: number | null;
   importFee: number | null;
+  /** true quand importFee est une estimation (TVA France 20% du
+   * sous-total, appliquee quand AliExpress ne montre le vrai montant
+   * qu'a l'etape de paiement) plutot qu'une valeur lue sur la fiche
+   * produit -- ne jamais afficher ce cas comme "confirmé". */
+  importFeeEstimated?: boolean;
   total: number | null;
   currency: string;
   rating: number | null;
@@ -79,6 +84,7 @@ function buildExampleResult(): ApiResult {
     subtotal: 14.49,
     shipping: 0,
     importFee: 3.6,
+    importFeeEstimated: false,
     total: 18.09,
     currency: "EUR",
     // Memes chiffres que la demonstration de la landing (demo.tsx) : "3,9/5
@@ -517,7 +523,7 @@ export function SearchPanel({
                   {" · "}Analysé le {formatAnalyzedAt(result.analyzedAt)}
                 </p>
               </div>
-              {result.shipping !== null && result.importFee !== null ? (
+              {result.shipping !== null && result.importFee !== null && !result.importFeeEstimated ? (
                 <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
                   <CheckCircle2 className="h-3 w-3" />
                   Vérifié
@@ -568,10 +574,18 @@ export function SearchPanel({
                   {formatEuro(result.importFee)}{" "}
                   <span
                     className={`text-[10px] uppercase tracking-wide ${
-                      result.importFee === null ? "text-amber-300/70" : "text-green-300/70"
+                      result.importFee === null
+                        ? "text-amber-300/70"
+                        : result.importFeeEstimated
+                          ? "text-cyan-300/70"
+                          : "text-green-300/70"
                     }`}
                   >
-                    {result.importFee === null ? "manquant" : "confirmé"}
+                    {result.importFee === null
+                      ? "manquant"
+                      : result.importFeeEstimated
+                        ? "estimé (TVA 20 %)"
+                        : "confirmé"}
                   </span>
                 </span>
               </div>
@@ -604,11 +618,12 @@ export function SearchPanel({
               </div>
             </div>
 
-            {(result.shipping === null || result.importFee === null) && (
+            {(result.shipping === null || result.importFeeEstimated) && (
               <p className="border-t border-white/10 px-5 py-3 text-xs text-white/40">
-                Certains champs (livraison ou frais d&apos;importation) n&apos;ont
-                pas pu être extraits de cette page — ils sont affichés
-                comme indisponibles plutôt qu&apos;estimés au hasard.
+                {result.shipping === null &&
+                  "Les frais de livraison n'ont pas pu être lus sur cette fiche — affichés comme indisponibles plutôt qu'estimés au hasard. "}
+                {result.importFeeEstimated &&
+                  "AliExpress n'affiche les droits de douane réels qu'à l'étape de paiement : le montant ci-dessus est une estimation (TVA France 20 % du sous-total), pas une valeur confirmée."}
               </p>
             )}
 

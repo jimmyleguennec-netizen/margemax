@@ -32,6 +32,11 @@ export type AliExpressSearchResult = {
   /** Pays cible des taxes d'importation calculees (voir location.country
    * passe a Firecrawl dans fetchHtmlViaFirecrawl). */
   destination: "FR";
+  /** true quand importFee n'a pas pu etre lu sur la fiche produit et a ete
+   * remplace par une estimation (TVA France 20% du sous-total) -- voir
+   * extractShippingAndImportFee. false/absent pour une valeur reellement
+   * extraite. Ne jamais afficher ce cas comme "confirme" cote UI. */
+  importFeeEstimated?: boolean;
   /** Horodatage serveur de l'analyse (ISO 8601) -- pas l'horodatage client,
    * qui peut deriver ou etre falsifie. */
   analyzedAt: string;
@@ -367,22 +372,104 @@ function extractOpenGraphFallback(html: string): {
   };
 }
 
+// Marqueurs de debut des blocs "hors produit principal" (avis clients,
+// recommandations, articles similaires) verifies en conditions reelles
+// (navigateur, fiche produit AliExpress live) : le bloc "Vous aimerez
+// aussi" contient les prix/badges "Livraison gratuite" d'articles
+// totalement differents, et un ancien regex non borne au bloc du produit
+// principal pouvait "trouver" un prix de livraison appartenant a un tout
+// autre article recommande plus bas sur la meme page -- cause reelle
+// constatee du bug "frais de port errone" (ex. 1,00€ au lieu du vrai
+// montant, ou d'un montant absent).
+const OFF_PRODUCT_SECTION_MARKERS = [
+  "Avis des acheteurs",
+  "Customer Reviews",
+  "Vous aimerez aussi",
+  "You may also like",
+  "Articles similaires",
+  "Produits similaires",
+];
+
+/** Coupe le HTML avant le premier bloc "hors produit principal" trouve
+ * (voir OFF_PRODUCT_SECTION_MARKERS) pour que toute extraction ulterieure
+ * ne puisse plus remonter un prix/une livraison appartenant a un article
+ * recommande ou a un avis client plutot qu'au produit reellement analyse.
+ * Si aucun marqueur n'est trouve, renvoie le HTML complet tel quel (pas
+ * pire que le comportement precedent). */
+function isolateMainProductHtml(html: string): string {
+  let cutoff = html.length;
+  for (const marker of OFF_PRODUCT_SECTION_MARKERS) {
+    const idx = html.indexOf(marker);
+    if (idx !== -1 && idx < cutoff) cutoff = idx;
+  }
+  return html.slice(0, cutoff);
+}
+
+/** Mots indiquant un SEUIL ou une CONDITION ("gratuit des 10€ d'achat",
+ * "a partir de 2,99€") plutot que le cout reel de livraison/taxe de CE
+ * produit -- un montant precede de l'un de ces mots entre le libelle et
+ * le nombre est ignore plutot que pris pour argent comptant. */
+const THRESHOLD_WORDS = /d[eè]s|jusqu'?\s*[aà]|a partir|à partir|minimum/i;
+
+/** Parcourt TOUTES les occurrences de `pattern` (doit avoir le flag "g")
+ * et renvoie le nombre du premier match dont le texte entre le libelle et
+ * le nombre (groupe 1) ne contient aucun THRESHOLD_WORDS -- un premier
+ * match rejete (ex. bandeau promo "Livraison gratuite des 10€") ne doit
+ * pas empecher de trouver un second match plus loin dans la page qui, lui,
+ * donne le vrai cout de CE produit (ex. "Livraison : 5,41 €" plus bas dans
+ * le bloc d'achat). */
+function findFirstValidAmount(html: string, pattern: RegExp): string | null {
+  for (const match of html.matchAll(pattern)) {
+    if (!THRESHOLD_WORDS.test(match[1])) return match[2];
+  }
+  return null;
+}
+
 function extractShippingAndImportFee(html: string): {
   shipping: number | null;
   importFee: number | null;
 } {
-  const freeShipping = /(?:free shipping|livraison gratuite)/i.test(html);
-  const shippingMatch = html.match(
-    /(?:Shipping|Livraison)[^<{}]{0,40}?([\d]+[.,]\d{2})\s*(?:€|EUR)/i
+  const mainHtml = isolateMainProductHtml(html);
+
+  // "Livraison gratuite" veut dire livraison gratuite SANS condition --
+  // mais la meme phrase apparait aussi dans des bannieres conditionnelles
+  // ("Livraison gratuite des 10,00€ d'achat", verifie sur une fiche
+  // produit live) qui ne garantissent rien pour CE produit precis. Rejete
+  // si un mot de seuil suit "gratuite" a moins de ~20 caracteres -- meme
+  // logique de balayage complet (pas juste la 1ere occurrence) que
+  // findFirstValidAmount ci-dessus.
+  const freeShipping = [...mainHtml.matchAll(/(?:free shipping|livraison gratuite)([^<{}]{0,20})/gi)]
+    .some((match) => !THRESHOLD_WORDS.test(match[1]));
+
+  const shippingRaw = findFirstValidAmount(
+    mainHtml,
+    /(?:Shipping|Livraison)\s*:?\s*([^<{}]{0,40}?)([\d]+[.,]\d{2})\s*(?:€|EUR)/gi
   );
-  const importFeeMatch = html.match(
-    /(?:Import (?:duty|fee|tax)|Frais? d[’']import|Taxe)[^<{}]{0,60}?([\d]+[.,]\d{2})\s*(?:€|EUR)/i
+  const importFeeRaw = findFirstValidAmount(
+    mainHtml,
+    /(?:Import (?:duty|fee|tax)|Frais? d[’']import|Droits? de douane|Taxe)\s*:?\s*([^<{}]{0,60}?)([\d]+[.,]\d{2})\s*(?:€|EUR)/gi
   );
 
   return {
-    shipping: freeShipping ? 0 : parseNumber(shippingMatch?.[1]),
-    importFee: parseNumber(importFeeMatch?.[1]),
+    shipping: freeShipping ? 0 : parseNumber(shippingRaw),
+    importFee: parseNumber(importFeeRaw),
   };
+}
+
+// Taux de TVA France applique en estimation UNIQUEMENT quand la fiche
+// produit ne permet pas de lire un vrai montant de taxes d'importation --
+// AliExpress affiche tres souvent "Les droits de douane sont calcules
+// lors du paiement" (verifie en conditions reelles sur des fiches
+// produit live) : ce montant n'existe alors nulle part avant l'etape de
+// paiement reelle, inaccessible a un scraper anonyme. Plutot que
+// d'afficher un cout total silencieusement sous-estime (bug constate :
+// total manquant les taxes d'importation), une estimation FR est
+// appliquee et explicitement marquee comme telle (importFeeEstimated),
+// jamais presentee comme une valeur "confirmee".
+const ESTIMATED_VAT_RATE = 0.2;
+
+function estimateImportFee(subtotal: number): number {
+  return Math.round(subtotal * ESTIMATED_VAT_RATE * 100) / 100;
 }
 
 /**
@@ -452,10 +539,23 @@ export async function performAliExpressSearch(
   // Meme logique que fromJsonLd ci-dessus : sans danger a tenter meme sur
   // une page partiellement bloquee, se degrade simplement en null si rien
   // n'est trouve plutot que d'echouer.
-  const { shipping, importFee } = extractShippingAndImportFee(html);
+  const { shipping, importFee: extractedImportFee } = extractShippingAndImportFee(html);
 
   const subtotal = price;
-  const total = subtotal + (shipping ?? 0) + (importFee ?? 0);
+
+  // AliExpress n'affiche tres souvent AUCUN montant de taxes d'importation
+  // sur la fiche produit elle-meme ("Les droits de douane sont calcules
+  // lors du paiement", verifie en conditions reelles) : ce montant existe
+  // seulement a l'etape de paiement reelle, inaccessible a ce scraper. Sans
+  // repli, le cout total affiche sous-estimait systematiquement le vrai
+  // total payé (bug constate : taxes manquantes, total incomplet).
+  // Repli explicite sur une estimation TVA France 20% du sous-total,
+  // TOUJOURS marquee importFeeEstimated: true pour que l'UI l'affiche
+  // comme une estimation et non comme une valeur confirmee.
+  const importFeeEstimated = extractedImportFee === null;
+  const importFee = extractedImportFee ?? estimateImportFee(subtotal);
+
+  const total = subtotal + (shipping ?? 0) + importFee;
 
   return {
     title: title ?? "Titre indisponible",
@@ -465,6 +565,7 @@ export async function performAliExpressSearch(
     subtotal,
     shipping,
     importFee,
+    importFeeEstimated,
     total,
     currency: currency ?? "EUR",
     rating: rating ?? null,
