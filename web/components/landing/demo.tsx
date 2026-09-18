@@ -6,52 +6,57 @@ import {
   CheckCircle2,
   ExternalLink,
   Minus,
+  Sparkles,
   Square,
   Star,
+  TrendingDown,
   TrendingUp,
   Truck,
   X,
 } from "lucide-react";
 
 import { MIconBadge } from "@/components/ui/m-icon-badge";
+import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
+import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-function formatPct(n: number): string {
+function formatPct(n: number | null): string {
+  if (n === null) return "Non calculable";
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
 
 const PRODUCT_URL = "https://fr.aliexpress.com/item/1005006478208156.html";
 
+// Memes chiffres d'exemple partout dans l'app pour rester coherent : la
+// recherche exemple du dashboard (search-panel.tsx buildExampleResult) ET
+// les valeurs par defaut du Calculateur de marge reel (calculator-panel.tsx,
+// prix produit/livraison/taxes/prix de vente) utilisent deja exactement
+// ces memes chiffres -- jamais une marge/ROI recalculee ou arrondie a la
+// main ici, toujours computeMarginEstimate(), la meme fonction partagee
+// que les deux pages reelles.
+const SUBTOTAL = 14.49;
+const SHIPPING = 0;
+const IMPORT_FEE = 3.6;
+const TOTAL_COST = SUBTOTAL + SHIPPING + IMPORT_FEE;
+const SALE_PRICE = 29.9; // valeur par defaut du champ "Prix de vente (manuel)" du vrai Calculateur
+const MARGIN = SALE_PRICE - TOTAL_COST;
+const MARGIN_PCT = (MARGIN / SALE_PRICE) * 100;
+const ROI_PCT = (MARGIN / TOTAL_COST) * 100;
+const PRICE_ESTIMATE = computeMarginEstimate(TOTAL_COST, IMPORT_FEE);
+
 const rows = [
-  { label: "Sous-total produit", value: "14,49 €" },
+  { label: "Sous-total produit", value: formatEuro(SUBTOTAL) },
   { label: "Frais de livraison", value: "Gratuit (0,00 €)" },
-  { label: "Frais d'importation estimés", value: "3,60 €" },
+  { label: "Frais d'importation estimés", value: formatEuro(IMPORT_FEE) },
 ];
 
 const reliability = [
-  { icon: Star, label: "3,9/5 (47 vendus)" },
+  { icon: Star, label: "3,9/5 (47 avis)" },
   { icon: Truck, label: "Colissimo / Colis Privé" },
-];
-
-const offers = [
-  {
-    name: "Offre n° 1 — Sélection MargeMax",
-    price: "18,09 €",
-    marge: "21,81 €",
-    margePct: "120,6 % ROI",
-    best: true,
-  },
-  {
-    name: "Offre n° 2 — Annonce alternative",
-    price: "24,90 €",
-    marge: "15,00 €",
-    margePct: "60,2 % ROI",
-    best: false,
-  },
 ];
 
 function MacDemoWindow() {
@@ -133,7 +138,7 @@ function MacDemoWindow() {
                   Coût total estimé
                 </span>
                 <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                  <CountUp value={18.09} format={formatEuro} />
+                  <CountUp value={TOTAL_COST} format={formatEuro} />
                 </span>
               </div>
             </div>
@@ -166,32 +171,55 @@ function MacDemoWindow() {
               ))}
             </motion.div>
 
+            {/* Prix de vente recommande -- meme presentation que le vrai
+                bloc d'estimation (EstimateBlock dans search-panel.tsx) :
+                prix conseille en avant, fourchette basse/haute avec marge
+                et ROI en dessous, meme fonction de calcul. */}
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.65, duration: 0.4 }}
-              className="grid grid-cols-2 gap-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4"
+              className="rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4"
             >
-              <div>
-                <p className="text-xs text-white/40">Marge avant publicité et autres frais</p>
-                <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-                  <CountUp value={21.81} format={formatEuro} />
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs text-white/40">
+                  <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                  Prix de vente recommandé estimé
                 </p>
-                <p className="text-xs text-white/40">
-                  Marge sur prix de vente : 54,7 %
-                </p>
+                <ReliabilityBadge tier={PRICE_ESTIMATE.reliability} />
               </div>
-              <div>
-                <p className="flex items-center gap-1 text-xs text-white/40">
-                  <TrendingUp className="h-3.5 w-3.5" /> ROI
-                </p>
-                <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-                  <CountUp value={120.6} format={formatPct} />
-                </p>
-                <p className="text-xs text-white/40">
-                  Prix de vente conseillé : 39,90 €
-                </p>
+              <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
+                <CountUp value={PRICE_ESTIMATE.recommendedPrice} format={formatEuro} />
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-white/10 pt-3">
+                <div>
+                  <p className="flex items-center gap-1 text-[11px] text-white/40">
+                    <TrendingDown className="h-3 w-3 text-pink-300" />
+                    Prix bas
+                  </p>
+                  <p className="text-sm font-semibold text-white">
+                    {formatEuro(PRICE_ESTIMATE.lowPrice)}
+                  </p>
+                  <p className="text-[11px] text-white/40">
+                    Marge {formatEuro(PRICE_ESTIMATE.marginLow)} ·{" "}
+                    {formatPct(PRICE_ESTIMATE.roiLow)} ROI
+                  </p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1 text-[11px] text-white/40">
+                    <TrendingUp className="h-3 w-3 text-cyan-300" />
+                    Prix haut
+                  </p>
+                  <p className="text-sm font-semibold text-white">
+                    {formatEuro(PRICE_ESTIMATE.highPrice)}
+                  </p>
+                  <p className="text-[11px] text-white/40">
+                    Marge {formatEuro(PRICE_ESTIMATE.marginHigh)} ·{" "}
+                    {formatPct(PRICE_ESTIMATE.roiHigh)} ROI
+                  </p>
+                </div>
               </div>
             </motion.div>
 
@@ -211,7 +239,17 @@ function MacDemoWindow() {
   );
 }
 
-function WindowsDemoWindow() {
+/**
+ * Deuxieme fenetre de demo : PAS un "comparateur d'offres" (aucune telle
+ * fonctionnalite n'existe dans le produit -- deux annonces comparees cote
+ * a cote n'a jamais ete construit). Remplace par un apercu fidele du
+ * Calculateur de marge reel (onglet "Calculateur" du dashboard), sur les
+ * MEMES valeurs par defaut que ce dernier (calculator-panel.tsx : prix
+ * produit 14,49 €, livraison 0 €, taxes 3,60 €, prix de vente manuel
+ * 29,90 €) -- ce que cette fenetre affiche est exactement ce qu'un
+ * visiteur voit en ouvrant cet onglet pour la premiere fois.
+ */
+function CalculatorDemoWindow() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
@@ -233,7 +271,7 @@ function WindowsDemoWindow() {
           {/* Barre de titre style Windows 11 */}
           <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] pl-4">
             <span className="truncate text-xs font-medium text-white/50">
-              MargeMax — Comparateur d&apos;offres AliExpress
+              MargeMax — Calculateur de marge
             </span>
             <div className="flex items-center">
               <button
@@ -265,51 +303,72 @@ function WindowsDemoWindow() {
 
           <div className="space-y-4 p-6 text-left">
             <p className="text-sm text-white/50">
-              Même produit, deux annonces AliExpress — comparez leurs coûts
-              et repérez vous-même la meilleure marge.
+              Simulez vos propres coûts et découvrez votre marge et votre
+              ROI en temps réel — utilisable à volonté, sans consommer de
+              crédit.
             </p>
 
-            <div className="space-y-3">
-              {offers.map((s, i) => (
-                <motion.div
-                  key={s.name}
-                  initial={{ opacity: 0, x: 8 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.2 + i * 0.12, duration: 0.4 }}
-                  className={`relative rounded-lg border p-4 text-sm ${
-                    s.best
-                      ? "border-cyan-400/40 bg-cyan-400/[0.06] shadow-[0_0_20px_-6px_rgba(34,211,238,0.6)]"
-                      : "border-white/10 bg-white/[0.03]"
-                  }`}
-                >
-                  {s.best && (
-                    <span className="absolute -top-2.5 right-4 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-[0_0_10px_-1px_rgba(34,211,238,0.8)]">
-                      Meilleur ROI
-                    </span>
-                  )}
-                  <div className="flex items-center justify-between font-medium text-white">
-                    <span>{s.name}</span>
-                    <span className="text-white/50">{s.price}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-white/40">Marge avant pub</span>
-                    <span
-                      className={
-                        s.best
-                          ? "font-semibold text-cyan-300"
-                          : "font-medium text-white/70"
-                      }
-                    >
-                      {s.marge}{" "}
-                      <span className="text-xs text-white/40">
-                        ({s.margePct})
-                      </span>
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            <motion.div
+              initial={{ opacity: 0, x: 8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
+            >
+              <div className="flex items-center justify-between text-white/50">
+                <span>Prix produit</span>
+                <span className="font-medium text-white">{formatEuro(SUBTOTAL)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-white/50">
+                <span>Livraison</span>
+                <span className="font-medium text-white">{formatEuro(SHIPPING)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-white/50">
+                <span>Taxes / import</span>
+                <span className="font-medium text-white">{formatEuro(IMPORT_FEE)}</span>
+              </div>
+              <div className="my-2 h-px bg-white/10" />
+              <div className="flex items-center justify-between font-semibold text-white">
+                <span>Coût total</span>
+                <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                  {formatEuro(TOTAL_COST)}
+                </span>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.32, duration: 0.4 }}
+              className="grid grid-cols-3 gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
+            >
+              <div>
+                <p className="text-xs text-white/40">Marge</p>
+                <p className="mt-1 text-lg font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
+                  <CountUp value={MARGIN} format={formatEuro} />
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-white/40">Marge %</p>
+                <p className="mt-1 text-lg font-bold text-white">
+                  {formatPct(MARGIN_PCT)}
+                </p>
+              </div>
+              <div>
+                <p className="flex items-center gap-1 text-xs text-white/40">
+                  <TrendingUp className="h-3 w-3" /> ROI
+                </p>
+                <p className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
+                  <CountUp value={ROI_PCT} format={formatPct} />
+                </p>
+              </div>
+            </motion.div>
+
+            <p className="text-center text-[11px] text-white/40">
+              Prix de vente testé : {formatEuro(SALE_PRICE)} — librement
+              modifiable dans le vrai calculateur, sans limite d&apos;essais.
+            </p>
           </div>
         </div>
       </div>
@@ -333,7 +392,7 @@ export function Demo() {
 
       <div className="mx-auto grid max-w-4xl grid-cols-1 items-start gap-8 lg:grid-cols-2">
         <MacDemoWindow />
-        <WindowsDemoWindow />
+        <CalculatorDemoWindow />
       </div>
 
       <p className="mt-4 text-center text-xs text-white/30">

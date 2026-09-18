@@ -11,7 +11,7 @@ import {
   LogOut,
   Plus,
   Search,
-  Settings,
+  User,
   Zap,
 } from "lucide-react";
 
@@ -22,7 +22,6 @@ import { Logo } from "@/components/ui/logo";
 import { SearchPanel } from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
-import { FirstLaunchHint } from "@/components/dashboard/first-launch-hint";
 import { BuyCreditsModal } from "@/components/dashboard/buy-credits-modal";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { formatEuro, PACKS, type Pack } from "@/lib/packs";
@@ -44,7 +43,7 @@ const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
   { value: "calculateur", label: "Calculateur", icon: Calculator },
   { value: "historique", label: "Historique", icon: History },
-  { value: "parametres", label: "Mon compte", icon: Settings },
+  { value: "parametres", label: "Mon compte", icon: User },
 ];
 
 // Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
@@ -330,7 +329,6 @@ export function DashboardShell({
         </header>
 
         <main className="relative z-10 container py-10 pointer-events-auto">
-          {!isDemo && <FirstLaunchHint />}
           <AnimatePresence mode="wait">
             <motion.div
               key={active}
