@@ -10,18 +10,52 @@ const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const ALIEXPRESS_APP_KEY = process.env.ALIEXPRESS_APP_KEY;
 const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
 
+/** Statut d'un champ individuel : donnee reellement lue sur la fiche
+ * ("confirmed"), repli calcule faute de mieux ("estimated" -- seul
+ * importFee peut l'etre, voir estimateImportFee), ou jamais trouvee
+ * ("missing" -- reste null, JAMAIS remplacee par 0). */
+export type FieldStatus = "confirmed" | "estimated" | "missing";
+
 export type AliExpressSearchResult = {
   title: string;
   /** Variante (couleur/taille/modele) du prix affiche, quand AliExpress la
    * precise dans les donnees structurees de la page -- null si la page ne
    * distingue pas explicitement de variante (prix de l'offre par defaut). */
   variant: string | null;
+  /** "confirmed" si une variante precise est identifiee, "missing" sinon --
+   * un sous-total "prix de l'offre par defaut" est intrinsequement moins
+   * fiable qu'un prix rattache a une variante precise, donc compte dans le
+   * calcul de completude du total (voir isComplete). */
+  variantStatus: FieldStatus;
   url: string;
   product_image_url: string | null;
   subtotal: number | null;
   shipping: number | null;
+  shippingStatus: FieldStatus;
   importFee: number | null;
+  importFeeStatus: FieldStatus;
+  /** @deprecated conserve pour compatibilite ascendante -- equivalent a
+   * importFeeStatus === "estimated". Utiliser importFeeStatus. */
+  importFeeEstimated?: boolean;
+  /**
+   * Cout total REEL, uniquement quand TOUS les composants (livraison,
+   * taxes, variante) sont confirmes -- jamais calcule en remplacant un
+   * champ manquant par 0. null des qu'un seul champ n'est pas confirme :
+   * ne JAMAIS afficher ce cas comme "Coût total" complet cote UI.
+   */
   total: number | null;
+  /**
+   * Cout partiel TOUJOURS calculable (sous-total + les frais reellement
+   * connus, les inconnus comptes pour 0 dans CE calcul uniquement) --
+   * distinct de `total`, a afficher sous un libelle explicite ("Coût
+   * partiel estimé" / "Total hors frais inconnus"), jamais sous "Coût
+   * total".
+   */
+  partialTotal: number;
+  /** true seulement quand `total` est non-null (livraison confirmee, taxe
+   * confirmee -- pas estimee -- et variante identifiee). Piloté ici plutot
+   * que recalcule cote UI pour eviter toute divergence entre les deux. */
+  isComplete: boolean;
   currency: string;
   /** Note moyenne (/5) et nombre d'avis, depuis aggregateRating des donnees
    * structurees JSON-LD -- null si l'annonce n'en expose pas (toutes ne le
@@ -32,11 +66,6 @@ export type AliExpressSearchResult = {
   /** Pays cible des taxes d'importation calculees (voir location.country
    * passe a Firecrawl dans fetchHtmlViaFirecrawl). */
   destination: "FR";
-  /** true quand importFee n'a pas pu etre lu sur la fiche produit et a ete
-   * remplace par une estimation (TVA France 20% du sous-total) -- voir
-   * extractShippingAndImportFee. false/absent pour une valeur reellement
-   * extraite. Ne jamais afficher ce cas comme "confirme" cote UI. */
-  importFeeEstimated?: boolean;
   /** Horodatage serveur de l'analyse (ISO 8601) -- pas l'horodatage client,
    * qui peut deriver ou etre falsifie. */
   analyzedAt: string;
@@ -562,27 +591,41 @@ export async function performAliExpressSearch(
   // AliExpress n'affiche tres souvent AUCUN montant de taxes d'importation
   // sur la fiche produit elle-meme ("Les droits de douane sont calcules
   // lors du paiement", verifie en conditions reelles) : ce montant existe
-  // seulement a l'etape de paiement reelle, inaccessible a ce scraper. Sans
-  // repli, le cout total affiche sous-estimait systematiquement le vrai
-  // total payé (bug constate : taxes manquantes, total incomplet).
+  // seulement a l'etape de paiement reelle, inaccessible a ce scraper.
   // Repli explicite sur une estimation TVA France 20% du sous-total,
-  // TOUJOURS marquee importFeeEstimated: true pour que l'UI l'affiche
-  // comme une estimation et non comme une valeur confirmee.
-  const importFeeEstimated = extractedImportFee === null;
+  // TOUJOURS marque importFeeStatus: "estimated" -- jamais "confirmed".
+  const importFeeStatus: FieldStatus = extractedImportFee === null ? "estimated" : "confirmed";
   const importFee = extractedImportFee ?? estimateImportFee(subtotal);
+  const shippingStatus: FieldStatus = shipping === null ? "missing" : "confirmed";
+  const variantStatus: FieldStatus = variant ? "confirmed" : "missing";
 
-  const total = subtotal + (shipping ?? 0) + importFee;
+  // `total` = cout REEL, uniquement si tout est confirme (jamais un champ
+  // manquant remplace par 0 dans CE calcul). `partialTotal` reste toujours
+  // calculable (fournisseurs manquants comptes pour 0 dans ce calcul-la
+  // uniquement) pour un affichage explicitement partiel cote UI -- jamais
+  // sous le libelle "Coût total".
+  const isComplete =
+    shippingStatus === "confirmed" &&
+    importFeeStatus === "confirmed" &&
+    variantStatus === "confirmed";
+  const partialTotal = subtotal + (shipping ?? 0) + importFee;
+  const total = isComplete ? partialTotal : null;
 
   return {
     title: title ?? "Titre indisponible",
     variant: variant ?? null,
+    variantStatus,
     url: targetUrl,
     product_image_url: imageUrl ?? null,
     subtotal,
     shipping,
+    shippingStatus,
     importFee,
-    importFeeEstimated,
+    importFeeStatus,
+    importFeeEstimated: importFeeStatus === "estimated",
     total,
+    partialTotal,
+    isComplete,
     currency: currency ?? "EUR",
     rating: rating ?? null,
     reviewCount: reviewCount ?? null,

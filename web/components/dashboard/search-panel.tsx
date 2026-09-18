@@ -26,20 +26,28 @@ import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 type Status = "idle" | "loading" | "result" | "error";
 
+type FieldStatus = "confirmed" | "estimated" | "missing";
+
 type ApiResult = {
   title: string;
   variant: string | null;
+  variantStatus: FieldStatus;
   url: string;
   product_image_url: string | null;
   subtotal: number | null;
   shipping: number | null;
+  shippingStatus: FieldStatus;
   importFee: number | null;
-  /** true quand importFee est une estimation (TVA France 20% du
-   * sous-total, appliquee quand AliExpress ne montre le vrai montant
-   * qu'a l'etape de paiement) plutot qu'une valeur lue sur la fiche
-   * produit -- ne jamais afficher ce cas comme "confirmé". */
-  importFeeEstimated?: boolean;
+  importFeeStatus: FieldStatus;
+  /** total REEL, null des qu'un seul champ (livraison, taxe, variante)
+   * n'est pas confirme -- ne jamais afficher comme "Coût total" quand
+   * null : voir partialTotal/isComplete. */
   total: number | null;
+  /** toujours calculable (frais inconnus comptes pour 0 dans CE calcul
+   * uniquement) -- a afficher sous un libelle explicitement partiel,
+   * jamais sous "Coût total". */
+  partialTotal: number;
+  isComplete: boolean;
   currency: string;
   rating: number | null;
   reviewCount: number | null;
@@ -76,16 +84,23 @@ const POPULAR_KEYWORDS = [
 function buildExampleResult(): ApiResult {
   return {
     title: "Station de charge sans fil 3-en-1 pliable",
-    variant: null,
+    // Exemple statique volontairement complet (tous les champs confirmes)
+    // pour illustrer le cas ideal -- un vrai résultat peut être partiel,
+    // voir le badge "Partiellement vérifié" documenté plus bas.
+    variant: "Blanc",
+    variantStatus: "confirmed",
     url: "https://fr.aliexpress.com/item/1005006478208156.html",
     // Asset statique reel (public/images/product-charger.jpg), pas une URL
     // AliExpress -- jamais recuperee en direct, voir commentaire ci-dessus.
     product_image_url: "/images/product-charger.jpg",
     subtotal: 14.49,
     shipping: 0,
+    shippingStatus: "confirmed",
     importFee: 3.6,
-    importFeeEstimated: false,
+    importFeeStatus: "confirmed",
     total: 18.09,
+    partialTotal: 18.09,
+    isComplete: true,
     currency: "EUR",
     // Memes chiffres que la demonstration de la landing (demo.tsx) : "3,9/5
     // (47 vendus)".
@@ -119,6 +134,26 @@ function formatEuro(n: number | null): string {
   );
 }
 
+const STATUS_LABEL: Record<FieldStatus, string> = {
+  confirmed: "confirmé",
+  estimated: "estimé (TVA 20 %)",
+  missing: "manquant",
+};
+
+const STATUS_CLASS: Record<FieldStatus, string> = {
+  confirmed: "text-green-300/70",
+  estimated: "text-cyan-300/70",
+  missing: "text-amber-300/70",
+};
+
+function StatusTag({ status }: { status: FieldStatus }) {
+  return (
+    <span className={`text-[10px] uppercase tracking-wide ${STATUS_CLASS[status]}`}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
 /** null (non calculable, denominateur nul) -> "Non calculable", jamais 0 %. */
 function formatPct(n: number | null): string {
   if (n === null) return "Non calculable";
@@ -132,20 +167,46 @@ function formatPct(n: number | null): string {
 
 function EstimateBlock({
   total,
+  partialTotal,
+  isComplete,
   importFee,
 }: {
-  total: number;
+  total: number | null;
+  partialTotal: number;
+  isComplete: boolean;
   importFee: number | null;
 }) {
-  const estimate = computeMarginEstimate(total, importFee);
+  // Marge/ROI/prix conseillé/budget pub calcules a partir du cout partiel
+  // quand le cout reel n'est pas confirme -- JAMAIS masques (l'utilisateur
+  // a paye un credit pour cette analyse), mais marques "incomplets" de
+  // façon visible plutot que presentes comme fiables. Voir isComplete dans
+  // lib/aliexpress-search.ts.
+  const basis = total ?? partialTotal;
+  const estimate = computeMarginEstimate(basis, importFee);
 
   return (
     <div className="border-t border-cyan-400/20 bg-cyan-400/[0.05] p-5">
+      {!isComplete && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs text-amber-200">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Estimation <strong>incomplète</strong> : calculée à partir du
+            coût partiel (certains frais restent manquants ou estimés).
+            Marge, ROI, prix conseillé et budget pub ci-dessous peuvent
+            s&apos;écarter du coût réel.
+          </span>
+        </div>
+      )}
       <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
         <div>
           <p className="flex items-center gap-1.5 text-xs text-white/40">
             <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
             Prix de vente recommandé estimé
+            {!isComplete && (
+              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+                incomplet
+              </span>
+            )}
           </p>
           <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
             <CountUp value={estimate.recommendedPrice} format={formatEuro} />
@@ -185,7 +246,14 @@ function EstimateBlock({
 
       <div className="mt-4 rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
+          <span className="text-white/50">
+            Budget pub maximum par vente (TikTok/Meta)
+            {!isComplete && (
+              <span className="ml-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+                incomplet
+              </span>
+            )}
+          </span>
           <span className="font-bold text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.6)]">
             <CountUp value={Math.max(0, estimate.marginHigh)} format={formatEuro} />
           </span>
@@ -198,12 +266,13 @@ function EstimateBlock({
       </div>
 
       <p className="mt-4 text-center text-[11px] text-white/40">
-        Estimation calculée à partir du coût de cette annonce (confirmé ou
-        estimé selon les données disponibles) — pas une donnée de marché
-        garantie. Méthode : prix conseillé = coût × 1,8, arrondi au 0,90 €
-        psychologique le plus proche. La fiabilité est qualitative, pas un
-        pourcentage : elle diminue quand les frais d&apos;importation
-        pèsent lourd dans le coût total.
+        {isComplete
+          ? "Estimation calculée à partir du coût total confirmé de cette annonce — "
+          : "Estimation calculée à partir du coût partiel de cette annonce (voir le détail ci-dessus) — "}
+        pas une donnée de marché garantie. Méthode : prix conseillé = coût ×
+        1,8, arrondi au 0,90 € psychologique le plus proche. La fiabilité
+        est qualitative, pas un pourcentage : elle diminue quand les frais
+        d&apos;importation pèsent lourd dans le coût total.
       </p>
     </div>
   );
@@ -220,7 +289,9 @@ export function SearchPanel({
     id: string;
     query: string;
     title: string;
-    total: string;
+    total: number | null;
+    partialTotal: number;
+    isComplete: boolean;
     url: string;
     timestamp: number;
   }) => void;
@@ -287,7 +358,9 @@ export function SearchPanel({
         id: `${Date.now()}`,
         query: trimmed,
         title: apiResult.title,
-        total: formatEuro(apiResult.total),
+        total: apiResult.total,
+        partialTotal: apiResult.partialTotal,
+        isComplete: apiResult.isComplete,
         url: apiResult.url,
         timestamp: Date.now(),
       });
@@ -317,7 +390,7 @@ export function SearchPanel({
       {status === "idle" && (
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-2xl font-bold text-white sm:text-3xl">
-            Analyse ton prochain produit
+            Analysez votre prochain produit
           </h1>
           {typeof credits === "number" && (
             <p className="flex items-center gap-1.5 text-sm text-cyan-300">
@@ -523,7 +596,7 @@ export function SearchPanel({
                   {" · "}Analysé le {formatAnalyzedAt(result.analyzedAt)}
                 </p>
               </div>
-              {result.shipping !== null && result.importFee !== null && !result.importFeeEstimated ? (
+              {result.isComplete ? (
                 <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
                   <CheckCircle2 className="h-3 w-3" />
                   Vérifié
@@ -545,10 +618,16 @@ export function SearchPanel({
                   Sous-total
                 </span>
                 <span className="text-white/70">
-                  {formatEuro(result.subtotal)}{" "}
-                  <span className="text-[10px] uppercase tracking-wide text-green-300/70">
-                    confirmé
-                  </span>
+                  {formatEuro(result.subtotal)} <StatusTag status="confirmed" />
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Variante
+                </span>
+                <span className="text-white/70">
+                  {result.variant ?? "prix de l'offre par défaut"}{" "}
+                  <StatusTag status={result.variantStatus} />
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
@@ -556,14 +635,7 @@ export function SearchPanel({
                   Frais de port
                 </span>
                 <span className="text-white/70">
-                  {formatEuro(result.shipping)}{" "}
-                  <span
-                    className={`text-[10px] uppercase tracking-wide ${
-                      result.shipping === null ? "text-amber-300/70" : "text-green-300/70"
-                    }`}
-                  >
-                    {result.shipping === null ? "manquant" : "confirmé"}
-                  </span>
+                  {formatEuro(result.shipping)} <StatusTag status={result.shippingStatus} />
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
@@ -571,36 +643,38 @@ export function SearchPanel({
                   Taxes d&apos;importation
                 </span>
                 <span className="text-white/70">
-                  {formatEuro(result.importFee)}{" "}
-                  <span
-                    className={`text-[10px] uppercase tracking-wide ${
-                      result.importFee === null
-                        ? "text-amber-300/70"
-                        : result.importFeeEstimated
-                          ? "text-cyan-300/70"
-                          : "text-green-300/70"
-                    }`}
-                  >
-                    {result.importFee === null
-                      ? "manquant"
-                      : result.importFeeEstimated
-                        ? "estimé (TVA 20 %)"
-                        : "confirmé"}
-                  </span>
+                  {formatEuro(result.importFee)} <StatusTag status={result.importFeeStatus} />
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3 font-semibold">
                 <span className="text-xs uppercase tracking-wider text-white/40">
-                  Coût total
+                  {result.isComplete ? "Coût total" : "Coût partiel estimé"}
                 </span>
                 <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                  {result.total !== null ? (
-                    <CountUp value={result.total} format={formatEuro} />
-                  ) : (
-                    "—"
-                  )}
+                  <CountUp
+                    value={result.isComplete ? (result.total as number) : result.partialTotal}
+                    format={formatEuro}
+                  />
                 </span>
               </div>
+              {!result.isComplete && (
+                <div className="px-5 py-3">
+                  <p className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-200">
+                    Total hors frais inconnus —{" "}
+                    {[
+                      result.shippingStatus === "missing" &&
+                        "la livraison n'est pas incluse (introuvable sur la fiche)",
+                      result.importFeeStatus === "estimated" &&
+                        "les taxes sont une estimation TVA, pas le montant réel du paiement",
+                      result.variantStatus === "missing" &&
+                        "le sous-total correspond à l'offre par défaut, pas à une variante identifiée",
+                    ]
+                      .filter(Boolean)
+                      .join(" ; ")}
+                    . Le coût réel payé peut être plus élevé.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-x-3 px-5 py-3">
                 <span className="text-xs uppercase tracking-wider text-white/40">
                   Lien
@@ -618,18 +692,34 @@ export function SearchPanel({
               </div>
             </div>
 
-            {(result.shipping === null || result.importFeeEstimated) && (
+            {typeof result.creditsDebited === "boolean" && (
               <p className="border-t border-white/10 px-5 py-3 text-xs text-white/40">
-                {result.shipping === null &&
-                  "Les frais de livraison n'ont pas pu être lus sur cette fiche — affichés comme indisponibles plutôt qu'estimés au hasard. "}
-                {result.importFeeEstimated &&
-                  "AliExpress n'affiche les droits de douane réels qu'à l'étape de paiement : le montant ci-dessus est une estimation (TVA France 20 % du sous-total), pas une valeur confirmée."}
+                {result.creditsDebited ? (
+                  result.isComplete ? (
+                    "1 crédit débité — analyse complète (tous les frais confirmés)."
+                  ) : (
+                    <>
+                      1 crédit débité — l&apos;annonce a été analysée avec
+                      succès (produit et sous-total confirmés), même si le
+                      coût ci-dessus reste{" "}
+                      <strong className="text-amber-300/80">partiel</strong> :
+                      l&apos;analyse elle-même a bien eu lieu et a un coût
+                      réel côté fournisseur de données, que le résultat soit
+                      complet ou non.
+                    </>
+                  )
+                ) : (
+                  "Aucun crédit débité pour cette analyse (incident technique passager) — votre solde n'a pas changé."
+                )}
               </p>
             )}
 
-            {result.total !== null && (
-              <EstimateBlock total={result.total} importFee={result.importFee} />
-            )}
+            <EstimateBlock
+              total={result.total}
+              partialTotal={result.partialTotal}
+              isComplete={result.isComplete}
+              importFee={result.importFee}
+            />
           </motion.div>
         )}
       </AnimatePresence>
