@@ -15,7 +15,11 @@ function isNextRedirectError(error: unknown): boolean {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { pack?: string };
+}) {
   try {
     const supabase = createClient();
     const {
@@ -24,7 +28,7 @@ export default async function DashboardPage() {
     } = await supabase.auth.getUser();
 
     if (error || !user) {
-      redirect("/login");
+      redirect(searchParams.pack ? `/login?pack=${searchParams.pack}` : "/login");
     }
 
     // Solde de credits reel (table public.profiles, voir schema_margemax.sql
@@ -51,10 +55,12 @@ export default async function DashboardPage() {
 
     return (
       <DashboardShell
+        userId={user.id}
         email={user.email ?? ""}
         credits={profile?.credits ?? null}
         creditsMax={profile?.credits_gauge_max ?? null}
         purchases={purchaseRows ?? []}
+        pendingPackKey={searchParams.pack ?? null}
       />
     );
   } catch (err) {

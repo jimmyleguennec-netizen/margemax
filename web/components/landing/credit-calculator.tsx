@@ -13,6 +13,7 @@ import {
   formatEuro,
   recommendPackForVolume,
   recommendPackCombinationForVolume,
+  type Pack,
 } from "@/lib/packs";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 import {
@@ -33,11 +34,16 @@ export function CreditCalculator() {
   const [consentPack, setConsentPack] = useState<ConsentPack | null>(null);
   const router = useRouter();
 
-  function handleChoosePack(packKey: string, packLabel: string) {
+  function handleChoosePack(pack: Pack) {
     if (user?.id) {
-      setConsentPack({ key: packKey, label: packLabel });
+      setConsentPack({
+        key: pack.key,
+        label: pack.label,
+        credits: pack.credits,
+        priceEuros: pack.priceEuros,
+      });
     } else {
-      router.push(buildPackCheckoutHref(packKey, undefined));
+      router.push(buildPackCheckoutHref(pack.key, undefined));
     }
   }
 
@@ -88,7 +94,7 @@ export function CreditCalculator() {
             max={MAX_VOLUME}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
-            aria-label="Volume d'analyses par mois"
+            aria-label="Nombre d'analyses prévues"
             className="absolute inset-x-0 top-1/2 h-2 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-[0_0_12px_2px_rgba(34,211,238,0.8)] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_12px_2px_rgba(34,211,238,0.8)]"
           />
         </div>
@@ -155,11 +161,7 @@ export function CreditCalculator() {
               label={`Choisir ${recommended.label}`}
               successLabel="C'est parti !"
               href={buildPackCheckoutHref(recommended.key, user?.id)}
-              onIntercept={
-                user?.id
-                  ? () => setConsentPack({ key: recommended.key, label: recommended.label })
-                  : undefined
-              }
+              onIntercept={user?.id ? () => handleChoosePack(recommended) : undefined}
               className="sm:w-auto sm:px-8"
             />
           </div>
@@ -199,7 +201,7 @@ export function CreditCalculator() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleChoosePack(item.pack.key, item.pack.label)}
+                        onClick={() => handleChoosePack(item.pack)}
                         className="rounded-full border border-cyan-400/30 px-3 py-1 text-xs font-semibold text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_14px_-2px_rgba(34,211,238,0.6)]"
                       >
                         Choisir

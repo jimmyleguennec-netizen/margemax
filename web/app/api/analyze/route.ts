@@ -8,6 +8,9 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Voir app/api/search/route.ts : meme budget, memes appels ScraperAPI
+// potentiellement enchaines cote lib/aliexpress-search.ts.
+export const maxDuration = 60;
 
 /**
  * Parcours reel du Dashboard : authentifie, 1 credit debite par analyse

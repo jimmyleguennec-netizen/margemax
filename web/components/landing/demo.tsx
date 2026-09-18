@@ -130,7 +130,7 @@ function MacDemoWindow() {
               <div className="my-2 h-px bg-white/10" />
               <div className="flex items-center justify-between font-semibold text-white">
                 <span className="uppercase tracking-wide">
-                  Total réel checkout
+                  Coût total estimé
                 </span>
                 <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                   <CountUp value={18.09} format={formatEuro} />
@@ -325,8 +325,9 @@ export function Demo() {
           Une fiche claire, pas une estimation au doigt mouillé
         </h2>
         <p className="mt-3 text-white/50">
-          Chaque champ affiche sa source. Dès que le total réel payé au
-          checkout est retrouvé, MargeMax le confirme avec un badge vérifié.
+          Chaque champ indique s&apos;il est confirmé ou estimé. Dès que
+          tous les frais d&apos;une annonce sont confirmés, MargeMax
+          l&apos;indique avec un badge vérifié.
         </p>
       </div>
 

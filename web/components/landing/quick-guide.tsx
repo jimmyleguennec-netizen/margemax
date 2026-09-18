@@ -79,7 +79,7 @@ function SearchVisual() {
           transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
           className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_2px_rgba(34,211,238,0.8)]"
         />
-        Scan des annonces en direct
+        Exemple de recherche
       </div>
     </div>
   );

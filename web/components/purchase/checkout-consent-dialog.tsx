@@ -8,8 +8,14 @@ import { ShieldAlert, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { IMMEDIATE_EXECUTION_WAIVER_LABEL } from "@/lib/legal-consent";
+import { formatEuro } from "@/lib/packs";
 
-export type ConsentPack = { key: string; label: string };
+export type ConsentPack = {
+  key: string;
+  label: string;
+  credits: number;
+  priceEuros: number;
+};
 
 /**
  * Case a cocher "execution immediate + renonciation au droit de
@@ -93,16 +99,34 @@ export function CheckoutConsentDialog({
             <div className="flex items-center gap-2 text-cyan-300">
               <ShieldAlert className="h-5 w-5" />
               <h2 id="checkout-consent-title" className="text-lg font-bold text-white">
-                Avant de payer le pack {pack.label}
+                Confirmer votre commande
               </h2>
             </div>
 
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-white/50">Pack</span>
+                <span className="font-medium text-white">{pack.label}</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-white/50">Crédits</span>
+                <span className="font-medium text-white">{pack.credits} crédits</span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between border-t border-white/10 pt-1.5">
+                <span className="text-white/50">Montant dû</span>
+                <span className="font-bold text-cyan-300">{formatEuro(pack.priceEuros)}</span>
+              </div>
+            </div>
+
             <p className="mt-3 text-sm text-white/50">
-              MargeMax est une prestation de service à exécution immédiate
-              (les crédits sont utilisables dès votre paiement confirmé).
-              Conformément à l&apos;article L.221-28 du Code de la
-              consommation, cette action distincte est requise pour
-              confirmer votre commande.
+              Le paiement crédite immédiatement votre compte, mais le
+              service lui-même (l&apos;analyse de sourcing) s&apos;exécute
+              progressivement, à chaque fois que vous utilisez un crédit —
+              pas en une seule fois au moment du paiement. Conformément à
+              l&apos;article L.221-28 du Code de la consommation, cocher la
+              case ci-dessous constitue une action distincte demandant le
+              début immédiat de cette exécution et renonçant à votre droit
+              de rétractation de 14 jours pour cet achat.
             </p>
 
             <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">

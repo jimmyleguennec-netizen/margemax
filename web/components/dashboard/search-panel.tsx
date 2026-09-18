@@ -18,7 +18,7 @@ import {
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { ProductThumbnail } from "@/components/ui/product-thumbnail";
-import { CircularGauge } from "@/components/ui/circular-gauge";
+import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
 import { computeMarginEstimate } from "@/lib/margin-estimate";
 
@@ -26,6 +26,7 @@ type Status = "idle" | "loading" | "result" | "error";
 
 type ApiResult = {
   title: string;
+  variant: string | null;
   url: string;
   product_image_url: string | null;
   subtotal: number | null;
@@ -33,9 +34,22 @@ type ApiResult = {
   importFee: number | null;
   total: number | null;
   currency: string;
+  destination: string;
+  analyzedAt: string;
   creditsDebited?: boolean;
   credits?: number;
 };
+
+function formatAnalyzedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("fr-FR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 function formatEuro(n: number | null): string {
   if (n === null) return "—";
@@ -48,7 +62,9 @@ function formatEuro(n: number | null): string {
   );
 }
 
-function formatPct(n: number): string {
+/** null (non calculable, denominateur nul) -> "Non calculable", jamais 0 %. */
+function formatPct(n: number | null): string {
+  if (n === null) return "Non calculable";
   return (
     n.toLocaleString("fr-FR", {
       minimumFractionDigits: 1,
@@ -78,7 +94,7 @@ function EstimateBlock({
             <CountUp value={estimate.recommendedPrice} format={formatEuro} />
           </p>
         </div>
-        <CircularGauge value={estimate.reliability} size={64} strokeWidth={5} label="fiabilité" />
+        <ReliabilityBadge tier={estimate.reliability} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -110,17 +126,27 @@ function EstimateBlock({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
-        <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
-        <span className="font-bold text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.6)]">
-          <CountUp value={Math.max(0, estimate.marginHigh)} format={formatEuro} />
-        </span>
+      <div className="mt-4 rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
+          <span className="font-bold text-fuchsia-300 drop-shadow-[0_0_8px_rgba(217,70,239,0.6)]">
+            <CountUp value={Math.max(0, estimate.marginHigh)} format={formatEuro} />
+          </span>
+        </div>
+        <p className="mt-1.5 text-[11px] text-white/40">
+          Ne déduit ni frais de transaction (Stripe, PayPal...), ni
+          commissions publicitaires, ni impôts sur le profit — à
+          soustraire vous-même avant de fixer un budget réel.
+        </p>
       </div>
 
-      <p className="mt-4 text-center text-[11px] text-white/30">
+      <p className="mt-4 text-center text-[11px] text-white/40">
         Estimation calculée à partir du coût de cette annonce (confirmé ou
         estimé selon les données disponibles) — pas une donnée de marché
-        garantie.
+        garantie. Méthode : prix conseillé = coût × 1,8, arrondi au 0,90 €
+        psychologique le plus proche. La fiabilité est qualitative, pas un
+        pourcentage : elle diminue quand les frais d&apos;importation
+        pèsent lourd dans le coût total.
       </p>
     </div>
   );
@@ -159,9 +185,7 @@ export function SearchPanel({
     }
   }, [status, shakeControls]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = query.trim();
+  async function runAnalysis(trimmed: string) {
     if (!trimmed || status === "loading") return;
 
     setStatus("loading");
@@ -217,6 +241,11 @@ export function SearchPanel({
       );
       setStatus("error");
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    runAnalysis(query.trim());
   }
 
   return (
@@ -317,7 +346,7 @@ export function SearchPanel({
             pour continuer à analyser des produits.
           </p>
         ) : (
-          <p className="mt-2 text-xs text-white/30">
+          <p className="mt-2 text-xs text-white/40">
             Entrez des mots-clés ou collez l&apos;URL d&apos;une annonce
             AliExpress pour lancer l&apos;analyse complète (1 crédit par
             analyse réussie).
@@ -336,7 +365,18 @@ export function SearchPanel({
             className="flex items-start gap-3 rounded-2xl border border-pink-400/30 bg-pink-400/10 p-5 text-sm text-pink-200"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>{errorMessage}</p>
+            <div className="flex-1">
+              <p>{errorMessage}</p>
+              {query.trim() && (
+                <button
+                  type="button"
+                  onClick={() => runAnalysis(query.trim())}
+                  className="mt-2 text-xs font-semibold uppercase tracking-wide text-pink-100 underline-offset-4 hover:underline"
+                >
+                  Réessayer
+                </button>
+              )}
+            </div>
           </motion.div>
         )}
 
@@ -358,11 +398,23 @@ export function SearchPanel({
                 <p className="truncate font-medium text-white">
                   {result.title}
                 </p>
+                <p className="mt-1 text-xs text-white/40">
+                  Variante : {result.variant ?? "non précisée (prix de l'offre par défaut)"}
+                  {" · "}Destination : France
+                  {" · "}Analysé le {formatAnalyzedAt(result.analyzedAt)}
+                </p>
               </div>
-              <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
-                <CheckCircle2 className="h-3 w-3" />
-                Vérifié
-              </span>
+              {result.shipping !== null && result.importFee !== null ? (
+                <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Vérifié
+                </span>
+              ) : (
+                <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] font-medium text-amber-300">
+                  <AlertTriangle className="h-3 w-3" />
+                  Partiellement vérifié
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -382,12 +434,29 @@ export function SearchPanel({
                   <tr>
                     <td className="px-5 py-4 text-white/70">
                       {formatEuro(result.subtotal)}
+                      <span className="ml-1.5 text-[10px] uppercase tracking-wide text-green-300/70">
+                        confirmé
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-white/70">
                       {formatEuro(result.shipping)}
+                      <span
+                        className={`ml-1.5 text-[10px] uppercase tracking-wide ${
+                          result.shipping === null ? "text-amber-300/70" : "text-green-300/70"
+                        }`}
+                      >
+                        {result.shipping === null ? "manquant" : "confirmé"}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-white/70">
                       {formatEuro(result.importFee)}
+                      <span
+                        className={`ml-1.5 text-[10px] uppercase tracking-wide ${
+                          result.importFee === null ? "text-amber-300/70" : "text-green-300/70"
+                        }`}
+                      >
+                        {result.importFee === null ? "manquant" : "confirmé"}
+                      </span>
                     </td>
                     <td className="px-5 py-4 font-semibold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
                       {result.total !== null ? (
@@ -414,7 +483,7 @@ export function SearchPanel({
             </div>
 
             {(result.shipping === null || result.importFee === null) && (
-              <p className="border-t border-white/10 px-5 py-3 text-xs text-white/30">
+              <p className="border-t border-white/10 px-5 py-3 text-xs text-white/40">
                 Certains champs (livraison ou frais d&apos;importation) n&apos;ont
                 pas pu être extraits de cette page — ils sont affichés
                 comme indisponibles plutôt qu&apos;estimés au hasard.

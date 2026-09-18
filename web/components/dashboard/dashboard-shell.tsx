@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -20,7 +21,12 @@ import { Logo } from "@/components/ui/logo";
 import { SearchPanel } from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
-import { formatEuro } from "@/lib/packs";
+import { FirstLaunchHint } from "@/components/dashboard/first-launch-hint";
+import { formatEuro, PACKS } from "@/lib/packs";
+import {
+  CheckoutConsentDialog,
+  type ConsentPack,
+} from "@/components/purchase/checkout-consent-dialog";
 
 export type PurchaseEntry = {
   id: number;
@@ -144,17 +150,24 @@ function ParametresPanel({
 }
 
 export function DashboardShell({
+  userId,
   email,
   isDemo = false,
   credits = null,
   creditsMax = null,
   purchases = [],
+  pendingPackKey = null,
 }: {
+  userId?: string;
   email: string;
   isDemo?: boolean;
   credits?: number | null;
   creditsMax?: number | null;
   purchases?: PurchaseEntry[];
+  /** Pack en attente (?pack=<cle>) apres redirection depuis /login ou
+   * /signup pour un utilisateur deja connecte -- voir app/dashboard/page.tsx
+   * et app/(auth)/login|signup/page.tsx. */
+  pendingPackKey?: string | null;
 }) {
   const [active, setActive] = useState("recherche");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -162,6 +175,26 @@ export function DashboardShell({
   // de la page, puis mis a jour en direct par SearchPanel apres chaque
   // debit reussi (voir app/api/analyze), sans recharger toute la page.
   const [liveCredits, setLiveCredits] = useState(credits);
+
+  const router = useRouter();
+  const pendingPack = PACKS.find((p) => p.key === pendingPackKey);
+  const [consentPack, setConsentPack] = useState<ConsentPack | null>(
+    pendingPack
+      ? {
+          key: pendingPack.key,
+          label: pendingPack.label,
+          credits: pendingPack.credits,
+          priceEuros: pendingPack.priceEuros,
+        }
+      : null
+  );
+
+  function handleConsentCancel() {
+    setConsentPack(null);
+    // Nettoie ?pack= de l'URL pour qu'un rechargement de page ne rouvre
+    // pas la modale indefiniment.
+    router.replace("/dashboard");
+  }
 
   return (
     <InteractiveGrid>
@@ -208,6 +241,7 @@ export function DashboardShell({
         </header>
 
         <main className="relative z-10 container py-10 pointer-events-auto">
+          {!isDemo && <FirstLaunchHint />}
           <AnimatePresence mode="wait">
             <motion.div
               key={active}
@@ -240,6 +274,12 @@ export function DashboardShell({
           </AnimatePresence>
         </main>
       </div>
+
+      <CheckoutConsentDialog
+        pack={consentPack}
+        userId={userId}
+        onCancel={handleConsentCancel}
+      />
     </InteractiveGrid>
   );
 }

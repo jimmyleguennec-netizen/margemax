@@ -285,7 +285,12 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
           } = await supabase.auth.getUser();
           if (user) {
             setConsentUserId(user.id);
-            setConsentPack({ key: pack.key, label: pack.label });
+            setConsentPack({
+              key: pack.key,
+              label: pack.label,
+              credits: pack.credits,
+              priceEuros: pack.priceEuros,
+            });
             return;
           }
         }

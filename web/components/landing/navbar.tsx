@@ -12,6 +12,7 @@ import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
+import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 
 const links = [
   { href: "#demo", label: "Démo" },
@@ -48,16 +49,16 @@ function ScrollingBanner() {
   );
 }
 
-function TopBar() {
+function TopBar({ loggedIn }: { loggedIn: boolean }) {
   return (
     <div className="hidden w-full items-center justify-end border-b border-white/5 bg-black/60 px-4 py-1.5 sm:flex">
       <ScrollingBanner />
 
       <Link
-        href="/signup"
+        href={loggedIn ? "/dashboard" : "/signup"}
         className="shrink-0 origin-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200 shadow-[0_0_12px_-2px_rgba(34,211,238,0.6)] transition-all duration-300 hover:scale-x-105 hover:bg-cyan-400/20 hover:shadow-[0_0_18px_-2px_rgba(34,211,238,0.9)]"
       >
-        Essayer maintenant
+        {loggedIn ? "Mon espace" : "Essayer maintenant"}
       </Link>
     </div>
   );
@@ -66,9 +67,11 @@ function TopBar() {
 function MobileMenu({
   open,
   onClose,
+  loggedIn,
 }: {
   open: boolean;
   onClose: () => void;
+  loggedIn: boolean;
 }) {
   return (
     <AnimatePresence>
@@ -119,20 +122,32 @@ function MobileMenu({
             transition={{ delay: 0.3, duration: 0.3 }}
             className="container mb-10 flex flex-col gap-3"
           >
-            <Link
-              href="/login"
-              onClick={onClose}
-              className="rounded-full border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white/80"
-            >
-              Connexion
-            </Link>
-            <Link
-              href="/signup"
-              onClick={onClose}
-              className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
-            >
-              Essayer gratuitement
-            </Link>
+            {loggedIn ? (
+              <Link
+                href="/dashboard"
+                onClick={onClose}
+                className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
+              >
+                Mon espace
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={onClose}
+                  className="rounded-full border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white/80"
+                >
+                  Connexion
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={onClose}
+                  className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
+                >
+                  Essayer gratuitement
+                </Link>
+              </>
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -145,6 +160,8 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { scrollY } = useScroll();
+  const { user } = useSupabaseUser();
+  const loggedIn = Boolean(user);
 
   useMotionValueEvent(scrollY, "change", (latest) => {
     setScrolled(latest > 20);
@@ -166,7 +183,7 @@ export function Navbar() {
             transition={{ duration: 0.25, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <TopBar />
+            <TopBar loggedIn={loggedIn} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -218,18 +235,29 @@ export function Navbar() {
           </nav>
 
           <div className="hidden items-center gap-2 sm:flex">
-            <Link
-              href="/login"
-              className="origin-center rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-all duration-300 hover:scale-x-105 hover:text-white"
-            >
-              Connexion
-            </Link>
-            <Link
-              href="/signup"
-              className="origin-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_24px_-2px_rgba(34,211,238,0.8)]"
-            >
-              Essayer gratuitement
-            </Link>
+            {loggedIn ? (
+              <Link
+                href="/dashboard"
+                className="origin-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_24px_-2px_rgba(34,211,238,0.8)]"
+              >
+                Mon espace
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="origin-center rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-all duration-300 hover:scale-x-105 hover:text-white"
+                >
+                  Connexion
+                </Link>
+                <Link
+                  href="/signup"
+                  className="origin-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_24px_-2px_rgba(34,211,238,0.8)]"
+                >
+                  Essayer gratuitement
+                </Link>
+              </>
+            )}
           </div>
 
           <button
@@ -243,7 +271,7 @@ export function Navbar() {
         </div>
       </div>
 
-      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} loggedIn={loggedIn} />
     </motion.header>
   );
 }

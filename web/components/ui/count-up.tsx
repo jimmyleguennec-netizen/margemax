@@ -1,47 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useInView } from "framer-motion";
+import { motion } from "framer-motion";
 
 /**
- * Anime un nombre de 0 vers sa valeur finale des qu'il entre dans le
- * viewport (une seule fois). Le formatage (devise, %, decimales) reste a
- * la charge de l'appelant via `format`.
+ * Affiche une valeur (montant, %...) avec un simple fondu d'apparition.
+ * N'anime PLUS le nombre lui-meme de 0 vers sa valeur finale : cette
+ * ancienne interpolation affichait pendant ~1 s des valeurs intermediaires
+ * qui ne correspondaient a AUCUN prix/marge reel (ex. "12,34 €" puis
+ * "45,67 €" avant d'atteindre le vrai "127,50 €") -- risque de
+ * capture d'ecran ou de lecture d'une valeur transitoire trompeuse sur des
+ * montants financiers. Le formatage (devise, %, decimales) reste a la
+ * charge de l'appelant via `format`.
  */
 export function CountUp({
   value,
-  duration = 1.1,
   format,
   className,
 }: {
   value: number;
+  /** Conserve pour compatibilite des appels existants ; ignore (plus
+   * d'interpolation numerique a durer). */
   duration?: number;
   format: (n: number) => string;
   className?: string;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.6 });
-  const [display, setDisplay] = useState(0);
-
-  useEffect(() => {
-    if (!inView) return;
-    let raf = 0;
-    const start = performance.now();
-
-    function tick(now: number) {
-      const progress = Math.min(1, (now - start) / (duration * 1000));
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(value * eased);
-      if (progress < 1) raf = requestAnimationFrame(tick);
-    }
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, value, duration]);
-
   return (
-    <span ref={ref} className={className}>
-      {format(inView ? display : 0)}
-    </span>
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className={className}
+    >
+      {format(value)}
+    </motion.span>
   );
 }

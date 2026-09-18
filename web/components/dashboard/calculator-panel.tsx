@@ -2,16 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useAnimation } from "framer-motion";
-import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 
-import { computeMarginEstimate } from "@/lib/margin-estimate";
-import { CircularGauge } from "@/components/ui/circular-gauge";
+import { computeMarginEstimate, parseDecimalInput } from "@/lib/margin-estimate";
+import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
-
-function parseEuro(value: string): number {
-  const n = Number(value.replace(",", "."));
-  return Number.isFinite(n) && n >= 0 ? n : 0;
-}
 
 function formatEuro(n: number): string {
   return (
@@ -29,7 +24,9 @@ function toInputValue(n: number): string {
   });
 }
 
-function formatPct(n: number): string {
+/** null (non calculable, denominateur nul) -> "Non calculable", jamais 0 %. */
+function formatPct(n: number | null): string {
+  if (n === null) return "Non calculable";
   return (
     n.toLocaleString("fr-FR", {
       minimumFractionDigits: 1,
@@ -43,11 +40,13 @@ function NeonNumberField({
   label,
   value,
   onChange,
+  invalid,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
+  invalid: boolean;
 }) {
   return (
     <div className="space-y-1.5">
@@ -64,7 +63,12 @@ function NeonNumberField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0,00"
-          className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-3 pr-10 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+          aria-invalid={invalid}
+          className={`w-full rounded-lg border bg-white/5 py-2.5 pl-3 pr-10 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
+            invalid
+              ? "border-pink-500/60 shadow-[0_0_20px_-2px_rgba(244,63,94,0.6)]"
+              : "border-cyan-400/20 focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+          }`}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30">
           €
@@ -100,18 +104,41 @@ export function CalculatorPanel() {
   const [importTax, setImportTax] = useState("3,60");
   const [salePrice, setSalePrice] = useState("29,90");
 
+  const parsed = useMemo(
+    () => ({
+      p: parseDecimalInput(purchase),
+      s: parseDecimalInput(shipping),
+      t: parseDecimalInput(importTax),
+      sale: parseDecimalInput(salePrice),
+    }),
+    [purchase, shipping, importTax, salePrice]
+  );
+
+  // Une saisie invalide (texte, negatif, vide) suspend TOUT le bloc de
+  // resultats plutot que de la convertir silencieusement en 0 -- un "abc"
+  // ou un "-10" dans le prix d'achat ne doit jamais artificiellement
+  // gonfler la marge affichee.
+  const invalidFields = {
+    purchase: parsed.p === null,
+    shipping: parsed.s === null,
+    importTax: parsed.t === null,
+    salePrice: parsed.sale === null,
+  };
+  const hasInvalidInput = Object.values(invalidFields).some(Boolean);
+
   const estimate = useMemo(() => {
-    const p = parseEuro(purchase);
-    const s = parseEuro(shipping);
-    const t = parseEuro(importTax);
-    const sale = parseEuro(salePrice);
+    if (parsed.p === null || parsed.s === null || parsed.t === null || parsed.sale === null) {
+      return null;
+    }
 
-    const totalCost = p + s + t;
-    const margin = sale - totalCost;
-    const marginPct = sale > 0 ? (margin / sale) * 100 : 0;
-    const roiPct = totalCost > 0 ? (margin / totalCost) * 100 : 0;
+    const totalCost = parsed.p + parsed.s + parsed.t;
+    const margin = parsed.sale - totalCost;
+    // Denominateur nul (prix de vente ou cout total a 0) -> non
+    // calculable, jamais un faux "0 %".
+    const marginPct = parsed.sale > 0 ? (margin / parsed.sale) * 100 : null;
+    const roiPct = totalCost > 0 ? (margin / totalCost) * 100 : null;
 
-    const priceEstimate = computeMarginEstimate(totalCost, t);
+    const priceEstimate = computeMarginEstimate(totalCost, parsed.t);
 
     return {
       totalCost,
@@ -120,21 +147,21 @@ export function CalculatorPanel() {
       roiPct,
       ...priceEstimate,
     };
-  }, [purchase, shipping, importTax, salePrice]);
+  }, [parsed]);
 
-  const isProfitable = estimate.margin > 0;
+  const isProfitable = (estimate?.margin ?? 0) > 0;
   const warnControls = useAnimation();
   const wasProfitable = useRef(isProfitable);
 
   useEffect(() => {
-    if (!isProfitable && wasProfitable.current) {
+    if (estimate && !isProfitable && wasProfitable.current) {
       warnControls.start({
         x: [0, -6, 6, -4, 4, 0],
         transition: { duration: 0.4 },
       });
     }
     wasProfitable.current = isProfitable;
-  }, [isProfitable, warnControls]);
+  }, [isProfitable, warnControls, estimate]);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -153,47 +180,65 @@ export function CalculatorPanel() {
             label="Prix d'achat"
             value={purchase}
             onChange={setPurchase}
+            invalid={invalidFields.purchase}
           />
           <NeonNumberField
             id="calc-shipping"
             label="Frais de livraison"
             value={shipping}
             onChange={setShipping}
+            invalid={invalidFields.shipping}
           />
           <NeonNumberField
             id="calc-import"
             label="Frais d'importation / TVA"
             value={importTax}
             onChange={setImportTax}
+            invalid={invalidFields.importTax}
           />
           <NeonNumberField
             id="calc-sale"
             label="Prix de vente (manuel)"
             value={salePrice}
             onChange={setSalePrice}
+            invalid={invalidFields.salePrice}
           />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSalePrice(toInputValue(estimate.lowPrice))}
-            className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(244,114,182,0.5)]"
-          >
-            <TrendingDown className="h-3.5 w-3.5" />
-            Appliquer prix de vente bas
-          </button>
-          <button
-            type="button"
-            onClick={() => setSalePrice(toInputValue(estimate.highPrice))}
-            className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]"
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            Appliquer prix de vente haut
-          </button>
-        </div>
+        {hasInvalidInput && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-pink-400/30 bg-pink-400/10 p-3 text-xs text-pink-200">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Saisissez des nombres valides et positifs ou nuls (virgule ou
+            point accepté comme séparateur décimal) dans tous les champs
+            pour voir les résultats.
+          </p>
+        )}
 
-        {/* Resultat du prix de vente manuel */}
+        {estimate && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSalePrice(toInputValue(estimate.lowPrice))}
+              className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(244,114,182,0.5)]"
+            >
+              <TrendingDown className="h-3.5 w-3.5" />
+              Appliquer prix de vente bas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSalePrice(toInputValue(estimate.highPrice))}
+              className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Appliquer prix de vente haut
+            </button>
+          </div>
+        )}
+
+        {/* Resultat du prix de vente manuel -- suspendu (non rendu) tant
+            qu'une saisie est invalide, voir hasInvalidInput ci-dessus. */}
+        {estimate && (
+        <>
         <motion.div
           animate={warnControls}
           className={`mt-6 grid grid-cols-2 gap-4 rounded-xl border p-5 transition-colors duration-300 sm:grid-cols-4 ${
@@ -243,15 +288,22 @@ export function CalculatorPanel() {
           </p>
         )}
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
-          <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
-          <span
-            className={`font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.6)] ${
-              isProfitable ? "text-fuchsia-300" : "text-pink-400"
-            }`}
-          >
-            {formatEuro(Math.max(0, estimate.margin))}
-          </span>
+        <div className="mt-3 rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
+            <span
+              className={`font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.6)] ${
+                isProfitable ? "text-fuchsia-300" : "text-pink-400"
+              }`}
+            >
+              {formatEuro(Math.max(0, estimate.margin))}
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-white/40">
+            Ne déduit ni frais de transaction (Stripe, PayPal...), ni
+            commissions publicitaires, ni impôts sur le profit — à
+            soustraire vous-même avant de fixer un budget réel.
+          </p>
         </div>
 
         {/* Bloc 1 : detail des couts saisis manuellement */}
@@ -263,19 +315,19 @@ export function CalculatorPanel() {
             <div className="flex items-center justify-between text-white/50">
               <span>Prix produit</span>
               <span className="font-medium text-white">
-                {formatEuro(parseEuro(purchase))}
+                {formatEuro(parsed.p ?? 0)}
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between text-white/50">
               <span>Livraison</span>
               <span className="font-medium text-white">
-                {formatEuro(parseEuro(shipping))}
+                {formatEuro(parsed.s ?? 0)}
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between text-white/50">
               <span>Taxes / import</span>
               <span className="font-medium text-white">
-                {formatEuro(parseEuro(importTax))}
+                {formatEuro(parsed.t ?? 0)}
               </span>
             </div>
             <div className="my-2 h-px bg-white/10" />
@@ -306,7 +358,7 @@ export function CalculatorPanel() {
                   <CountUp value={estimate.recommendedPrice} format={formatEuro} />
                 </p>
               </div>
-              <CircularGauge value={estimate.reliability} size={64} strokeWidth={5} label="fiabilité" />
+              <ReliabilityBadge tier={estimate.reliability} />
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -340,13 +392,18 @@ export function CalculatorPanel() {
               </div>
             </div>
 
-            <p className="mt-4 text-center text-[11px] text-white/30">
-              Estimation calculée à partir des coûts que vous avez saisis —
-              pas une donnée de marché garantie. Le score de fiabilité
-              diminue quand la part de frais estimés augmente.
+            <p className="mt-4 text-center text-[11px] text-white/40">
+              Méthode : prix bas = coût × 1,5, prix conseillé = coût × 1,8,
+              prix haut = coût × 2,3, arrondis au 0,90 € psychologique le
+              plus proche — coefficients fixes, pas une donnée de marché.
+              La fiabilité est qualitative, pas un pourcentage : elle
+              diminue quand les frais d&apos;importation pèsent lourd dans
+              le coût total (composant le plus sujet à variation/estimation).
             </p>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

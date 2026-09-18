@@ -52,11 +52,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Le montant reellement encaisse est lu depuis la session Stripe (source
-  // de verite), jamais depuis un calcul client -- coherence
-  // enregistree avec le pack pour audit, meme si on ne bloque pas le
-  // credit sur une divergence mineure d'arrondi Stripe.
+  // de verite), jamais depuis un calcul client.
   const amountTotal = session.amount_total ?? 0;
   const currency = session.currency ?? "eur";
+
+  // FAILLE CORRIGEE : client_reference_id (donc `parsed.packKey` ci-dessus)
+  // est construit cote client (lib/stripe-links.ts) et transite par l'URL
+  // du Payment Link -- un attaquant peut ouvrir le Payment Link du pack le
+  // MOINS CHER puis modifier manuellement ?client_reference_id=ultimate:...
+  // dans la barre d'adresse avant de payer. Stripe ne valide jamais la
+  // coherence entre client_reference_id et le prix reel du Payment Link
+  // utilise : sans ce controle, le webhook aurait credite le nombre de
+  // credits du pack DECLARE, quel que soit le montant REELLEMENT encaisse.
+  // Tolerance minime pour d'eventuels ecarts d'arrondi Stripe legitimes --
+  // jamais pour couvrir un ecart pack-a-pack, qui doit toujours rejeter.
+  const expectedAmountCents = Math.round(pack.priceEuros * 100);
+  const AMOUNT_TOLERANCE_CENTS = 2;
+  if (Math.abs(amountTotal - expectedAmountCents) > AMOUNT_TOLERANCE_CENTS) {
+    console.error(
+      "[stripe webhook] montant encaissé incohérent avec le pack déclaré -- crédit BLOQUÉ (URL de Payment Link modifiée ou tentative de fraude) :",
+      {
+        session: session.id,
+        packKey: pack.key,
+        expectedAmountCents,
+        amountTotalCents: amountTotal,
+      }
+    );
+    return;
+  }
 
   const supabase = createAdminClient();
 

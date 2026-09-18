@@ -77,6 +77,19 @@ export default function CgvPage() {
           appliqué pleinement.
         </p>
         <p>
+          Le paiement d&apos;un pack de crédits déclenche l&apos;ajout
+          immédiat des crédits correspondants sur le compte du client — ce
+          n&apos;est que le <strong className="text-white">début</strong>{" "}
+          de l&apos;exécution du service, pas son exécution complète. Le
+          service lui-même (l&apos;analyse de sourcing) ne s&apos;exécute
+          qu&apos;au fur et à mesure que le client utilise chacun de ses
+          crédits. Cette distinction, pertinente au regard des articles
+          L.221-25 et L.221-28 du Code de la consommation, n&apos;a pas
+          encore été formellement validée par un professionnel du droit —
+          en cas de doute sur vos droits pour une commande précise, contactez
+          AutOutilShop SAS avant d&apos;utiliser vos crédits.
+        </p>
+        <p>
           Pour exercer ce droit ou pour toute question, le client peut
           écrire à{" "}
           <a
