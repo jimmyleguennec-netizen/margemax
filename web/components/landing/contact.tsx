@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, MessageSquare, ShieldCheck, User } from "lucide-react";
+import { CheckCircle2, Mail, MessageSquare, User } from "lucide-react";
+
+import { RgbLoader } from "@/components/ui/rgb-loader";
 
 const CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@autoutilshop.fr";
@@ -21,7 +23,7 @@ export function Contact() {
     name.trim() && EMAIL_PATTERN.test(email.trim()) && message.trim()
   );
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (sending) return;
 
@@ -41,11 +43,36 @@ export function Contact() {
     setFormError(null);
     setSending(true);
 
-    const subject = encodeURIComponent(`Contact MargeMax : ${name || "Visiteur"}`);
-    const body = encodeURIComponent(`${message}\n\n${name}\n${email}`);
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
-    setSent(true);
-    setSending(false);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+      });
+      const data: { ok?: boolean; error?: string } = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        // Jamais l'UI bloquée sur un echec reseau : le bouton se
+        // reactive, les champs saisis restent intacts (rien a resaisir).
+        setFormError(
+          data.error ?? "Impossible d'envoyer votre message pour le moment. Réessayez."
+        );
+        setSending(false);
+        return;
+      }
+
+      setSent(true);
+      setSending(false);
+      setName("");
+      setEmail("");
+      setMessage("");
+    } catch (err) {
+      console.error("[Contact] Échec de l'appel /api/contact :", err);
+      setFormError(
+        "Impossible de contacter le serveur pour le moment. Réessayez dans quelques instants."
+      );
+      setSending(false);
+    }
   }
 
   return (
@@ -156,25 +183,31 @@ export function Contact() {
 
         <button
           type="submit"
-          disabled={!canSend || sending || sent}
+          disabled={!canSend || sending}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:bg-[position:0%_0]"
         >
-          <Mail className="h-4 w-4" />
-          Envoyer le message
+          {sending ? (
+            <>
+              <RgbLoader size={16} />
+              Envoi en cours...
+            </>
+          ) : (
+            <>
+              <Mail className="h-4 w-4" />
+              Envoyer le message
+            </>
+          )}
         </button>
 
         {sent && (
           <motion.p
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="flex items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200"
+            className="flex items-center gap-1.5 rounded-md border border-green-400/30 bg-green-400/10 px-3 py-2 text-xs text-green-300"
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Votre application e-mail devrait s&apos;être ouverte avec le
-            message pré-rempli : vérifiez qu&apos;elle s&apos;est bien
-            ouverte, puis confirmez l&apos;envoi depuis celle-ci. Rien
-            n&apos;est transmis tant que vous n&apos;avez pas cliqué sur
-            envoyer dans votre application e-mail.
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            Votre message a été envoyé avec succès ! Nous vous répondrons
+            sous 24h.
           </motion.p>
         )}
       </motion.form>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AnimatePresence,
@@ -167,6 +167,22 @@ export function Navbar() {
     setScrolled(latest > 20);
   });
 
+  // Bloque le scroll de la page derriere le menu plein ecran tant qu'il
+  // est ouvert -- sans ca, un swipe sur l'overlay peut faire defiler la
+  // page en dessous (visible au relachement, ou via le repli/deploiement
+  // de la barre d'adresse mobile pendant le scroll), ce qui rend
+  // l'ouverture/fermeture du menu moins fluide sur telephone. Restaure
+  // systematiquement au demontage, jamais de scroll bloque en permanence
+  // si le composant disparait pendant que le menu est ouvert.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -16 }}
@@ -264,7 +280,12 @@ export function Navbar() {
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Ouvrir le menu"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 transition-colors hover:bg-cyan-400/10 sm:hidden"
+            // z-index/pointer-events explicites : sur mobile, ce bouton
+            // doit toujours rester au-dessus de tout calque decoratif
+            // (fond de grille interactif, halos flous...) qui pourrait
+            // se retrouver au-dessus de lui selon l'ordre de peinture du
+            // navigateur.
+            className="relative z-50 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 pointer-events-auto transition-colors hover:bg-cyan-400/10 sm:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>

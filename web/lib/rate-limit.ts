@@ -23,6 +23,10 @@ export const RATE_LIMITS = {
   signupByEmail: { maxAttempts: 5, windowSeconds: 900, lockSeconds: 900 },
   passwordResetByIp: { maxAttempts: 10, windowSeconds: 900, lockSeconds: 900 },
   passwordResetByEmail: { maxAttempts: 5, windowSeconds: 900, lockSeconds: 900 },
+  // Formulaire de contact (app/api/contact/route.ts) : cle par IP
+  // uniquement (pas d'e-mail authentifie a ce stade), evite qu'un envoi
+  // automatise n'epuise le quota Resend ou n'inonde contact@autoutilshop.fr.
+  contactByIp: { maxAttempts: 5, windowSeconds: 3600, lockSeconds: 3600 },
 } as const satisfies Record<string, RateLimitConfig>;
 
 export const RATE_LIMIT_MESSAGE =
