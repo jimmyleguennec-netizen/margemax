@@ -1,5 +1,68 @@
 # Passation — MargeMax
 
+## Sprint structuration globale : ergonomie, stabilité & mobile (2026-09-18, session "structuration globale")
+
+Toujours sans Node/npm sur cette machine — relecture statique + vérification
+en direct sur le site Vercel déployé (navigateur intégré, 375-430px) partout
+où c'était accessible sans authentification.
+
+- **Vrai bug de freeze trouvé et corrigé** (`neon-auth-panel.tsx`) :
+  l'appel `supabase.auth.getUser()` juste après une connexion/inscription
+  réussie (pour reprendre un achat de pack en attente, `?pack=<clé>`)
+  n'avait aucun `try/catch`. Un blip réseau à cet instant précis laissait
+  l'utilisateur bloqué indéfiniment sur l'écran "Redirection en cours..."
+  (succès affiché, mais ni la modale de consentement ni la redirection
+  `/dashboard` n'étaient jamais atteintes) — nécessitait un rechargement
+  manuel. Corrigé : repli systématique sur `/dashboard` en cas d'échec.
+  Les autres flux async (recherche, `BuyCreditsModal`, `CheckoutConsentDialog`,
+  toutes les Server Actions de `lib/actions/auth.ts`) ont été relus et
+  résolvent déjà correctement leur promesse dans tous les cas — rien
+  d'autre à corriger sur ce point.
+- **Saut d'écran au rechargement** (`app/layout.tsx`) : script inline
+  (avant hydratation React) qui désactive `history.scrollRestoration` et
+  force `window.scrollTo(0,0)` — **sauf si l'URL contient une ancre**
+  (`#pricing`, `#contact`, `#faq`) pour ne pas casser les liens profonds
+  utilisés ailleurs dans l'app (ex. le nouveau menu du compte). Aucun
+  `autoFocus` ni `.focus()` impératif nulle part dans le code (vérifié par
+  recherche globale) — rien d'autre ne tirait la page vers le bas au
+  chargement.
+- **`overflow-x: hidden` sur `html`/`body`** : déjà présent avant cette
+  session (`app/layout.tsx`). Vérifié en direct sur le site déployé à
+  375px et 430px : **aucun scroll horizontal page-level**, et aucun
+  élément des cartes de prix, du slider du calculateur de crédits, ou du
+  comparateur d'offres ne dépasse la largeur de viewport à ces tailles
+  (vérifié par script mesurant les `getBoundingClientRect()` de tous les
+  éléments de ces sections) — rien à corriger côté landing. Les
+  correctifs mobile du dashboard (tableaux, header) restent ceux de la
+  session précédente.
+- **Redirections Stripe** (`/signup?pack=`, `/api/checkout`) : déjà
+  corrigées intégralement lors d'une session précédente — vérifiées à
+  nouveau intactes, aucune régression.
+- **Menu du compte** (nouveau, `account-menu.tsx` + `ui/dropdown-menu.tsx`) :
+  icône engrenage seule (sans texte) après le bouton "+" de crédits dans
+  le header, toujours visible (même en mode démo, même sans crédits
+  connus). Construit sur `@radix-ui/react-dropdown-menu`, **déjà une
+  dépendance installée** (`^2.1.2` dans `package.json`, jamais utilisée
+  avant) — aucune nouvelle dépendance ajoutée, donc rien à faire tourner
+  avec `npm install` pour que ça fonctionne. Contenu du menu : "Aide et
+  paramètres" et "Votre compte" basculent tous deux vers l'onglet "Mon
+  compte" ; "Service client" pointe vers `/#contact` (section réelle de la
+  landing, confirmée existante) ; "Se connecter" (mode démo) ou "Se
+  déconnecter" (appelle directement la Server Action `logout()`, sans
+  `<form>` intermédiaire). **Langue : Français / Pays : France / Devise :
+  Euro (€) affichés comme simples lignes d'information NON cliquables**
+  — décision délibérée : le produit n'a aucun système multilingue,
+  multi-pays ou multi-devise réel, donc les présenter comme des réglages
+  actionnables aurait été exactement le type de fonctionnalité fantôme
+  déjà retirée ailleurs sur ce site (générateur de fiche IA, comparateur,
+  voir plus bas dans ce fichier) — **si un vrai sélecteur de langue/devise
+  est souhaité plus tard, ce sera un travail produit à part entière, pas
+  une case à cocher dans ce menu.**
+- **Onglet "Paramètres" renommé "Mon compte"** (`dashboard-shell.tsx`,
+  label du tab + titre du bandeau d'aide contextuel). Le panneau
+  lui-même était déjà nettoyé (une seule carte crédits) depuis la session
+  précédente — rien de plus à faire là.
+
 ## Sprint final unifié : Firecrawl réel, redirections Stripe & UI/mobile (2026-09-18, session "sprint final")
 
 Session avec accès disque réel (git repo détecté cette fois), toujours sans
