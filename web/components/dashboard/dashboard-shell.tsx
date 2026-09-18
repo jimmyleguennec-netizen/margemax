@@ -46,6 +46,55 @@ const tabs: AnimatedTabItem[] = [
   { value: "parametres", label: "Paramètres", icon: Settings },
 ];
 
+// Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
+// ActiveTabHint ci-dessous. Vouvoiement pour rester cohérent avec le reste
+// du site (voir passation.md : repasse complète en vouvoiement, contenu de
+// ce sprint fourni au tutoiement, converti ici).
+const TAB_HELP: Record<string, { title: string; body: string }> = {
+  recherche: {
+    title: "Recherche & Sourcing",
+    body: "Entrez un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit déduit uniquement par analyse réussie).",
+  },
+  calculateur: {
+    title: "Calculateur de Marge",
+    body: "Simulez et ajustez vos coûts (frais de port, TVA, pub) en temps réel. Utilisable à volonté sans consommer de crédit.",
+  },
+  historique: {
+    title: "Historique des analyses",
+    body: "Retrouvez et réexaminez les produits analysés au cours de votre session.",
+  },
+  parametres: {
+    title: "Paramètres du compte",
+    body: "Gérez votre compte, consultez votre solde et rechargez vos crédits d'analyse.",
+  },
+};
+
+function ActiveTabHint({ active }: { active: string }) {
+  const hint = TAB_HELP[active];
+  if (!hint) return null;
+
+  return (
+    <div className="border-t border-white/5 bg-white/[0.02]">
+      <div className="container py-2">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={active}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.2 }}
+            className="text-xs text-white/50"
+          >
+            <strong className="font-semibold text-cyan-200">{hint.title}</strong>
+            {" — "}
+            {hint.body}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 function ParametresPanel({
   email,
   isDemo,
@@ -70,14 +119,6 @@ function ParametresPanel({
           </p>
           <p className="text-lg font-medium text-white">{email}</p>
         </div>
-        {credits !== null && (
-          <p className="flex items-center gap-1.5 text-sm text-cyan-300">
-            <Zap className="h-4 w-4" />
-            {credits} crédit{credits > 1 ? "s" : ""}
-            {creditsMax !== null ? ` sur ${creditsMax}` : ""} disponible
-            {credits > 1 ? "s" : ""}
-          </p>
-        )}
         {isDemo ? (
           <a
             href="/login"
@@ -271,6 +312,8 @@ export function DashboardShell({
               layoutId="dashboard-tab-indicator-mobile"
             />
           </div>
+
+          <ActiveTabHint active={active} />
         </header>
 
         <main className="relative z-10 container py-10 pointer-events-auto">

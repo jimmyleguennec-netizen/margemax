@@ -58,7 +58,9 @@ function buildExampleResult(): ApiResult {
     title: "Station de charge sans fil 3-en-1 pliable",
     variant: null,
     url: "https://fr.aliexpress.com/item/1005006478208156.html",
-    product_image_url: null,
+    // Asset statique reel (public/images/product-charger.jpg), pas une URL
+    // AliExpress -- jamais recuperee en direct, voir commentaire ci-dessus.
+    product_image_url: "/images/product-charger.jpg",
     subtotal: 14.49,
     shipping: 0,
     importFee: 3.6,

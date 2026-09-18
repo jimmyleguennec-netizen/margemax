@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldAlert, X } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { IMMEDIATE_EXECUTION_WAIVER_LABEL } from "@/lib/legal-consent";
 import { formatEuro } from "@/lib/packs";
 
@@ -38,7 +36,6 @@ export function CheckoutConsentDialog({
   const [checked, setChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   function handleCancel() {
     if (submitting) return;
@@ -47,21 +44,55 @@ export function CheckoutConsentDialog({
     onCancel();
   }
 
+  // Deux appels distincts, jamais fusionnes : (1) enregistre la preuve de
+  // consentement retractation AVANT tout paiement -- doit reussir meme si
+  // le paiement echoue ensuite, pour garder une trace de ce qui a ete
+  // accepte ; (2) resout l'URL Stripe reelle cote SERVEUR (jamais calculee
+  // ici a partir d'un userId client, qui repliait silencieusement sur
+  // "/login?pack=..." pour un utilisateur pourtant deja connecte des qu'un
+  // seul Payment Link etait mal configure -- voir app/api/checkout/route.ts).
   async function handleConfirm() {
     if (!pack || !userId || !checked || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/consent/checkout", {
+      const consentRes = await fetch("/api/consent/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packKey: pack.key }),
       });
-      if (!res.ok) throw new Error("consent_failed");
-      router.push(buildPackCheckoutHref(pack.key, userId));
+      if (!consentRes.ok) {
+        setError(
+          "Impossible d'enregistrer votre consentement pour le moment. Réessayez."
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const checkoutRes = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packKey: pack.key }),
+      });
+      const checkoutData: { url?: string; error?: string } = await checkoutRes
+        .json()
+        .catch(() => ({}));
+
+      if (!checkoutRes.ok || !checkoutData.url) {
+        setError(
+          checkoutData.error ??
+            "Impossible de démarrer le paiement pour le moment. Réessayez."
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      // Redirection externe reelle (domaine Stripe) -- pas router.push, qui
+      // est concu pour la navigation interne Next.js.
+      window.location.href = checkoutData.url;
     } catch {
       setError(
-        "Impossible d'enregistrer votre consentement pour le moment. Réessayez."
+        "Impossible de démarrer le paiement pour le moment. Réessayez."
       );
       setSubmitting(false);
     }
