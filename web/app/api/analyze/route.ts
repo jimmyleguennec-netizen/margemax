@@ -8,7 +8,7 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Voir app/api/search/route.ts : meme budget, memes appels ScraperAPI
+// Voir app/api/search/route.ts : meme budget, memes appels Firecrawl
 // potentiellement enchaines cote lib/aliexpress-search.ts.
 export const maxDuration = 60;
 
@@ -18,7 +18,7 @@ export const maxDuration = 60;
  *
  * Ordre des operations, dans cet ordre precis pour respecter "aucun
  * debit si l'analyse echoue" sans pour autant lancer un scrape (couteux,
- * facture par ScraperAPI) pour un utilisateur a 0 credit :
+ * facture par Firecrawl) pour un utilisateur a 0 credit :
  *   1. Verifie la session (401 si absente).
  *   2. Lit le solde actuel -- simple garde-fou pour eviter un scrape
  *      inutile, PAS la protection anti-concurrence (voir etape 4).
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   if (consumeError) {
     console.error("[api/analyze] Échec du débit de crédit :", consumeError);
     // L'analyse a reussi mais le debit a echoue techniquement (panne DB) --
-    // on renvoie quand meme le resultat (deja paye a ScraperAPI) plutot que
+    // on renvoie quand meme le resultat (deja paye a Firecrawl) plutot que
     // de le jeter, en signalant clairement que le credit n'a pas ete
     // debite pour que le client ne prenne pas ca pour un solde a jour.
     return NextResponse.json({
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   if (newBalance === null) {
     // Solde tombe a 0 entre la lecture (etape 2) et le debit atomique --
     // requete concurrente sur le meme compte. L'analyse a deja ete
-    // effectuee (et facturee cote ScraperAPI) : on la renvoie quand meme,
+    // effectuee (et facturee cote Firecrawl) : on la renvoie quand meme,
     // mais sans decompter un credit inexistant.
     return NextResponse.json({
       ...result,

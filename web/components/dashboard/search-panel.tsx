@@ -14,6 +14,7 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Zap,
 } from "lucide-react";
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
@@ -38,7 +39,36 @@ type ApiResult = {
   analyzedAt: string;
   creditsDebited?: boolean;
   credits?: number;
+  /** true pour l'exemple illustratif ("Voir une analyse exemple", aucun
+   * appel reseau ni credit consomme) -- jamais pour une vraie analyse. */
+  isExample?: boolean;
 };
+
+const EXAMPLE_QUERY = "chargeur à induction pour iPhone";
+
+/**
+ * Donnees fixes, non recuperees en direct -- memes chiffres que la
+ * demonstration de la landing page (components/landing/demo.tsx), pour
+ * ne jamais promettre un appel reseau reel gratuit illimite (couteux,
+ * facture au fournisseur) alors qu'un exemple statique suffit a montrer
+ * le fonctionnement.
+ */
+function buildExampleResult(): ApiResult {
+  return {
+    title: "Station de charge sans fil 3-en-1 pliable",
+    variant: null,
+    url: "https://fr.aliexpress.com/item/1005006478208156.html",
+    product_image_url: null,
+    subtotal: 14.49,
+    shipping: 0,
+    importFee: 3.6,
+    total: 18.09,
+    currency: "EUR",
+    destination: "France",
+    analyzedAt: new Date().toISOString(),
+    isExample: true,
+  };
+}
 
 function formatAnalyzedAt(iso: string): string {
   try {
@@ -243,6 +273,13 @@ export function SearchPanel({
     }
   }
 
+  function showExample() {
+    if (status === "loading") return;
+    setErrorMessage(null);
+    setResult(buildExampleResult());
+    setStatus("result");
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     runAnalysis(query.trim());
@@ -250,6 +287,28 @@ export function SearchPanel({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      {status === "idle" && (
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-2xl font-bold text-white sm:text-3xl">
+            Analyse ton prochain produit
+          </h1>
+          {typeof credits === "number" && (
+            <p className="flex items-center gap-1.5 text-sm text-cyan-300">
+              <Zap className="h-4 w-4" />
+              {credits} crédit{credits > 1 ? "s" : ""} disponible
+              {credits > 1 ? "s" : ""}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={showExample}
+            className="mt-1 text-xs font-medium text-cyan-300/80 underline-offset-4 hover:underline"
+          >
+            Voir une analyse exemple (aucun crédit utilisé)
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm"
@@ -389,6 +448,13 @@ export function SearchPanel({
             transition={{ type: "spring", stiffness: 280, damping: 24 }}
             className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] backdrop-blur-sm"
           >
+            {result.isExample && (
+              <div className="flex items-center gap-1.5 border-b border-amber-400/20 bg-amber-400/10 px-5 py-2 text-xs font-medium text-amber-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                Exemple illustratif — aucun crédit utilisé, aucune donnée
+                récupérée en direct.
+              </div>
+            )}
             <div className="flex items-center gap-4 border-b border-white/10 p-5">
               <ProductThumbnail
                 src={result.product_image_url}

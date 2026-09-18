@@ -19,7 +19,13 @@ function formatTime(ts: number) {
   });
 }
 
-export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
+export function HistoryPanel({
+  entries,
+  onGoToSearch,
+}: {
+  entries: HistoryEntry[];
+  onGoToSearch?: () => void;
+}) {
   if (entries.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
@@ -31,6 +37,15 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
           Lancez une analyse depuis l&apos;onglet Recherche — elle
           apparaîtra ici automatiquement.
         </p>
+        {onGoToSearch && (
+          <button
+            type="button"
+            onClick={onGoToSearch}
+            className="mt-2 rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)] transition-all hover:scale-105"
+          >
+            Analyser mon premier produit
+          </button>
+        )}
       </div>
     );
   }

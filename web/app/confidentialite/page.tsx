@@ -15,10 +15,10 @@ export default function ConfidentialitePage() {
           sur MargeMax est la société AutOutilShop SAS, 4 rue Gustave
           Delory, 11100 Narbonne, France --{" "}
           <a
-            href="mailto:contact@autoutilshop.com"
+            href="mailto:contact@autoutilshop.fr"
             className="text-cyan-300 hover:underline"
           >
-            contact@autoutilshop.com
+            contact@autoutilshop.fr
           </a>
           .
         </p>
@@ -71,10 +71,10 @@ export default function ConfidentialitePage() {
           Ces droits peuvent être exercés à tout moment sur simple demande
           adressée à{" "}
           <a
-            href="mailto:contact@autoutilshop.com"
+            href="mailto:contact@autoutilshop.fr"
             className="text-cyan-300 hover:underline"
           >
-            contact@autoutilshop.com
+            contact@autoutilshop.fr
           </a>
           . Une réponse sera apportée dans les meilleurs délais et au plus
           tard dans le délai légal d&apos;un mois.

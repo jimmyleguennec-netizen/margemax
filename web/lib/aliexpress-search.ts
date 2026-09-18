@@ -6,7 +6,7 @@
 
 import { createHmac } from "crypto";
 
-const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
 const ALIEXPRESS_APP_KEY = process.env.ALIEXPRESS_APP_KEY;
 const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
 
@@ -23,9 +23,9 @@ export type AliExpressSearchResult = {
   importFee: number | null;
   total: number | null;
   currency: string;
-  source: "scraperapi";
-  /** Pays cible des taxes d'importation calculees (voir country_code=fr
-   * passe a ScraperAPI dans fetchHtmlViaScraperApi). */
+  source: "firecrawl";
+  /** Pays cible des taxes d'importation calculees (voir location.country
+   * passe a Firecrawl dans fetchHtmlViaFirecrawl). */
   destination: "FR";
   /** Horodatage serveur de l'analyse (ISO 8601) -- pas l'horodatage client,
    * qui peut deriver ou etre falsifie. */
@@ -90,7 +90,7 @@ function looksLikeBotBlock(html: string): boolean {
 async function findFirstProductIdFromKeyword(
   keyword: string
 ): Promise<string | null> {
-  const searchHtml = await fetchHtmlViaScraperApi(buildSearchUrl(keyword));
+  const searchHtml = await fetchHtmlViaFirecrawl(buildSearchUrl(keyword));
 
   if (looksLikeBotBlock(searchHtml)) {
     // Distinct de "0 resultat" : le fournisseur a bloque/limite la
@@ -112,42 +112,53 @@ async function findFirstProductIdFromKeyword(
 
 // Doit laisser de la marge sous maxDuration (voir app/api/search/route.ts
 // et app/api/analyze/route.ts) : une recherche par mot-clé peut enchainer
-// DEUX appels ScraperAPI (page de résultats puis page produit) --
+// DEUX appels Firecrawl (page de résultats puis page produit) --
 // 2 x 20 s = 40 s, sous le maxDuration=60 configuré sur les deux routes.
-const SCRAPER_TIMEOUT_MS = 20000;
+const FIRECRAWL_TIMEOUT_MS = 20000;
 
-async function fetchHtmlViaScraperApi(targetUrl: string): Promise<string> {
-  if (!SCRAPER_API_KEY) {
+type FirecrawlScrapeResponse = {
+  success: boolean;
+  data?: { rawHtml?: string };
+  error?: string;
+};
+
+async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
+  if (!FIRECRAWL_API_KEY) {
     throw new AliExpressSearchError(
-      "SCRAPER_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
+      "FIRECRAWL_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
       502
     );
   }
 
-  const proxyUrl = new URL("https://api.scraperapi.com/");
-  proxyUrl.searchParams.set("api_key", SCRAPER_API_KEY);
-  proxyUrl.searchParams.set("url", targetUrl);
-  proxyUrl.searchParams.set("render", "true");
-  // Force une IP proxy française : coherent avec fr.aliexpress.com
-  // ci-dessus (prix/disponibilite/langue de la vitrine France), au lieu de
-  // laisser ScraperAPI choisir un pays de sortie arbitraire (US par
-  // defaut) qui renvoie une page differente de ce qu'un client francais
-  // verrait reellement.
-  proxyUrl.searchParams.set("country_code", "fr");
-
   let response: Response;
   try {
-    response = await fetch(proxyUrl.toString(), {
-      signal: AbortSignal.timeout(SCRAPER_TIMEOUT_MS),
+    response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: targetUrl,
+        // "rawHtml" (pas "html", qui est nettoye par Firecrawl et peut
+        // retirer les <script type="application/ld+json"> dont dependent
+        // extractFromJsonLd/extractOgImage ci-dessous). location force une
+        // IP/langue France, coherent avec fr.aliexpress.com ci-dessus, au
+        // lieu de laisser Firecrawl choisir un pays de sortie arbitraire.
+        formats: ["rawHtml"],
+        location: { country: "FR", languages: ["fr"] },
+        timeout: 18000,
+      }),
+      signal: AbortSignal.timeout(FIRECRAWL_TIMEOUT_MS),
     });
   } catch (err) {
     // AbortSignal.timeout() declenche une DOMException "TimeoutError" dont
     // le .message ("The operation was aborted due to timeout") est en
     // anglais et ne doit JAMAIS atteindre l'utilisateur tel quel -- avant
-    // ce correctif, cette exception remontait non enveloppee jusqu'a
-    // l'API route, qui renvoyait error.message brut au client (voir
-    // performAliExpressSearch plus bas : seule une AliExpressSearchError a
-    // un message deja destine a l'utilisateur).
+    // ce correctif (session precedente), cette exception remontait non
+    // enveloppee jusqu'a l'API route, qui renvoyait error.message brut au
+    // client (voir performAliExpressSearch plus bas : seule une
+    // AliExpressSearchError a un message deja destine a l'utilisateur).
     const isTimeout = err instanceof Error && err.name === "TimeoutError";
     if (isTimeout) {
       throw new AliExpressSearchError(
@@ -170,7 +181,26 @@ async function fetchHtmlViaScraperApi(targetUrl: string): Promise<string> {
     );
   }
 
-  return response.text();
+  let payload: FirecrawlScrapeResponse;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new AliExpressSearchError(
+      "Réponse du fournisseur de données illisible. Réessayez dans quelques instants.",
+      502
+    );
+  }
+
+  if (!payload.success || !payload.data?.rawHtml) {
+    throw new AliExpressSearchError(
+      payload.error
+        ? `Le fournisseur de données n'a pas pu récupérer cette page (${payload.error}).`
+        : "Le fournisseur de données n'a pas pu récupérer cette page. Réessayez dans quelques instants.",
+      502
+    );
+  }
+
+  return payload.data.rawHtml;
 }
 
 function parseNumber(raw: string | undefined | null): number | null {
@@ -268,7 +298,7 @@ export async function performAliExpressSearch(
   }
 
   const targetUrl = buildProductUrl(productId);
-  const html = await fetchHtmlViaScraperApi(targetUrl);
+  const html = await fetchHtmlViaFirecrawl(targetUrl);
 
   if (looksLikeBotBlock(html)) {
     throw new AliExpressSearchError(
@@ -301,7 +331,7 @@ export async function performAliExpressSearch(
     importFee,
     total,
     currency: currency ?? "EUR",
-    source: "scraperapi",
+    source: "firecrawl",
     destination: "FR",
     analyzedAt: new Date().toISOString(),
   };
@@ -317,7 +347,7 @@ export async function performAliExpressSearch(
  * OAuth utilisateur (ALIEXPRESS_ACCESS_TOKEN), qui n'a pas ete fourni --
  * seul ALIEXPRESS_APP_KEY (identifiant public) et ALIEXPRESS_APP_SECRET
  * ont ete configures. Conservee ici, prete a etre branchee, une fois le
- * flux OAuth reconstruit cote Next.js. D'ici la, ScraperAPI est le seul
+ * flux OAuth reconstruit cote Next.js. D'ici la, Firecrawl est le seul
  * chemin reellement fonctionnel.
  */
 export function signTopRest(

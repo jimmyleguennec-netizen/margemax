@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFormState } from "react-dom";
@@ -31,6 +31,33 @@ const CALLBACK_ERROR_MESSAGE =
 const ACCOUNT_NOT_FOUND_MESSAGE =
   "Aucun compte MargeMax associé à cet e-mail. Veuillez d'abord vous inscrire.";
 
+/**
+ * Garde-fou anti double-soumission : `useFormStatus().pending` (dans
+ * NeonSubmitButton) desactive deja le bouton, mais seulement APRES le
+ * premier rendu suivant le clic -- un double-clic tres rapide ou un
+ * Entree maintenu peut declencher deux soumissions natives du <form>
+ * avant que React n'ait eu le temps de re-rendre le bouton desactive.
+ * `submittingRef` bloque synchronement toute soumission tant que la
+ * precedente n'a pas produit un nouvel etat (succes OU erreur).
+ */
+function useSubmitOnceGuard(state: AuthActionState) {
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    submittingRef.current = false;
+  }, [state]);
+
+  function guardSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (submittingRef.current) {
+      e.preventDefault();
+      return;
+    }
+    submittingRef.current = true;
+  }
+
+  return guardSubmit;
+}
+
 function LoginForm({
   action,
   state,
@@ -40,8 +67,10 @@ function LoginForm({
   state: AuthActionState;
   idPrefix: string;
 }) {
+  const guardSubmit = useSubmitOnceGuard(state);
+
   return (
-    <form action={action} className="w-full max-w-sm space-y-4">
+    <form action={action} onSubmit={guardSubmit} className="w-full max-w-sm space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-white">Connexion</h2>
         <p className="mt-1 text-sm text-white/50">
@@ -89,6 +118,11 @@ function SignupForm({
   state: AuthActionState;
   idPrefix: string;
 }) {
+  // Hook appele avant tout retour anticipe (regle des Hooks) -- meme si
+  // OtpVerifyForm est affiche juste apres, le rendu suivant reinitialise
+  // proprement ce composant.
+  const guardSubmit = useSubmitOnceGuard(state);
+
   // Confirmation par email requise cote Supabase (signUp() sans session
   // immediate) : bascule vers la saisie du code OTP plutot que d'afficher
   // a nouveau le formulaire d'inscription.
@@ -97,7 +131,7 @@ function SignupForm({
   }
 
   return (
-    <form action={action} className="w-full max-w-sm space-y-4">
+    <form action={action} onSubmit={guardSubmit} className="w-full max-w-sm space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-white">Créer un compte</h2>
         <p className="mt-1 text-sm text-white/50">
@@ -248,8 +282,29 @@ function SuccessOverlay({ statusText }: { statusText: string }) {
   );
 }
 
+const MODE_TITLES: Record<Mode, string> = {
+  login: "Connexion — MargeMax",
+  signup: "Créer un compte — MargeMax",
+};
+
 export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
   const [mode, setMode] = useState<Mode>(initialMode);
+
+  // Le bascule login/signup est un simple etat client (panneau glissant),
+  // pas une navigation Next.js -- volontaire, pour ne jamais demonter le
+  // formulaire en cours de saisie. Mais l'URL et le <title> affiches
+  // restaient figes sur la route de depart, incoherents avec le
+  // formulaire reellement visible. history.replaceState (pas
+  // router.replace, qui remonterait le composant en changeant de route)
+  // met a jour l'un et l'autre sans perturber l'etat du composant.
+  useEffect(() => {
+    document.title = MODE_TITLES[mode];
+    const path = mode === "login" ? "/login" : "/signup";
+    if (window.location.pathname !== path) {
+      window.history.replaceState(null, "", path + window.location.search);
+    }
+  }, [mode]);
+
   const searchParams = useSearchParams();
   const callbackError = searchParams.get("error");
   const initialLoginState: AuthActionState =

@@ -93,10 +93,10 @@ export default function CgvPage() {
           Pour exercer ce droit ou pour toute question, le client peut
           écrire à{" "}
           <a
-            href="mailto:contact@autoutilshop.com"
+            href="mailto:contact@autoutilshop.fr"
             className="text-cyan-300 hover:underline"
           >
-            contact@autoutilshop.com
+            contact@autoutilshop.fr
           </a>
           .
         </p>
@@ -141,10 +141,10 @@ export default function CgvPage() {
           contacter AutOutilShop SAS via le formulaire de contact du site ou
           à l&apos;adresse{" "}
           <a
-            href="mailto:contact@autoutilshop.com"
+            href="mailto:contact@autoutilshop.fr"
             className="text-cyan-300 hover:underline"
           >
-            contact@autoutilshop.com
+            contact@autoutilshop.fr
           </a>
           .
         </p>

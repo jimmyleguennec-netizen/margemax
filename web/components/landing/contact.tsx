@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Mail, MessageSquare, ShieldCheck, User } from "lucide-react";
 
 const CONTACT_EMAIL =
-  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@autoutilshop.com";
+  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@autoutilshop.fr";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

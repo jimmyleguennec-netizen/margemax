@@ -13,7 +13,7 @@ import {
 
 import { Logo } from "@/components/ui/logo";
 
-const CONTACT_EMAIL = "contact@autoutilshop.com";
+const CONTACT_EMAIL = "contact@autoutilshop.fr";
 
 // "Générateur de fiche IA" et "Carnet de notes" retirés : ces
 // fonctionnalités sont mentionnées dans les textes marketing mais
@@ -25,7 +25,7 @@ const toolLinks: { label: string; href: string; icon: LucideIcon }[] = [
 ];
 
 const resourceLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Tutoriel MargeMax", href: "#guide", icon: ScrollText },
+  { label: "Voir la démo", href: "#guide", icon: ScrollText },
   { label: "Mentions légales", href: "/mentions-legales", icon: FileText },
   { label: "CGV / CGU", href: "/cgv", icon: FileText },
   { label: "Confidentialité", href: "/confidentialite", icon: FileText },
