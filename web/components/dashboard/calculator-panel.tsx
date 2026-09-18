@@ -262,7 +262,7 @@ export function CalculatorPanel() {
 
               <motion.div
                 animate={warnControls}
-                className={`grid grid-cols-3 gap-4 rounded-xl border p-4 text-sm transition-colors duration-300 ${
+                className={`grid grid-cols-3 gap-2 rounded-xl border p-3 text-sm transition-colors duration-300 sm:gap-4 sm:p-4 ${
                   isProfitable
                     ? "border-white/10 bg-white/[0.02]"
                     : "animate-pulse border-pink-500/40 bg-pink-500/[0.04] shadow-[0_0_24px_-6px_rgba(244,63,94,0.5)]"

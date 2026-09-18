@@ -12,6 +12,7 @@ import {
   Search,
   Send,
   Sparkles,
+  Star,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -35,6 +36,8 @@ type ApiResult = {
   importFee: number | null;
   total: number | null;
   currency: string;
+  rating: number | null;
+  reviewCount: number | null;
   destination: string;
   analyzedAt: string;
   creditsDebited?: boolean;
@@ -66,6 +69,10 @@ function buildExampleResult(): ApiResult {
     importFee: 3.6,
     total: 18.09,
     currency: "EUR",
+    // Memes chiffres que la demonstration de la landing (demo.tsx) : "3,9/5
+    // (47 vendus)".
+    rating: 3.9,
+    reviewCount: 47,
     destination: "France",
     analyzedAt: new Date().toISOString(),
     isExample: true,
@@ -466,6 +473,19 @@ export function SearchPanel({
                 <p className="truncate font-medium text-white">
                   {result.title}
                 </p>
+                {result.rating !== null && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-white/40">
+                    <Star className="h-3 w-3 shrink-0 text-amber-300" />
+                    {result.rating.toLocaleString("fr-FR", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                    /5
+                    {result.reviewCount !== null
+                      ? ` (${result.reviewCount} avis)`
+                      : ""}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-white/40">
                   Variante : {result.variant ?? "non précisée (prix de l'offre par défaut)"}
                   {" · "}Destination : France
@@ -485,69 +505,78 @@ export function SearchPanel({
               )}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-white/40">
-                    <th className="px-5 py-3 font-medium">Sous-total</th>
-                    <th className="px-5 py-3 font-medium">Frais de port</th>
-                    <th className="px-5 py-3 font-medium">
-                      Taxes d&apos;importation
-                    </th>
-                    <th className="px-5 py-3 font-medium">Coût total</th>
-                    <th className="px-5 py-3 font-medium">Lien</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="px-5 py-4 text-white/70">
-                      {formatEuro(result.subtotal)}
-                      <span className="ml-1.5 text-[10px] uppercase tracking-wide text-green-300/70">
-                        confirmé
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-white/70">
-                      {formatEuro(result.shipping)}
-                      <span
-                        className={`ml-1.5 text-[10px] uppercase tracking-wide ${
-                          result.shipping === null ? "text-amber-300/70" : "text-green-300/70"
-                        }`}
-                      >
-                        {result.shipping === null ? "manquant" : "confirmé"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-white/70">
-                      {formatEuro(result.importFee)}
-                      <span
-                        className={`ml-1.5 text-[10px] uppercase tracking-wide ${
-                          result.importFee === null ? "text-amber-300/70" : "text-green-300/70"
-                        }`}
-                      >
-                        {result.importFee === null ? "manquant" : "confirmé"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 font-semibold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                      {result.total !== null ? (
-                        <CountUp value={result.total} format={formatEuro} />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <Link
-                        href={result.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-cyan-300 transition-colors hover:text-cyan-200"
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
-                        Voir
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            {/* Liste de lignes label/valeur plutot qu'un tableau : reste
+                lisible sans jamais avoir besoin de defiler horizontalement,
+                du telephone (375px) au desktop. */}
+            <div className="divide-y divide-white/10 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Sous-total
+                </span>
+                <span className="text-white/70">
+                  {formatEuro(result.subtotal)}{" "}
+                  <span className="text-[10px] uppercase tracking-wide text-green-300/70">
+                    confirmé
+                  </span>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Frais de port
+                </span>
+                <span className="text-white/70">
+                  {formatEuro(result.shipping)}{" "}
+                  <span
+                    className={`text-[10px] uppercase tracking-wide ${
+                      result.shipping === null ? "text-amber-300/70" : "text-green-300/70"
+                    }`}
+                  >
+                    {result.shipping === null ? "manquant" : "confirmé"}
+                  </span>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Taxes d&apos;importation
+                </span>
+                <span className="text-white/70">
+                  {formatEuro(result.importFee)}{" "}
+                  <span
+                    className={`text-[10px] uppercase tracking-wide ${
+                      result.importFee === null ? "text-amber-300/70" : "text-green-300/70"
+                    }`}
+                  >
+                    {result.importFee === null ? "manquant" : "confirmé"}
+                  </span>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3 font-semibold">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Coût total
+                </span>
+                <span className="text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                  {result.total !== null ? (
+                    <CountUp value={result.total} format={formatEuro} />
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-x-3 px-5 py-3">
+                <span className="text-xs uppercase tracking-wider text-white/40">
+                  Lien
+                </span>
+                <Link
+                  href={result.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-cyan-300 transition-colors hover:text-cyan-200"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Voir
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
             </div>
 
             {(result.shipping === null || result.importFee === null) && (

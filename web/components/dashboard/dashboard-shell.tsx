@@ -47,25 +47,29 @@ const tabs: AnimatedTabItem[] = [
 ];
 
 // Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
-// ActiveTabHint ci-dessous. Vouvoiement pour rester cohérent avec le reste
-// du site (voir passation.md : repasse complète en vouvoiement, contenu de
-// ce sprint fourni au tutoiement, converti ici).
+// ActiveTabHint ci-dessous. Tutoiement DELIBERE, distinct du vouvoiement
+// utilise partout ailleurs sur le site (formulaires, CGV, boutons...) :
+// fourni deux fois de suite en tutoiement pour ce bandeau precis dans deux
+// briefs consecutifs -- traite ici comme un choix de ton assume pour cette
+// astuce contextuelle courte, pas comme une repasse globale (voir
+// passation.md, qui documente les allers-retours tutoiement/vouvoiement
+// passes : signale explicitement a l'utilisateur si ce n'etait pas voulu).
 const TAB_HELP: Record<string, { title: string; body: string }> = {
   recherche: {
     title: "Recherche & Sourcing",
-    body: "Entrez un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit déduit uniquement par analyse réussie).",
+    body: "Entre un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit par analyse réussie).",
   },
   calculateur: {
     title: "Calculateur de Marge",
-    body: "Simulez et ajustez vos coûts (frais de port, TVA, pub) en temps réel. Utilisable à volonté sans consommer de crédit.",
+    body: "Simule tes coûts et marges en temps réel. Utilisable à volonté sans consommer de crédit.",
   },
   historique: {
     title: "Historique des analyses",
-    body: "Retrouvez et réexaminez les produits analysés au cours de votre session.",
+    body: "Retrouve et réexamine les produits analysés lors de cette session.",
   },
   parametres: {
     title: "Paramètres du compte",
-    body: "Gérez votre compte, consultez votre solde et rechargez vos crédits d'analyse.",
+    body: "Gère ton compte, consulte ton solde et recharge tes crédits d'analyse.",
   },
 };
 
@@ -272,9 +276,13 @@ export function DashboardShell({
         />
 
         <header className="sticky top-0 z-50 border-b border-white/10 bg-black/40 backdrop-blur-xl">
-          <div className="container flex h-16 items-center justify-between">
-            <Link href="/">
-              <Logo />
+          <div className="container flex h-16 items-center justify-between gap-2">
+            {/* Logo retreci sous sm (640px) : a sa taille par defaut
+                (h-14), combine au badge de credits, il depassait la
+                largeur d'un ecran de telephone (375-414px) et forcait un
+                defilement horizontal du header. */}
+            <Link href="/" className="shrink-0">
+              <Logo className="h-9 sm:h-14 md:h-16" />
             </Link>
             <AnimatedTabs
               tabs={tabs}
@@ -284,18 +292,19 @@ export function DashboardShell({
               className="hidden sm:inline-flex"
             />
             {liveCredits !== null && (
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)]">
-                  <Zap className="h-3.5 w-3.5" />
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+                <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)] sm:gap-1.5 sm:px-3 sm:py-1.5">
+                  <Zap className="h-3.5 w-3.5 shrink-0" />
                   {liveCredits}
-                  {creditsMax !== null ? ` / ${creditsMax}` : ""} crédits
+                  {creditsMax !== null ? ` / ${creditsMax}` : ""}
+                  <span className="hidden sm:inline">&nbsp;crédits</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setBuyModalOpen(true)}
                   aria-label="Acheter des crédits"
                   title="Acheter des crédits"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_0_14px_-4px_rgba(217,70,239,0.8)] transition-transform hover:scale-110"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_0_14px_-4px_rgba(217,70,239,0.8)] transition-transform hover:scale-110"
                 >
                   <Plus className="h-4 w-4" />
                 </button>

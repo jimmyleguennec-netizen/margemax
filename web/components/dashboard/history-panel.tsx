@@ -52,46 +52,36 @@ export function HistoryPanel({
 
   return (
     <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-white/40">
-              <th className="px-5 py-3 font-medium">Heure</th>
-              <th className="px-5 py-3 font-medium">Recherche</th>
-              <th className="px-5 py-3 font-medium">Coût total</th>
-              <th className="px-5 py-3 font-medium">Lien</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id} className="border-b border-white/5 last:border-0">
-                <td className="px-5 py-4 text-white/40">
-                  {formatTime(entry.timestamp)}
-                </td>
-                <td className="px-5 py-4">
-                  <p className="text-white">{entry.title}</p>
-                  <p className="text-xs text-white/40">
-                    Recherché : « {entry.query} »
-                  </p>
-                </td>
-                <td className="px-5 py-4 font-semibold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-                  {entry.total}
-                </td>
-                <td className="px-5 py-4">
-                  <Link
-                    href={entry.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-cyan-300 transition-colors hover:text-cyan-200"
-                  >
-                    Voir
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Cartes empilees plutot qu'un tableau : lisibles sans defilement
+          horizontal, du telephone (375px) au desktop. */}
+      <div className="divide-y divide-white/5">
+        {entries.map((entry) => (
+          <div
+            key={entry.id}
+            className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-white">{entry.title}</p>
+              <p className="text-xs text-white/40">
+                Recherché : « {entry.query} » · {formatTime(entry.timestamp)}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+              <span className="font-semibold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+                {entry.total}
+              </span>
+              <Link
+                href={entry.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-cyan-300 transition-colors hover:text-cyan-200"
+              >
+                Voir
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+        ))}
       </div>
       <p className="border-t border-white/10 px-5 py-3 text-xs text-white/30">
         Historique de cette session — les recherches ne sont pas encore

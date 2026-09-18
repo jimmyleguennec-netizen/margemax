@@ -23,6 +23,11 @@ export type AliExpressSearchResult = {
   importFee: number | null;
   total: number | null;
   currency: string;
+  /** Note moyenne (/5) et nombre d'avis, depuis aggregateRating des donnees
+   * structurees JSON-LD -- null si l'annonce n'en expose pas (toutes ne le
+   * font pas), jamais une valeur inventee. */
+  rating: number | null;
+  reviewCount: number | null;
   source: "firecrawl";
   /** Pays cible des taxes d'importation calculees (voir location.country
    * passe a Firecrawl dans fetchHtmlViaFirecrawl). */
@@ -216,6 +221,8 @@ function extractFromJsonLd(html: string): {
   currency?: string;
   imageUrl?: string;
   variant?: string;
+  rating?: number;
+  reviewCount?: number;
 } {
   const matches = html.matchAll(
     /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi
@@ -239,6 +246,21 @@ function extractFromJsonLd(html: string): {
       const productName = typeof product.name === "string" ? product.name : undefined;
       const variant = offerName && offerName !== productName ? offerName : undefined;
 
+      // aggregateRating n'est pas toujours present (toutes les annonces ne
+      // l'exposent pas dans leurs donnees structurees) -- undefined plutot
+      // qu'une valeur par defaut si absent ou non numerique.
+      const aggregateRating = product.aggregateRating;
+      const ratingValue =
+        aggregateRating?.ratingValue !== undefined
+          ? Number.parseFloat(String(aggregateRating.ratingValue))
+          : undefined;
+      const reviewCountValue =
+        aggregateRating?.reviewCount !== undefined
+          ? Number.parseInt(String(aggregateRating.reviewCount), 10)
+          : aggregateRating?.ratingCount !== undefined
+            ? Number.parseInt(String(aggregateRating.ratingCount), 10)
+            : undefined;
+
       return {
         title: productName,
         price:
@@ -246,6 +268,8 @@ function extractFromJsonLd(html: string): {
         currency: typeof offer?.priceCurrency === "string" ? offer.priceCurrency : undefined,
         imageUrl: typeof rawImage === "string" ? rawImage : undefined,
         variant,
+        rating: Number.isFinite(ratingValue) ? ratingValue : undefined,
+        reviewCount: Number.isFinite(reviewCountValue) ? reviewCountValue : undefined,
       };
     } catch {
       continue;
@@ -307,7 +331,8 @@ export async function performAliExpressSearch(
     );
   }
 
-  const { title, price, currency, imageUrl, variant } = extractFromJsonLd(html);
+  const { title, price, currency, imageUrl, variant, rating, reviewCount } =
+    extractFromJsonLd(html);
   const { shipping, importFee } = extractShippingAndImportFee(html);
   const productImageUrl = imageUrl ?? extractOgImage(html) ?? null;
 
@@ -331,6 +356,8 @@ export async function performAliExpressSearch(
     importFee,
     total,
     currency: currency ?? "EUR",
+    rating: rating ?? null,
+    reviewCount: reviewCount ?? null,
     source: "firecrawl",
     destination: "FR",
     analyzedAt: new Date().toISOString(),
