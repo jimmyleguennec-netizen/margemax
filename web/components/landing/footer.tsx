@@ -13,22 +13,32 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/ui/logo";
+import {
+  ApplePayIcon,
+  CarteBancaireIcon,
+  GooglePayIcon,
+  MastercardIcon,
+  StripeIcon,
+  VisaIcon,
+} from "@/components/ui/payment-icons";
 
 const CONTACT_EMAIL = "contact@autoutilshop.fr";
 
 // Paiement traite via Stripe (Payment Links) -- ces moyens de paiement
 // sont proposes automatiquement par Stripe Checkout selon l'appareil/
 // navigateur du client, sans configuration supplementaire cote MargeMax.
-// Badges texte plutot que des logos de marque reconstitues a la main
-// (aucune bibliotheque d'icones de marque n'est installee ici) -- chaque
-// accent de couleur rappelle la marque sans en reproduire le logo exact.
-const PAYMENT_METHODS: { label: string; accent: string }[] = [
-  { label: "Apple Pay", accent: "border-white/20 text-white" },
-  { label: "Google Pay", accent: "border-blue-400/30 text-blue-300" },
-  { label: "Visa", accent: "border-indigo-400/30 text-indigo-300" },
-  { label: "Mastercard", accent: "border-orange-400/30 text-orange-300" },
-  { label: "CB", accent: "border-cyan-400/30 text-cyan-300" },
-  { label: "Stripe", accent: "border-violet-400/30 text-violet-300" },
+// Icones SVG dessinees a la main (components/ui/payment-icons.tsx) plutot
+// qu'une bibliotheque de logos de marque : ni react-icons ni un pack
+// d'icones de paiement ne sont installes dans ce projet, et il n'y a pas
+// de Node/npm disponible ici pour ajouter une dependance en toute
+// securite (regenerer package-lock.json a l'aveugle).
+const PAYMENT_METHODS: { label: string; Icon: (props: { className?: string }) => JSX.Element }[] = [
+  { label: "Apple Pay", Icon: ApplePayIcon },
+  { label: "Google Pay", Icon: GooglePayIcon },
+  { label: "Visa", Icon: VisaIcon },
+  { label: "Mastercard", Icon: MastercardIcon },
+  { label: "CB", Icon: CarteBancaireIcon },
+  { label: "Stripe", Icon: StripeIcon },
 ];
 
 // "Générateur de fiche IA" et "Carnet de notes" retirés : ces
@@ -156,14 +166,9 @@ export function Footer() {
           <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-cyan-200/70 sm:text-left">
             Moyens de paiement acceptés
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            {PAYMENT_METHODS.map((method) => (
-              <span
-                key={method.label}
-                className={`rounded-full border bg-white/[0.02] px-3 py-1.5 text-xs font-medium ${method.accent}`}
-              >
-                {method.label}
-              </span>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
+            {PAYMENT_METHODS.map(({ label, Icon }) => (
+              <Icon key={label} className="opacity-90 transition-opacity hover:opacity-100" />
             ))}
           </div>
         </div>
