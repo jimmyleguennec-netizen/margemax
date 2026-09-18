@@ -1,5 +1,52 @@
 # Passation — MargeMax
 
+## Sprint correctifs finaux : contact, burger, textes (2026-09-18, session "correctifs finaux")
+
+**Nouvelle dépendance externe requise : Resend.** Le formulaire de contact
+(`/#contact`) envoyait auparavant un `mailto:` (ouvre l'appli e-mail du
+visiteur, ne transmet réellement rien tant qu'il n'a pas lui-même cliqué
+"envoyer" dedans — pas un vrai envoi automatique). Remplacé par
+`app/api/contact/route.ts` (nouveau), qui appelle l'API REST de Resend en
+direct (`fetch`, pas le SDK npm `resend` — évite de toucher
+`package.json`/`package-lock.json` dans un environnement toujours sans
+Node pour régénérer le lockfile correctement ; même approche que
+l'intégration Firecrawl). Forme de la requête Resend (`from`/`to`/
+`subject`/`html`/`reply_to`) vérifiée via l'accès Firecrawl-developer-search
+de cette session avant d'écrire le code, pas de mémoire. Protégé par
+rate-limit IP (`lib/rate-limit.ts`, nouveau preset `contactByIp`,
+réutilise la RPC `register_auth_attempt` déjà en place).
+
+**⚠️ Bloquant tant que non fait : `RESEND_API_KEY` doit être renseignée
+dans Vercel → Project Settings → Environment Variables** (voir
+`.env.example`) pour que l'envoi fonctionne réellement — sans elle, le
+formulaire affiche un message d'erreur clair ("L'envoi de message n'est
+pas encore configuré...") au lieu d'échouer silencieusement, exactement
+comme le fait déjà `FIRECRAWL_API_KEY` absente pour la recherche. Optionnel
+mais recommandé : `RESEND_FROM_EMAIL` avec un domaine vérifié dans le
+compte Resend (sans elle, repli sur `onboarding@resend.dev`, le domaine de
+test de Resend qui fonctionne sans vérification mais n'est pas fait pour
+un usage de production durable). **Non testé en conditions réelles**
+(pas de compte/clé Resend accessible depuis cet environnement).
+
+**Menu burger mobile** (`navbar.tsx`) : **non reproduit** en testant en
+direct sur le site déployé (375px, navigateur intégré) — un clic
+`document.elementFromPoint()` au centre du bouton retombait bien sur un
+descendant du bouton lui-même (pas de calque bloquant trouvé), et un clic
+réel a ouvert le menu du premier coup. Durci quand même, comme demandé :
+`z-index`/`pointer-events` explicites sur le bouton, et **verrouillage du
+scroll de la page (`document.body.style.overflow`) tant que le menu plein
+écran est ouvert**, restauré à la fermeture/démontage — absent avant cette
+session, c'est la cause la plus probable d'un ressenti "pas fluide" sur un
+vrai téléphone (la page derrière l'overlay pouvait défiler au swipe).
+
+**Texte "au doigt mouillé"** : une seule occurrence dans tout le code
+(`demo.tsx`, vérifié par recherche globale) — remplacée par le texte
+fourni tel quel, tutoiement inclus (voir plus haut dans ce fichier : la
+bannière `TAB_HELP` du dashboard est aussi en tutoiement délibéré,
+troisième occurrence de ce choix de ton dans les briefs récents — le site
+reste vouvoiement partout ailleurs, signalé une fois de plus au cas où ce
+ne serait pas voulu pour un titre de landing aussi visible).
+
 ## Sprint final : webscraping Firecrawl, UI header & harmonisation (2026-09-18, session "sprint final v2")
 
 Cette session avait un accès MCP à Firecrawl côté Claude (outils
