@@ -1,5 +1,82 @@
 # Passation — MargeMax
 
+## Finalisation sprint P0-P3 & mentions légales (2026-09-18, session "reprise")
+
+Reprise de session sur une machine avec accès disque complet mais **toujours
+sans Node/npm** (vérifié à nouveau : ni dans PATH, ni dans les emplacements
+d'installation habituels — `npm run build` reste impossible à exécuter dans
+cet environnement, comme documenté depuis le début du projet). Relecture
+statique complète du diff en attente (11 fichiers modifiés + 1 nouveau)
+avant commit — voir détail des points vérifiés ci-dessous.
+
+**Commit `3feaf5e`** (contenait déjà, non committé jusqu'ici, le travail
+d'une session précédente non documentée dans ce fichier — repris et vérifié
+ici) :
+- **Migration ScraperAPI → Firecrawl** (`lib/aliexpress-search.ts`) :
+  `fetchHtmlViaScraperApi` → `fetchHtmlViaFirecrawl`, appel
+  `POST https://api.firecrawl.dev/v1/scrape` avec `formats: ["rawHtml"]`
+  (pas `"html"`, qui est nettoyé par Firecrawl et retirerait les
+  `<script type="application/ld+json">` dont dépendent les extracteurs) et
+  `location: { country: "FR", languages: ["fr"] }` pour préserver la
+  géolocalisation France déjà en place. Variable d'env renommée
+  `SCRAPER_API_KEY` → `FIRECRAWL_API_KEY` (`.env.example`,
+  `.env.local.example`). Traduction des erreurs/timeouts en français
+  préservée à l'identique. **Aucune référence à ScraperAPI restante**
+  (vérifié par recherche globale). **Non testé en conditions réelles**
+  (pas de clé Firecrawl ni d'accès réseau ici) — relecture statique
+  uniquement, cohérence du contrat API Firecrawl vérifiée par lecture de
+  la doc publique connue au moment de l'écriture, pas par appel réel.
+- **Fix double-soumission Auth** (`neon-auth-panel.tsx`) : garde
+  synchrone (`submittingRef`) sur les formulaires login/signup, en plus
+  de `useFormStatus().pending` (qui ne désactive le bouton qu'après le
+  premier re-render suivant le clic — un double-clic rapide ou un Entrée
+  maintenu pouvait déclencher deux soumissions natives avant ce re-render).
+  Réinitialisé sur tout changement de `state` (succès ou erreur). Profité
+  de l'occasion pour synchroniser `document.title` et l'URL affichée
+  (`history.replaceState`, pas `router.replace` qui remonterait le
+  composant) avec le mode login/signup réellement affiché dans le panneau
+  glissant.
+- **`BuyCreditsModal`** (nouveau, `components/dashboard/buy-credits-modal.tsx`)
+  + retouches `dashboard-shell.tsx` : achat de crédits sans quitter le
+  dashboard (bouton "+" dans le header à côté du solde, et bouton
+  "Acheter des crédits" dans Paramètres, qui redirigeait avant vers
+  `/#pricing` sur la landing). Le modal ne fait que choisir un pack ; la
+  case de consentement retrait/exécution immédiate et la redirection
+  Stripe restent gérées par `CheckoutConsentDialog`, déjà en place et
+  inchangé.
+- **UX dashboard** : `search-panel.tsx` — bouton "Voir une analyse exemple"
+  (données statiques identiques à la démo de la landing, aucun appel
+  réseau ni crédit consommé, bandeau "Exemple illustratif" affiché sur le
+  résultat pour ne jamais le confondre avec une vraie analyse) ;
+  `history-panel.tsx` — CTA "Analyser mon premier produit" sur l'état vide
+  de l'historique ; `calculator-panel.tsx` — réorganisation en 2 colonnes
+  sur desktop (coûts à gauche, marge à droite), **logique de calcul et
+  formules inchangées**, uniquement du réagencement JSX.
+- **Mentions légales & CGV** (`web/app/mentions-legales/page.tsx`,
+  `web/app/cgv/page.tsx`) : les placeholders "en cours de finalisation"
+  remplacés par les informations réelles fournies par l'utilisateur cette
+  session — SIREN 107 057 432, SIRET 107 057 432 00018, RCS Narbonne,
+  capital social 251 €, Jimmy Le Guennec comme président et directeur de
+  la publication, hébergeur Vercel Inc. avec lien vers vercel.com. Email
+  de contact corrigé `contact@autoutilshop.com` → `contact@autoutilshop.fr`
+  partout où il apparaissait (mentions légales, CGV, confidentialité,
+  formulaire de contact `contact.tsx`, footer, commentaires
+  `.env.example`/`.env.local.example`) pour cohérence — l'utilisateur
+  n'avait donné le domaine `.fr` que pour les pages légales, corrigé
+  ailleurs par déduction du même fait (adresse de contact réelle), pas
+  une donnée inventée. **Restent en placeholder "en cours de
+  finalisation"** (non fournis par l'utilisateur, non inventés) : numéro
+  de TVA intracommunautaire, numéro de téléphone, identité du médiateur
+  de la consommation (nom/adresse/site).
+
+**⚠️ Toujours aucune exécution possible de `npm install`/`lint`/`build`/
+`test` dans cet environnement** (Node absent, recherché en profondeur dans
+PATH et emplacements d'installation habituels — pas seulement "pas dans le
+PATH courant"). Le commit a été poussé sur `main` en s'appuyant sur le
+build Vercel au déploiement comme filet de sécurité (Vercel ne promeut pas
+un déploiement dont le build échoue). **Recommandé à l'utilisateur : vérifier
+le statut du déploiement Vercel après ce push.**
+
 ## Correctifs P0-P2 (2026-09-18, session "audit et sécurisation")
 
 Session déclenchée par 5 constats confirmés par l'utilisateur en conditions
@@ -175,13 +252,13 @@ Audit demandé par l'utilisateur sur 5 points, résultat point par point :
 - `web/components/auth/neon-auth-panel.tsx` — panneau login/signup avec bascule overlay ; contient la logique de reprise du pack après connexion, qui ouvre désormais la modale de consentement au lieu de rediriger directement vers Stripe.
 - `web/components/dashboard/search-panel.tsx` / `calculator-panel.tsx` — UI dashboard réelle (recherche créditée / calculateur manuel).
 - `web/components/landing/*` — toute la page d'accueil marketing (hero, features, pricing, credit-calculator, demo, interactive-demo, quick-guide, faq, contact, footer, navbar).
-- `web/app/mentions-legales/page.tsx`, `web/app/cgv/page.tsx` — pages légales, encore incomplètes sur des points factuels (voir Bugs).
+- `web/app/mentions-legales/page.tsx`, `web/app/cgv/page.tsx` — pages légales ; SIREN/SIRET/RCS/capital/président/hébergeur/email complétés le 2026-09-18 (voir section "Finalisation sprint P0-P3 & mentions légales" en tête de fichier), TVA intracommunautaire/téléphone/médiateur de la consommation encore en placeholder (voir Bugs).
 
 ## Problématiques/Bugs en cours à résoudre
 
 - **Paiement encore sur Stripe Payment Links, pas Stripe Checkout Sessions.** Décision explicite de l'utilisateur (2026-09-18) : conserver les Payment Links pour l'instant, ne pas migrer vers Checkout Sessions dynamiques tout de suite.
 - **Case à cocher "exécution immédiate + renonciation rétractation" — codée et déployée, migration exécutée.** La modale (`checkout-consent-dialog.tsx`) et la route API (`/api/consent/checkout`) sont en place, la table `public.checkout_consents` existe en base. **Reste à vérifier en conditions réelles** (achat complet de bout en bout sur les 3 parcours). Choix produit fait par l'utilisateur : une seule case combinant les deux mentions (plutôt que deux cases séparées) — à valider avec un juriste si besoin, le texte exact est dans `web/lib/legal-consent.ts`.
-- **Mentions légales incomplètes.** SIREN, ville RCS, capital social, TVA intracommunautaire, téléphone, nom du Président, et l'identité du médiateur de la consommation sont absents — remplacés par des mentions "en cours de finalisation" (visibles publiquement mais honnêtes) au lieu d'inventer des valeurs. **Ces informations réelles doivent être fournies par l'utilisateur pour compléter la page.**
+- **Mentions légales — TVA intracommunautaire, téléphone et médiateur de la consommation encore manquants.** SIREN, SIRET, RCS, capital social et président ont été complétés le 2026-09-18 (voir section en tête de fichier) avec les vraies valeurs fournies par l'utilisateur. Restent en placeholder "en cours de finalisation" (visibles publiquement mais honnêtes, jamais inventés) : numéro de TVA intracommunautaire, numéro de téléphone, et l'identité (nom/adresse/site) du médiateur de la consommation désigné par AutOutilShop SAS. **Ces informations réelles doivent être fournies par l'utilisateur pour compléter la page.**
 - **Contradictions répétées entre briefs successifs sur tutoiement vs vouvoiement.** Le site est actuellement en vouvoiement partout (vérifié à nouveau le 2026-09-18, aucun marqueur de tutoiement trouvé) — vérifier avec l'utilisateur avant de relancer une passe de style si un nouveau brief le redemande.
 - **Framework de test ajouté (Vitest) mais jamais installé/exécuté ici.** `web/lib/margin-estimate.test.ts` couvre le calculateur (saisies invalides, division par zéro, arrondis, paliers de fiabilité). Exécuter `npm install && npm test` pour confirmer que ça passe réellement — jamais vérifié faute de Node dans cet environnement.
 - **Recherche "chargeur à induction pour iPhone" / "iphone" → "Aucune annonce trouvée"** : cause probable identifiée (recherche sur `www.aliexpress.com` sans géolocalisation FR) et corrigée (`fr.aliexpress.com` + `country_code=fr`, regex d'extraction élargie, marqueurs anti-bot étendus), mais **non re-testée en conditions réelles** (pas de clé ScraperAPI ni d'accès réseau ici) — cause exacte non confirmée à 100 %.
@@ -195,7 +272,7 @@ Audit demandé par l'utilisateur sur 5 points, résultat point par point :
 2. **Vérifier en conditions réelles avec une vraie clé ScraperAPI** : recherche "chargeur à induction pour iPhone", analyse du lien `fr.aliexpress.com/item/1005006478208156.html` — les deux corrections (géolocalisation FR + traduction des timeouts + `maxDuration=60`) sont des corrections de cause probable, **jamais re-testées** faute d'accès réseau ici.
 3. **Vérifier en conditions réelles (Stripe test mode)** le nouveau contrôle anti-fraude du webhook (`app/api/webhooks/stripe/route.ts`) : payer un pack via son Payment Link normal doit toujours créditer correctement ; un `client_reference_id` trafiqué doit être rejeté sans créditer (vérifiable en modifiant l'URL manuellement en environnement de test).
 4. **Vérifier dans Supabase Dashboard → Authentication → Settings** : durée d'expiration du JWT (access token) et rotation des refresh tokens — non vérifiable depuis cet environnement (voir section Audit de sécurité, point 5).
-5. **Demander à l'utilisateur les informations légales réelles** (SIREN, RCS, capital social, TVA, téléphone, Président, médiateur de la consommation) pour compléter `mentions-legales` et `cgv` — actuellement bloqué par l'absence de ces données, jamais inventées. L'utilisateur a dit les fournir plus tard.
+5. **Demander à l'utilisateur les informations légales encore manquantes** (TVA intracommunautaire, téléphone, identité du médiateur de la consommation) pour finir de compléter `mentions-legales` — SIREN/RCS/capital social/Président ont été fournis et intégrés le 2026-09-18, bloqué seulement sur ces 3 derniers points, jamais inventés.
 6. **Faire relire par un juriste** la nuance L.221-25/L.221-28 ajoutée cette session (paiement = début d'exécution, pas exécution complète) dans `cgv/page.tsx` et `checkout-consent-dialog.tsx` — rédigée de bonne foi mais non validée par un professionnel du droit.
 7. **Vérifier en conditions réelles** (déploiement Vercel + Supabase + Stripe live) : la case à cocher de consentement + récapitulatif sur les 3 parcours d'achat (pricing landing, calculateur de crédits, reprise après connexion), le rate limiting login/signup/reset mdp, `/login` et `/signup` qui redirigent bien un utilisateur déjà connecté (avec pack conservé), "Mon espace" dans la navbar connectée, les 5 packs, le parcours OTP (longueur de code), le reset de mot de passe, le webhook Stripe en mode test avec replay.
 8. **Balayage de contraste complet** (P2) : seuls quelques `text-white/30` du dashboard ont été relevés à `/40` cette session ; le reste du site (landing notamment) n'a pas été audité visuellement — nécessite un vrai rendu navigateur, impossible ici.
