@@ -1,5 +1,42 @@
 # Passation — MargeMax
 
+## Bug fix critique : recherche par mots-clés cassée en production (2026-09-18, session "fix keyword search 16-digit IDs")
+
+**Cause racine trouvée et confirmée en conditions réelles** (navigateur
+intégré, vraie page de résultats `fr.aliexpress.com/w/wholesale-...html`
+ouverte en direct) : **les ID produit AliExpress font aujourd'hui 16
+chiffres** (ex. `1005012427087010`, `1005012690129627`...), alors que les
+trois regex d'extraction d'ID dans `web/lib/aliexpress-search.ts`
+plafonnaient à 15 chiffres (`\d{9,15}`). Résultat : **aucun** lien produit
+réel — ni en résultat de recherche par mot-clé, ni dans une URL collée
+directement — ne pouvait plus matcher, d'où "Aucune annonce trouvée pour
+ce mot-clé sur AliExpress" sur absolument toute recherche. Testé en direct
+sur `fr.aliexpress.com/w/wholesale-coque-iphone-17.html` : le premier ID
+produit réel de la page fait bien 16 chiffres, confirmant le bug avant
+correctif.
+
+**Fix** : les trois regex (`extractProductId` — URL directe et ID brut
+collé, et `findFirstProductIdFromKeyword` — résultat de recherche par
+mot-clé) n'ont plus de borne haute sur le nombre de chiffres (`\d{9,}` au
+lieu de `\d{9,15}`) — seule une borne basse à 9 chiffres subsiste pour
+éviter de capturer un petit nombre incident. Le suffixe `.html` (ou la fin
+de chaîne pour un ID brut) délimite déjà le nombre, donc une borne haute
+n'apportait aucune sécurité, seulement un risque de re-casser au prochain
+allongement d'ID côté AliExpress — ce qui est exactement ce qui s'est
+produit ici.
+
+**La séparation URL directe / mot-clé demandée dans le brief existait déjà
+et était correcte** (`performAliExpressSearch` : `extractProductId(query)`
+d'abord, `findFirstProductIdFromKeyword(query)` seulement si ça échoue) —
+le vrai bug n'était pas un problème d'aiguillage entre les deux chemins,
+mais cette regex commune aux deux qui rejetait silencieusement tout ID
+produit moderne, quel que soit le chemin emprunté.
+
+**Sans lien avec le fix précédent (isolement du bloc produit pour les
+frais de port/taxes)** : ce fix-là opère uniquement sur le HTML de la
+fiche produit déjà trouvée, jamais sur la détection de l'ID lui-même — les
+deux bugs étaient distincts et indépendants.
+
 ## UI fix : icônes SVG pour les moyens de paiement du footer (2026-09-18, session "payment icons")
 
 **Badges texte remplacés par de vraies icônes SVG vectorielles**
