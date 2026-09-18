@@ -1,5 +1,61 @@
 # Passation — MargeMax
 
+## Sprint final unifié : Firecrawl réel, redirections Stripe & UI/mobile (2026-09-18, session "sprint final")
+
+Session avec accès disque réel (git repo détecté cette fois), toujours sans
+Node/npm — relecture statique uniquement. **Testé en direct sur le site
+Vercel déployé** (landing + /login, 375px et 890px, via le navigateur intégré)
+pour vérifier l'hypothèse de scroll horizontal AVANT de corriger : aucun
+scroll horizontal page-level trouvé sur ces pages publiques — confirme que
+le problème, s'il existe, est spécifique au dashboard (protégé par
+authentification, non testable en direct ici sans identifiants).
+
+- **Firecrawl — note/avis ajoutés** (`lib/aliexpress-search.ts`) :
+  extraction de `aggregateRating` (ratingValue/reviewCount, avec repli sur
+  `ratingCount`) depuis les données structurées JSON-LD, `null` si
+  l'annonce ne l'expose pas (jamais inventé). Titre/prix/devise/image pour
+  mot-clé ET lien direct, ainsi que "aucun crédit débité en cas
+  d'échec", étaient déjà en place (voir sprint précédent) — juste vérifiés
+  à nouveau ici. Toujours **non testé en conditions réelles** (pas de clé
+  Firecrawl ni d'accès réseau sortant ici).
+- **Bug racine du header mobile trouvé et corrigé** (`dashboard-shell.tsx`) :
+  le logo (`h-14` = 56px de haut, ratio ~3.5:1 ≈ 196px de large) et le badge
+  de crédits ("X / Y crédits" + bouton "+") ensemble dépassaient largement
+  la largeur disponible sur un téléphone (375-414px, ~311px utilisables
+  après le padding du conteneur) — calcul vérifié à la main
+  (196px + ~150px > ~311px), sur un `<div className="flex justify-between">`
+  sans `flex-wrap`, ce qui forçait un débordement horizontal du header.
+  Corrigé : logo réduit à `h-9` sous `sm:` (640px), badge de crédits
+  compacté (mot "crédits" masqué sous `sm:`, ne garde que l'icône + les
+  chiffres), `shrink-0` ajouté partout pour empêcher un écrasement
+  imprévisible par le flex.
+- **Tableaux de résultats/historique remplacés** (`search-panel.tsx`,
+  `history-panel.tsx`) : les deux `<table className="min-w-[480px]">`
+  (carte de résultat d'analyse, liste d'historique) forçaient un défilement
+  horizontal interne dès qu'un écran faisait moins de ~480px de large —
+  remplacés par des listes de lignes label/valeur empilées (même motif
+  déjà utilisé par le calculateur), lisibles à toute largeur sans jamais
+  avoir besoin de défiler.
+- **Calculateur** : espacement/padding resserrés sur la ligne de stats
+  Marge/Marge %/ROI (3 colonnes) pour plus de marge sur téléphone étroit —
+  la disposition Coûts/Marge en 1 colonne sous `lg:` (1024px) était déjà en
+  place depuis le sprint précédent, rien à changer là.
+- **Bandeau d'aide contextuelle — texte mis à jour, tutoiement conservé
+  DÉLIBÉRÉMENT.** Le brief de cette session a redonné le même bandeau en
+  tutoiement, pour la deuxième fois consécutive (la première fois, la
+  session précédente l'avait converti en vouvoiement sans demander, en
+  citant la cohérence du site). Face à cette répétition, le texte a été
+  intégré tel quel cette fois (tutoiement), avec un commentaire dans le
+  code expliquant ce choix — **à confirmer avec l'utilisateur** : est-ce
+  un choix de ton assumé pour ce bandeau précis (differencié du reste du
+  site, en vouvoiement partout ailleurs), ou une incohérence non voulue ?
+  Voir aussi plus bas dans ce fichier : contradictions déjà notées comme
+  point de friction récurrent.
+- **Flux paiement Stripe (redirections `/signup`, `/api/checkout`)** :
+  déjà corrigé intégralement lors du sprint précédent (voir section
+  suivante ci-dessous) — vérifié à nouveau ici, aucune régression, rien
+  d'autre à faire.
+
 ## Sprint correctifs urgents : Stripe, images & UX dashboard (2026-09-18, session "sprint urgent")
 
 Toujours aucun Node/npm sur cette machine (revérifié) — relecture statique
