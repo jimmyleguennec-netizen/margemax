@@ -81,7 +81,11 @@ function MobileMenu({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-xl sm:hidden"
+          // Pas de backdrop-blur ici : le fond est deja quasi-opaque
+          // (bg-black/95), et animer un filtre backdrop-filter en opacite
+          // sur un calque plein ecran est une cause frequente de flash
+          // noir a l'ouverture/fermeture sur mobile.
+          className="fixed inset-0 z-[60] flex flex-col bg-black/95 sm:hidden"
         >
           <div className="container flex h-16 items-center justify-between">
             <Link href="/" onClick={onClose}>
@@ -206,10 +210,16 @@ export function Navbar() {
 
       <div
         className={cn(
-          "w-full border-b backdrop-blur-xl transition-colors duration-300",
+          // backdrop-blur retire sur mobile : un filtre backdrop-filter
+          // recalcule a chaque frame sur un header position:sticky pendant
+          // le scroll declenche des glitches de rendu (flash noir) sur
+          // Safari/Chrome mobile. Le fond passe a une opacite plus elevee
+          // sur mobile pour compenser visuellement l'absence de flou ; le
+          // flou reste actif a partir de sm (desktop, moins expose au bug).
+          "w-full border-b transition-colors duration-300 sm:backdrop-blur-xl",
           scrolled
-            ? "border-cyan-500/20 bg-slate-950/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
-            : "border-white/10 bg-black/40"
+            ? "border-cyan-500/20 bg-slate-950/95 shadow-[0_4px_20px_rgba(0,0,0,0.5)] sm:bg-slate-950/80"
+            : "border-white/10 bg-black/80 sm:bg-black/40"
         )}
       >
         <div

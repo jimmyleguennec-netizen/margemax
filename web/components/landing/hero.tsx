@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef } from "react";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { MIconBadge } from "@/components/ui/m-icon-badge";
@@ -26,21 +25,20 @@ const bullets = [
 ];
 
 export function Hero() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end start"],
-  });
-  const orbY = useTransform(scrollYProgress, [0, 1], [0, -150]);
-
   return (
-    <section ref={sectionRef} className="relative overflow-hidden">
+    <section className="relative overflow-hidden">
+      {/* Halo decoratif statique -- l'ancienne version liait sa position au
+          scroll (useTransform sur scrollYProgress) par-dessus un filtre
+          blur-3xl : recalculer un transform sur un calque flou a chaque
+          frame de scroll est une combinaison connue pour faire clignoter
+          l'ecran en noir sur Safari/Chrome mobile. Le halo reste desormais
+          fixe pendant le scroll ; seule une respiration douce (opacity/
+          scale, sans dependance au scroll) subsiste. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-40 -z-10 flex justify-center blur-3xl"
+        className="pointer-events-none absolute inset-x-0 -top-40 -z-10 flex justify-center blur-2xl sm:blur-3xl"
       >
         <motion.div
-          style={{ y: orbY }}
           animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
           className="h-[420px] w-[720px] rounded-full bg-gradient-to-tr from-cyan-500/40 via-fuchsia-500/20 to-transparent"
