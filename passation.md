@@ -1,5 +1,63 @@
 # Passation — MargeMax
 
+## Fix urgent extraction Firecrawl AliExpress (2026-09-18, session "fix Firecrawl")
+
+Symptôme rapporté : recherches par mot-clé ET par URL directe échouaient
+systématiquement avec "AliExpress a limité ou bloqué l'accès" ou "Cette
+annonce n'a pas pu être analysée". Trois causes probables corrigées
+d'un coup dans `lib/aliexpress-search.ts` (non re-testé en conditions
+réelles — toujours pas de clé Firecrawl ni d'accès réseau sortant ici,
+relecture statique uniquement) :
+
+1. **URL de recherche par mot-clé changée** : `buildSearchUrl` utilisait
+   `https://fr.aliexpress.com/wholesale?SearchText=<mot-clé>`, remplacé par
+   `https://fr.aliexpress.com/w/wholesale-<slug>.html` — la forme "jolie"
+   vers laquelle l'ancienne redirige côté client (JS) dans un vrai
+   navigateur. Un scraper qui ne déclenche pas cette redirection JS
+   restait sur l'ancienne forme, plus souvent servie avec une page de
+   vérification anti-bot. `slugifyKeyword()` fait la slugification
+   (normalize NFD + suppression des diacritiques U+0300-U+036F, construite
+   via `String.fromCharCode` plutôt qu'un littéral regex avec séquences
+   d'échappement — **piège technique rencontré et documenté ci-dessous**).
+2. **Options Firecrawl anti-bot ajoutées** : `waitFor: 3000` (AliExpress
+   rend son contenu côté client en React — sans attendre, Firecrawl peut
+   capturer une coquille HTML vide, indépendamment de tout vrai blocage)
+   et `proxy: "auto"` (Firecrawl n'escalade vers son proxy
+   anti-détection, plus lent/coûteux, que si la tentative simple échoue —
+   jamais systématiquement). Budget timeout par appel remonté de 20 s à
+   25 s pour laisser la place à `waitFor` ; le pire cas (recherche par
+   mot-clé, 2 appels Firecrawl chaînés) passe à 2×25 = 50 s, toujours sous
+   le `maxDuration=60` des deux routes API — marge plus courte qu'avant,
+   à surveiller si de nouveaux timeouts apparaissent.
+3. **Nettoyage d'URL (tracking params `pdp_npi`, `search_p4p_id`...)** :
+   déjà géré avant cette session — `extractProductId` n'extrait que l'ID
+   numérique d'une URL collée, et `buildProductUrl` reconstruit toujours
+   une URL canonique propre à partir de ce seul ID, sans jamais transmettre
+   les paramètres de tracking d'origine à Firecrawl. Vérifié, aucun
+   changement de code nécessaire sur ce point.
+4. **Repli sur métadonnées OpenGraph/meta** (`extractOpenGraphFallback`,
+   nouveau) : `performAliExpressSearch` ne rejette plus immédiatement sur
+   un blocage anti-bot détecté ou un prix JSON-LD manquant — il tente
+   d'abord de reconstruire une fiche à partir de `og:title`/`og:image`/
+   `product:price:amount` (les fonctions d'extraction existantes sont sans
+   danger à appeler même sur une page partiellement bloquée, elles se
+   dégradent simplement en `{}`/`null`). L'erreur bloquante n'est levée
+   que si même ce repli échoue — **jamais de prix inventé**.
+
+**Piège technique rencontré et à retenir pour la suite** : écrire une
+séquence d'échappement Unicode du type `̀` directement dans le
+paramètre d'un appel d'outil d'édition (Edit) la fait décoder par le
+parseur JSON du paramètre AVANT qu'elle n'atteigne le fichier — le fichier
+reçoit alors le caractère Unicode littéral (ex. un vrai accent combinant),
+pas le texte `̀` attendu dans le code source. Repéré ici par relecture
+attentive (le rendu affichait des caractères bizarres dans une classe de
+caractères regex) et vérifié par inspection des octets bruts
+(`xxd`/recherche par plage Unicode). Corrigé en construisant la valeur via
+`String.fromCharCode(0x0300)` (texte 100 % ASCII dans le fichier source)
+plutôt qu'un littéral d'échappement direct. **À vérifier systématiquement
+si un futur correctif introduit un caractère Unicode via une séquence
+d'échappement dans un outil d'édition.**
+
 ## Sprint structuration globale : ergonomie, stabilité & mobile (2026-09-18, session "structuration globale")
 
 Toujours sans Node/npm sur cette machine — relecture statique + vérification
