@@ -1,5 +1,68 @@
 # Passation — MargeMax
 
+## Sprint correctifs urgents : Stripe, images & UX dashboard (2026-09-18, session "sprint urgent")
+
+Toujours aucun Node/npm sur cette machine (revérifié) — relecture statique
+uniquement, push en s'appuyant sur le build Vercel comme filet de sécurité.
+
+- **Bug racine du paiement identifié et corrigé** : `buildPackCheckoutHref`
+  (`lib/stripe-links.ts`) repliait sur `/login?pack=<cle>` dès que le
+  Payment Link Stripe d'UN SEUL pack n'était pas configuré
+  (`NEXT_PUBLIC_STRIPE_LINK_*` absente en prod) — y compris pour un
+  utilisateur déjà connecté dans le dashboard, dont le `userId` était
+  pourtant bien renseigné. Ce cas renvoyait vers `/login`, qui redirige
+  aussitôt un utilisateur connecté vers `/dashboard?pack=...` (fix P1
+  précédent), rouvrant la modale de consentement en boucle sans jamais
+  atteindre Stripe ni expliquer pourquoi.
+- **Fix** : nouvelle route `app/api/checkout/route.ts` (POST
+  `{ packKey }`) qui résout l'URL Stripe réelle **côté serveur**, à partir
+  de la session Supabase authentifiée (jamais d'un `user.id` fourni par le
+  client) — retourne une erreur claire (502, "Ce pack n'est pas
+  disponible...") si le Payment Link est manquant, au lieu d'un repli
+  silencieux vers `/login`. `lib/stripe-links.ts` scindé en
+  `buildStripeCheckoutUrl` (résolution serveur pack+userId → URL Stripe ou
+  `null`) et `buildPackCheckoutHref` (href du bouton pour un visiteur
+  anonyme uniquement, désormais `/signup?pack=<cle>` au lieu de
+  `/login?pack=<cle>` — un clic sur un pack depuis la Landing sans être
+  connecté est plus probablement un nouveau visiteur qu'un compte
+  existant). `checkout-consent-dialog.tsx` (utilisé par les 3 parcours :
+  pricing landing, calculateur de crédits, `BuyCreditsModal`/Paramètres du
+  dashboard) appelle désormais `/api/checkout` pour la redirection finale
+  et affiche l'erreur serveur au lieu de silencieusement échouer.
+  **Non re-testé en conditions réelles** (pas d'accès Stripe test mode
+  ici) — à vérifier : payer chaque pack depuis les 3 parcours, et
+  confirmer qu'un Payment Link volontairement mal configuré affiche bien
+  l'erreur 502 au lieu de rediriger vers /login.
+- **Image de l'exemple "Voir une analyse exemple"** (`search-panel.tsx`) :
+  affichait l'icône générique (`ProductThumbnail` sans `product_image_url`,
+  donc repli sur l'icône `Package`) au lieu d'une vraie photo. Corrigé en
+  pointant vers `public/images/product-charger.jpg`, asset déjà présent
+  dans le repo mais jamais référencé nulle part (vérifié par recherche
+  globale avant ce fix) — fichier JPEG valide (en-tête vérifié). La
+  démonstration de la landing (`demo.tsx`) n'a PAS été touchée : elle
+  affiche volontairement le logo MargeMax (`MIconBadge`), pas une photo
+  produit — ce n'est pas un placeholder cassé mais un choix de design
+  différent, aucune preuve dans le code d'un slot image prévu et non
+  rempli à cet endroit.
+- **Bannière d'aide contextuelle** (`dashboard-shell.tsx`, nouveau composant
+  `ActiveTabHint`) : ajoutée dans le header, change de texte selon l'onglet
+  actif (Recherche/Calculateur/Historique/Paramètres). **Texte fourni par
+  l'utilisateur en tutoiement, converti en vouvoiement** avant intégration
+  pour rester cohérent avec le reste du site (voir plus bas dans ce fichier :
+  repasse complète en vouvoiement déjà faite une fois, contradictions
+  répétées identifiées comme point de friction récurrent) — sens et
+  structure inchangés, seule la conjugaison a changé. **À confirmer avec
+  l'utilisateur si le tutoiement était en fait voulu spécifiquement pour ce
+  bandeau.** Coexiste avec `FirstLaunchHint` (aide de premier lancement,
+  dismissible, non touchée).
+- **Nettoyage `ParametresPanel`** : la ligne "X crédits sur Y disponibles"
+  de la première carte (email/déconnexion) supprimée — le solde ne
+  s'affiche plus qu'une fois, dans la carte "Crédits" dédiée juste en
+  dessous (gros chiffre + bouton "Acheter des crédits"). Le badge de
+  crédits dans le header du dashboard (bouton "+") n'a pas été touché : il
+  est visible sur tous les onglets, pas seulement Paramètres, ce n'est pas
+  la répétition signalée.
+
 ## Finalisation sprint P0-P3 & mentions légales (2026-09-18, session "reprise")
 
 Reprise de session sur une machine avec accès disque complet mais **toujours
