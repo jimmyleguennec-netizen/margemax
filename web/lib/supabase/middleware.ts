@@ -1,6 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Prefixes de route exigeant une session active. Verifie ici (middleware,
+ * execute avant TOUT rendu, y compris pour un Server Component) en plus
+ * du controle deja present dans app/dashboard/page.tsx -- defense en
+ * profondeur : toute nouvelle route ajoutee sous l'un de ces prefixes est
+ * protegee automatiquement, meme si son propre garde-fou est oublie.
+ */
+const PROTECTED_PREFIXES = ["/dashboard"];
+
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request });
 
@@ -40,7 +55,14 @@ export async function updateSession(request: NextRequest) {
     });
 
     // Rafraîchit la session si besoin -- ne pas retirer cet appel.
-    await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user && isProtectedPath(request.nextUrl.pathname)) {
+      const loginUrl = new URL("/login", request.url);
+      return NextResponse.redirect(loginUrl);
+    }
 
     return supabaseResponse;
   } catch (error) {

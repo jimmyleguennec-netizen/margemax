@@ -3,6 +3,13 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  RATE_LIMITS,
+  RATE_LIMIT_MESSAGE,
+  checkRateLimit,
+  getClientIp,
+  resetRateLimit,
+} from "@/lib/rate-limit";
 
 export type AuthActionState = {
   error?: string;
@@ -46,15 +53,32 @@ export async function login(
     return { error: "Merci de renseigner votre email et votre mot de passe." };
   }
 
+  const emailKey = `login:email:${email.toLowerCase()}`;
+  const ipKey = `login:ip:${getClientIp()}`;
+  const [ipAllowed, emailAllowed] = await Promise.all([
+    checkRateLimit(ipKey, RATE_LIMITS.loginByIp),
+    checkRateLimit(emailKey, RATE_LIMITS.loginByEmail),
+  ]);
+  if (!ipAllowed || !emailAllowed) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   try {
     const supabase = createClient({ rememberMe });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       // Erreur retournee explicitement par Supabase (identifiants
-      // invalides) -- distincte d'une exception reseau ci-dessous.
+      // invalides) -- distincte d'une exception reseau ci-dessous. Meme
+      // message generique que le mot de passe ou l'email soit en cause :
+      // ne jamais reveler si un compte existe pour cette adresse.
       return { error: "Email ou mot de passe incorrect." };
     }
+
+    // Connexion reussie : la tentative echouee juste avant (mot de passe
+    // mal saisi une premiere fois, par ex.) ne doit pas continuer a
+    // compter contre ce compte.
+    await resetRateLimit(emailKey);
 
     // Pas de redirect() ici : le client affiche une animation de succès
     // puis navigue lui-même vers /dashboard une fois celle-ci jouee.
@@ -87,6 +111,16 @@ export async function signup(
   }
   if (password !== confirmPassword) {
     return { error: "Les mots de passe ne correspondent pas." };
+  }
+
+  const ipKey = `signup:ip:${getClientIp()}`;
+  const emailKey = `signup:email:${email.toLowerCase()}`;
+  const [ipAllowed, emailAllowed] = await Promise.all([
+    checkRateLimit(ipKey, RATE_LIMITS.signupByIp),
+    checkRateLimit(emailKey, RATE_LIMITS.signupByEmail),
+  ]);
+  if (!ipAllowed || !emailAllowed) {
+    return { error: RATE_LIMIT_MESSAGE };
   }
 
   try {
@@ -161,6 +195,21 @@ export async function requestPasswordReset(
     return {
       error: "Récupération impossible pour le moment. Réessayez dans quelques instants.",
     };
+  }
+
+  // Limite meme sur ce parcours "sans risque de mot de passe" : sans elle,
+  // ce formulaire devient un moyen gratuit de spammer la boite mail d'une
+  // victime avec des e-mails de reinitialisation.
+  const ipKey = `password-reset:ip:${getClientIp()}`;
+  const emailKey = `password-reset:email:${email.toLowerCase()}`;
+  const [ipAllowed, emailAllowed] = await Promise.all([
+    checkRateLimit(ipKey, RATE_LIMITS.passwordResetByIp),
+    checkRateLimit(emailKey, RATE_LIMITS.passwordResetByEmail),
+  ]);
+  if (!ipAllowed || !emailAllowed) {
+    // Meme message generique que le succes : ce n'est pas parce que la
+    // limite est atteinte qu'il faut reveler l'existence du compte.
+    return { message: RESET_REQUEST_MESSAGE };
   }
 
   try {
