@@ -52,10 +52,22 @@ export class AliExpressSearchError extends Error {
   }
 }
 
+// Bug reel constate en production : toute recherche par mot-cle echouait
+// avec "Aucune annonce trouvee", meme sur des termes tres courants. Cause
+// racine trouvee en conditions reelles (navigateur, vraies fiches
+// produit AliExpress live) : les ID produit actuels font TOUS 16 chiffres
+// (ex. 1005012690129627), alors que ce regex plafonnait a 15 (\d{9,15})
+// -- il ne matchait donc plus AUCUN lien produit reel, ni en recherche
+// par mot-cle (voir findFirstProductIdFromKeyword plus bas) ni en URL
+// collee directement. Pas de borne haute desormais (juste une borne basse
+// a 9 pour eviter de capturer un petit nombre incident) : le suffixe
+// ".html" ou la fin de chaine delimitent deja le nombre, donc une borne
+// haute n'apportait aucune securite, seulement un risque de recasser au
+// prochain allongement d'ID cote AliExpress.
 function extractProductId(input: string): string | null {
-  const urlMatch = input.match(/item\/(\d{9,15})\.html/);
+  const urlMatch = input.match(/item\/(\d{9,})\.html/);
   if (urlMatch) return urlMatch[1];
-  const bareId = input.match(/^\d{9,15}$/);
+  const bareId = input.match(/^\d{9,}$/);
   return bareId ? bareId[0] : null;
 }
 
@@ -142,7 +154,11 @@ async function findFirstProductIdFromKeyword(
   // simple chemin (/item/ID.html), ou echappe dans un bloc JSON inline
   // (...item\/ID.html, present dans certains etats React/Vue serialises)
   // selon la page/le rendu -- \\? rend le antislash d'echappement optionnel.
-  const match = searchHtml.match(/item\\?\/(\d{9,15})\.html/);
+  // Pas de borne haute sur le nombre de chiffres (voir extractProductId
+  // ci-dessus) : les ID produit reels font 16 chiffres aujourd'hui, contre
+  // 15 max ici avant correctif -- cause reelle du bug "Aucune annonce
+  // trouvée" sur toute recherche par mot-clé constate en production.
+  const match = searchHtml.match(/item\\?\/(\d{9,})\.html/);
   return match ? match[1] : null;
 }
 
