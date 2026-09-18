@@ -1,5 +1,45 @@
 # Passation — MargeMax
 
+## UI fix : vrais tracés SVG officiels pour les moyens de paiement (2026-09-18, session "official payment logos")
+
+**Les icônes du footer dessinées à la main lors du sprint précédent ont
+été remplacées par les vrais tracés SVG officiels**, récupérés en direct
+(navigateur intégré) depuis `simple-icons` (bibliothèque MIT open-source
+de logos de marque en tracé unique) via jsdelivr, PAS approximés :
+
+- **Visa** : tracé officiel exact (`simple-icons`, slug `visa`), couleur
+  officielle `#1A1F71`.
+- **Stripe** : tracé officiel exact (slug `stripe`), couleur officielle
+  `#635BFF`.
+- **Apple Pay** : tracé officiel exact — logo complet pomme + "Pay" en un
+  seul tracé (slug `applepay`), couleur officielle `#000000`.
+- **Google Pay** : tracé officiel exact — logo complet "G Pay" en un seul
+  tracé (slug `googlepay`), couleur officielle `#4285F4`.
+- **Mastercard** : **volontairement PAS** le tracé simple-icons (qui est
+  un monochrome à un seul ton rouge) — gardé les deux cercles géométriques
+  dessinés précédemment, mais avec les **vraies couleurs officielles
+  Mastercard** (rouge `#EB001B` / orange `#F79E1B`, chevauchement
+  `#FF5F00`, conformes aux brand guidelines Mastercard) : plus fidèle au
+  vrai logo qu'une silhouette monochrome.
+- **CB (Cartes Bancaires)** : **aucun tracé officiel disponible** dans
+  simple-icons (marque française de niche, non couverte par cette
+  bibliothèque) — reste le badge stylisé "CB" du sprint précédent, ce
+  n'est PAS un logo officiel. À signaler si l'utilisateur a besoin d'un
+  vrai logo CB (il faudrait le récupérer depuis le kit de marque officiel
+  du Groupement des Cartes Bancaires, non accessible depuis cet
+  environnement).
+
+**Toujours pas de nouvelle dépendance npm** (react-icons/simple-icons ne
+sont pas installés, pas de Node/npm disponible ici pour en ajouter une en
+sécurité) : les tracés sont copiés tels quels dans
+`web/components/ui/payment-icons.tsx`, comme on copierait un SVG exporté
+d'un logiciel de design — mais ce sont maintenant les VRAIS tracés
+officiels plutôt que des approximations.
+
+**Toutes les icônes sur fond blanc uniforme désormais** (au lieu du mix
+noir/blanc/violet du sprint précédent) : plus cohérent visuellement, et
+les logos de paiement sont conçus pour un fond clair.
+
 ## Bug fix critique : recherche par mots-clés cassée en production (2026-09-18, session "fix keyword search 16-digit IDs")
 
 **Cause racine trouvée et confirmée en conditions réelles** (navigateur
