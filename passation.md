@@ -1,5 +1,61 @@
 # Passation — MargeMax
 
+## Bug fix : envoi du formulaire de contact via Resend (2026-09-18, session "fix contact resend")
+
+**Cause la plus probable du "Impossible d'envoyer le message" en
+production : `RESEND_FROM_EMAIL` configurée dans Vercel vers une adresse
+d'un domaine (ex. `contact@autoutilshop.fr`) jamais vérifié dans le
+compte Resend.** Resend rejette alors CHAQUE envoi avec une erreur 403
+"domain is not verified" -- le code affichait déjà un message générique
+dans ce cas, mais sans jamais essayer une adresse qui fonctionne
+réellement, ni logger assez précisément pour identifier la cause sans
+avoir accès aux logs Vercel.
+
+**Fix** (`web/app/api/contact/route.ts`) :
+- **Repli automatique** : si l'envoi échoue spécifiquement pour un motif
+  "domaine non vérifié" (détecté dans le corps de réponse Resend, `status
+  403` + message contenant "domain"+"verif"), une seconde tentative est
+  faite automatiquement avec `onboarding@resend.dev` (le domaine de test
+  Resend, toujours accepté sans vérification DNS) -- le formulaire
+  continue donc de fonctionner même si `RESEND_FROM_EMAIL` est mal
+  configurée, jusqu'à ce que la vérification DNS du vrai domaine soit
+  faite. Pas de boucle : si l'adresse utilisée était déjà celle de
+  secours, aucune deuxième tentative n'est faite (inutile).
+- **Logs plus précis** : chaque échec logue maintenant le corps d'erreur
+  Resend parsé (message réel, pas juste le texte brut) et l'adresse
+  `from` utilisée pour cette tentative -- diagnostic possible depuis les
+  logs Vercel sans avoir à reproduire le problème.
+- **Distinction réseau vs erreur Resend** : une panne réseau (impossible
+  de joindre `api.resend.com`) est maintenant explicitement distinguée
+  d'une erreur Resend (clé invalide, domaine non vérifié...) dans les logs
+  -- comportement utilisateur identique (message générique, 502) mais
+  diagnostic différent côté serveur.
+- `CONTACT_DESTINATION_EMAIL` (variable `NEXT_PUBLIC_CONTACT_EMAIL`,
+  déjà en place) reste le mécanisme pour changer le destinataire --
+  aucune adresse personnelle codée en dur dans le code committé, l'exemple
+  `jm.modzz@gmail.com` du brief reste une option à configurer via cette
+  variable si souhaité, pas un changement de code.
+- `.env.example`/`.env.local.example` mis à jour pour documenter ce
+  nouveau comportement de repli.
+
+Tests ajoutés : `web/app/api/contact/route.test.ts` (envoi réussi,
+validation avant tout appel réseau, repli automatique domaine non
+vérifié -> succès avec l'adresse de secours, erreur générique -> pas de
+repli inutile, déjà sur l'adresse de secours -> pas de boucle, panne
+réseau, clé API absente). **Non exécutés** (pas de Node/npm dans cet
+environnement, voir avertissement de la session précédente) -- écrits
+avec un `vi.resetModules()` + réimport dynamique après avoir positionné
+`process.env`, car `route.ts` lit ses variables d'environnement en
+constantes de module (une seule fois à l'import), pas à chaque requête.
+
+**Reste un vrai blocage externe que le code ne peut pas résoudre seul** :
+si `RESEND_API_KEY` elle-même est absente ou invalide, aucun repli ne
+peut fonctionner (déjà géré avec un message clair avant tout appel
+réseau). Et le repli automatique n'est qu'un filet de sécurité -- pour
+un usage de production durable, le domaine `autoutilshop.fr` doit être
+réellement vérifié dans le compte Resend (Resend -> Domains), sans quoi
+tous les messages partiront visiblement depuis `onboarding@resend.dev`.
+
 ## Audit global du dépôt (2026-09-18, session "audit global")
 
 Audit + corrections sur 8 chantiers demandés. Détail par chantier
