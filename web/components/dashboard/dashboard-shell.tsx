@@ -24,6 +24,7 @@ import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
 import { FirstLaunchHint } from "@/components/dashboard/first-launch-hint";
 import { BuyCreditsModal } from "@/components/dashboard/buy-credits-modal";
+import { AccountMenu } from "@/components/dashboard/account-menu";
 import { formatEuro, PACKS, type Pack } from "@/lib/packs";
 import {
   CheckoutConsentDialog,
@@ -43,7 +44,7 @@ const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
   { value: "calculateur", label: "Calculateur", icon: Calculator },
   { value: "historique", label: "Historique", icon: History },
-  { value: "parametres", label: "Paramètres", icon: Settings },
+  { value: "parametres", label: "Mon compte", icon: Settings },
 ];
 
 // Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
@@ -68,7 +69,7 @@ const TAB_HELP: Record<string, { title: string; body: string }> = {
     body: "Retrouve et réexamine les produits analysés lors de cette session.",
   },
   parametres: {
-    title: "Paramètres du compte",
+    title: "Mon compte",
     body: "Gère ton compte, consulte ton solde et recharge tes crédits d'analyse.",
   },
 };
@@ -291,25 +292,28 @@ export function DashboardShell({
               layoutId="dashboard-tab-indicator"
               className="hidden sm:inline-flex"
             />
-            {liveCredits !== null && (
-              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-                <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)] sm:gap-1.5 sm:px-3 sm:py-1.5">
-                  <Zap className="h-3.5 w-3.5 shrink-0" />
-                  {liveCredits}
-                  {creditsMax !== null ? ` / ${creditsMax}` : ""}
-                  <span className="hidden sm:inline">&nbsp;crédits</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setBuyModalOpen(true)}
-                  aria-label="Acheter des crédits"
-                  title="Acheter des crédits"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_0_14px_-4px_rgba(217,70,239,0.8)] transition-transform hover:scale-110"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+            <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              {liveCredits !== null && (
+                <>
+                  <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)] sm:gap-1.5 sm:px-3 sm:py-1.5">
+                    <Zap className="h-3.5 w-3.5 shrink-0" />
+                    {liveCredits}
+                    {creditsMax !== null ? ` / ${creditsMax}` : ""}
+                    <span className="hidden sm:inline">&nbsp;crédits</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBuyModalOpen(true)}
+                    aria-label="Acheter des crédits"
+                    title="Acheter des crédits"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_0_14px_-4px_rgba(217,70,239,0.8)] transition-transform hover:scale-110"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              <AccountMenu isDemo={isDemo} onGoToAccount={() => setActive("parametres")} />
+            </div>
           </div>
 
           {/* Onglets en dessous du header sur mobile, scrollables horizontalement */}

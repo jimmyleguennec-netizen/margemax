@@ -331,22 +331,36 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
       // compte (client_reference_id du Payment Link Stripe). Avant toute
       // redirection vers Stripe, la case "execution immediate +
       // renonciation retractation" (art. L.221-28) doit etre cochee.
+      //
+      // getUser() est dans un try/catch : sans lui, un blip reseau ici
+      // laissait l'ecran "Redirection en cours..." affiche indefiniment
+      // (aucune des deux branches -- ni ouverture du consentement, ni
+      // redirection /dashboard -- n'etait jamais atteinte), forcant un
+      // rechargement manuel de la page apres une connexion pourtant
+      // reussie.
       if (pendingPack) {
         const pack = PACKS.find((p) => p.key === pendingPack);
         if (pack) {
-          const supabase = createClient();
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
-            setConsentUserId(user.id);
-            setConsentPack({
-              key: pack.key,
-              label: pack.label,
-              credits: pack.credits,
-              priceEuros: pack.priceEuros,
-            });
-            return;
+          try {
+            const supabase = createClient();
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            if (user) {
+              setConsentUserId(user.id);
+              setConsentPack({
+                key: pack.key,
+                label: pack.label,
+                credits: pack.credits,
+                priceEuros: pack.priceEuros,
+              });
+              return;
+            }
+          } catch (err) {
+            console.error(
+              "[NeonAuthPanel] Impossible de récupérer l'utilisateur après connexion -- redirection vers /dashboard sans reprise du pack :",
+              err
+            );
           }
         }
       }

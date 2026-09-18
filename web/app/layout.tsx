@@ -18,6 +18,23 @@ export default function RootLayout({
   return (
     <html lang="fr" className="dark overflow-x-hidden" suppressHydrationWarning>
       <body className={`${inter.variable} overflow-x-hidden bg-background font-sans text-foreground antialiased`}>
+        {/* Desactive la restauration de scroll native du navigateur
+            (rechargement de page, retour arriere) le plus tot possible --
+            sans ca, un rechargement sur une page longue (dashboard,
+            landing) rouvrait a l'ancienne position de defilement au lieu
+            du haut de page, un "saut d'ecran" deroutant. Script inline
+            (pas un useEffect client) pour s'executer avant meme
+            l'hydratation React. */}
+        <script
+          dangerouslySetInnerHTML={{
+            // Le if(!location.hash) evite de casser un lien direct vers une
+            // ancre (ex. /#pricing, /#contact depuis le menu du dashboard) :
+            // uniquement le rechargement/retour arriere SANS ancre doit
+            // etre force en haut de page.
+            __html:
+              "try{if('scrollRestoration' in history){history.scrollRestoration='manual';}if(!window.location.hash){window.scrollTo(0,0);}}catch(e){}",
+          }}
+        />
         {children}
       </body>
     </html>
