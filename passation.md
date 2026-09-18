@@ -1,5 +1,47 @@
 # Passation — MargeMax
 
+## Sprint urgent mobile : écran noir au scroll & menu burger (2026-09-18, session "fix mobile scroll")
+
+**Cause racine identifiée pour l'écran noir au scroll : `web/components/landing/hero.tsx`.**
+Le halo décoratif du hero liait sa position au scroll (`useTransform` sur
+`scrollYProgress`, `y: orbY`) **par-dessus** un filtre `blur-3xl` sur un
+calque de 720×420px, en plus d'une animation `scale`/`opacity` infinie
+concurrente. Recalculer un `transform` à chaque frame de scroll sur un
+calque aussi lourdement flouté est une combinaison connue pour faire
+clignoter l'écran en noir sur Safari/Chrome mobile (le compositeur peine à
+suivre). **Fix : le parallax scroll-lié a été retiré entièrement** (plus de
+`useScroll`/`useTransform` dans ce fichier) — le halo reste fixe pendant le
+scroll, seule la respiration douce (`scale`/`opacity`, sans dépendance au
+scroll) subsiste. Le flou est aussi réduit sur mobile (`blur-2xl` au lieu
+de `blur-3xl`, `sm:blur-3xl` restauré à partir du desktop).
+
+**Deuxième cause probable, header sticky : `web/components/landing/navbar.tsx`.**
+Le header (`position: sticky`) portait un `backdrop-blur-xl` permanent,
+animé en filigrane à chaque scroll par le changement de hauteur/opacité
+lié à l'état `scrolled`. `backdrop-filter` + `position: sticky` recalculé
+en continu pendant le scroll est un autre déclencheur connu de glitches de
+rendu mobile. **Fix : le flou est retiré sur mobile** (`sm:backdrop-blur-xl`
+au lieu d'un flou permanent), compensé par un fond plus opaque sur mobile
+(`bg-black/80` / `bg-slate-950/95` selon l'état `scrolled`) pour garder un
+rendu visuellement propre sans le coût du filtre.
+
+**Flash noir à la fermeture du menu burger : même fichier, `MobileMenu`.**
+L'overlay plein écran avait `bg-black/95 backdrop-blur-xl` — le flou était
+redondant (fond déjà quasi opaque) et coûteux à animer en opacité
+(`initial={{opacity:0}}` → `animate={{opacity:1}}`) sur un calque plein
+écran. **Fix : `backdrop-blur-xl` retiré**, le fond `bg-black/95` seul
+suffit visuellement et supprime ce coût.
+
+**Non touché délibérément :** les halos statiques du footer (`blur-[100px]`,
+non liés au scroll, pas de `transform` animé dessus) et les petites
+animations `opacity`/`scale`/`x` sur des éléments ponctuels (points
+lumineux du quick-guide, bouton conic-gradient tournant) — aucun de ces
+éléments ne combine scroll + transform + flou lourd, donc hors de la cause
+racine identifiée. Impossible de reproduire l'écran noir en local (pas de
+Node/npm disponible dans cet environnement pour lancer un `npm run build`
+ni un test live sur device réel) — fix basé sur l'analyse du code, à
+confirmer par l'utilisateur sur son téléphone après déploiement.
+
 ## Sprint footer, humour formulaires & finitions (2026-09-18, session "footer & humour")
 
 **TikTok volontairement non ajouté.** Le brief demandait une icône TikTok
