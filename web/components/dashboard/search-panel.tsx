@@ -49,6 +49,18 @@ type ApiResult = {
 
 const EXAMPLE_QUERY = "chargeur à induction pour iPhone";
 
+// Suggestions de mots-cles populaires -- remplissent le champ de
+// recherche au clic (jamais de soumission automatique : une analyse
+// coute un credit, l'utilisateur doit rester libre de relire/modifier
+// avant de lancer).
+const POPULAR_KEYWORDS = [
+  "chargeur induction",
+  "nettoyant voiture",
+  "écouteurs sans fil",
+  "lampe led chambre",
+  "support téléphone voiture",
+];
+
 /**
  * Donnees fixes, non recuperees en direct -- memes chiffres que la
  * demonstration de la landing page (components/landing/demo.tsx), pour
@@ -315,6 +327,19 @@ export function SearchPanel({
           >
             Voir une analyse exemple (aucun crédit utilisé)
           </button>
+
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            {POPULAR_KEYWORDS.map((keyword) => (
+              <button
+                key={keyword}
+                type="button"
+                onClick={() => setQuery(keyword)}
+                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/60 transition-all hover:border-cyan-400/40 hover:text-white"
+              >
+                {keyword}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -117,6 +117,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.error("[stripe webhook] echec add_credits:", creditError);
     throw new Error("add_credits echouee");
   }
+
+  // Enregistre le client Stripe cree par ce paiement (necessaire pour
+  // stripe.billingPortal.sessions.create dans /api/stripe/billing-portal) --
+  // best-effort : une erreur ici ne doit jamais faire echouer tout le
+  // webhook, les credits ont deja ete attribues juste au-dessus, ce qui
+  // est la partie critique. Sans stripe_customer_id, le bouton "Gerer mes
+  // factures" affichera simplement un message clair plutot que de casser
+  // quoi que ce soit.
+  const customerId =
+    typeof session.customer === "string" ? session.customer : session.customer?.id;
+  if (customerId) {
+    const { error: customerUpdateError } = await supabase
+      .from("profiles")
+      .update({ stripe_customer_id: customerId })
+      .eq("id", parsed.userId);
+
+    if (customerUpdateError) {
+      console.error(
+        "[stripe webhook] echec enregistrement stripe_customer_id (non bloquant):",
+        customerUpdateError
+      );
+    }
+  }
 }
 
 export async function POST(request: Request) {

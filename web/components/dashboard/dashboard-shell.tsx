@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,6 +10,7 @@ import {
   History,
   LogOut,
   Plus,
+  Receipt,
   Search,
   User,
   Zap,
@@ -24,11 +25,20 @@ import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
 import { BuyCreditsModal } from "@/components/dashboard/buy-credits-modal";
 import { AccountMenu } from "@/components/dashboard/account-menu";
+import { HelpModal } from "@/components/dashboard/help-modal";
+import { ContactModal } from "@/components/dashboard/contact-modal";
 import { formatEuro, PACKS, type Pack } from "@/lib/packs";
 import {
   CheckoutConsentDialog,
   type ConsentPack,
 } from "@/components/purchase/checkout-consent-dialog";
+
+const TAB_VALUES = ["recherche", "calculateur", "historique", "account"] as const;
+type TabValue = (typeof TAB_VALUES)[number];
+
+function isTabValue(value: string | null): value is TabValue {
+  return value !== null && (TAB_VALUES as readonly string[]).includes(value);
+}
 
 export type PurchaseEntry = {
   id: number;
@@ -43,7 +53,7 @@ const tabs: AnimatedTabItem[] = [
   { value: "recherche", label: "Recherche", icon: Search },
   { value: "calculateur", label: "Calculateur", icon: Calculator },
   { value: "historique", label: "Historique", icon: History },
-  { value: "parametres", label: "Mon compte", icon: User },
+  { value: "account", label: "Mon compte", icon: User },
 ];
 
 // Bandeau d'aide contextuel du header, change selon l'onglet actif -- voir
@@ -67,7 +77,7 @@ const TAB_HELP: Record<string, { title: string; body: string }> = {
     title: "Historique des analyses",
     body: "Retrouve et réexamine les produits analysés lors de cette session.",
   },
-  parametres: {
+  account: {
     title: "Mon compte",
     body: "Gère ton compte, consulte ton solde et recharge tes crédits d'analyse.",
   },
@@ -99,6 +109,56 @@ function ActiveTabHint({ active }: { active: string }) {
   );
 }
 
+/**
+ * Bouton "Gérer mes factures" -- ouvre le vrai portail de facturation
+ * Stripe (POST /api/stripe/billing-portal). Aucun bouton affiche en mode
+ * demo (pas de compte reel, donc jamais de client Stripe possible).
+ * L'erreur la plus frequente attendue -- aucun achat encore effectue,
+ * donc pas de stripe_customer_id -- est affichee telle quelle plutot
+ * qu'un message generique, voir la route pour le detail.
+ */
+function BillingPortalButton() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleClick() {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/stripe/billing-portal", { method: "POST" });
+      const data: { url?: string; error?: string } = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.url) {
+        setError(data.error ?? "Impossible d'ouvrir le portail de facturation pour le moment.");
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (err) {
+      console.error("[BillingPortalButton] Échec de l'appel /api/stripe/billing-portal :", err);
+      setError("Impossible de contacter le serveur pour le moment. Réessayez.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        className="flex items-center gap-2 rounded-full border border-cyan-400/30 px-5 py-2.5 text-sm font-medium text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Receipt className="h-4 w-4" />
+        {loading ? "Ouverture..." : "Gérer mes factures"}
+      </button>
+      {error && <p className="mt-2 text-xs text-pink-300">{error}</p>}
+    </div>
+  );
+}
+
 function ParametresPanel({
   email,
   isDemo,
@@ -114,6 +174,9 @@ function ParametresPanel({
   purchases: PurchaseEntry[];
   onOpenBuyModal: () => void;
 }) {
+  const creditsPurchasedTotal = purchases.reduce((sum, p) => sum + p.credits, 0);
+  const amountSpentTotal = purchases.reduce((sum, p) => sum + p.amount_total, 0) / 100;
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
@@ -162,38 +225,77 @@ function ParametresPanel({
           </button>
         </div>
 
-        <div className="mt-8 border-t border-white/10 pt-6">
-          <h3 className="mb-4 text-center text-sm font-medium uppercase tracking-wider text-cyan-200/70">
-            Achats
-          </h3>
-          {purchases.length === 0 ? (
-            <p className="text-center text-sm text-white/40">
-              Aucun achat pour le moment.
+        {/* Recapitulatif -- uniquement des chiffres directement derives
+            des achats reels (jamais un "credits utilises" qui supposerait
+            connaitre le nombre de credits offerts a l'inscription comme
+            une constante fixe non trackee cote code : ce serait fragile
+            si ce nombre change ou si un solde est ajuste manuellement). */}
+        {purchases.length > 0 && (
+          <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-6 text-center">
+            <div>
+              <p className="text-lg font-bold text-white">{creditsPurchasedTotal}</p>
+              <p className="text-[11px] text-white/40">Crédits achetés</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">{purchases.length}</p>
+              <p className="text-[11px] text-white/40">
+                Achat{purchases.length > 1 ? "s" : ""}
+              </p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">{formatEuro(amountSpentTotal)}</p>
+              <p className="text-[11px] text-white/40">Dépensé au total</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!isDemo && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-cyan-200/70">
+              Moyen de paiement &amp; factures
+            </h3>
+            <p className="max-w-sm text-xs text-white/40">
+              Consultez vos factures et gérez le moyen de paiement utilisé
+              pour vos achats de crédits, via le portail sécurisé de Stripe.
             </p>
-          ) : (
-            <ul className="space-y-2">
-              {purchases.map((purchase) => (
-                <li
-                  key={purchase.id}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm"
-                >
-                  <span className="flex items-center gap-2 text-white/70">
-                    <CreditCard className="h-3.5 w-3.5 text-cyan-300" />
-                    Pack {purchase.pack_key} · {purchase.credits} crédits
-                  </span>
-                  <span className="text-right text-white/40">
-                    <span className="block font-medium text-white">
-                      {formatEuro(purchase.amount_total / 100)}
-                    </span>
-                    <span className="block text-xs">
-                      {new Date(purchase.created_at).toLocaleDateString("fr-FR")}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+            <BillingPortalButton />
+          </div>
         </div>
+      )}
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+        <h3 className="mb-4 text-center text-sm font-medium uppercase tracking-wider text-cyan-200/70">
+          Achats
+        </h3>
+        {purchases.length === 0 ? (
+          <p className="text-center text-sm text-white/40">
+            Aucun achat pour le moment.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {purchases.map((purchase) => (
+              <li
+                key={purchase.id}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm"
+              >
+                <span className="flex items-center gap-2 text-white/70">
+                  <CreditCard className="h-3.5 w-3.5 text-cyan-300" />
+                  Pack {purchase.pack_key} · {purchase.credits} crédits
+                </span>
+                <span className="text-right text-white/40">
+                  <span className="block font-medium text-white">
+                    {formatEuro(purchase.amount_total / 100)}
+                  </span>
+                  <span className="block text-xs">
+                    {new Date(purchase.created_at).toLocaleDateString("fr-FR")}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -219,14 +321,32 @@ export function DashboardShell({
    * et app/(auth)/login|signup/page.tsx. */
   pendingPackKey?: string | null;
 }) {
-  const [active, setActive] = useState("recherche");
+  const searchParams = useSearchParams();
+  // Onglet actif reflete dans l'URL (?tab=account, etc.) : un lien direct
+  // vers /dashboard?tab=account (menu du compte, retour du portail de
+  // facturation Stripe...) doit ouvrir le bon onglet des le chargement,
+  // et pas systematiquement "Recherche".
+  const [active, setActiveState] = useState<TabValue>(() => {
+    const fromUrl = searchParams.get("tab");
+    return isTabValue(fromUrl) ? fromUrl : "recherche";
+  });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   // Solde de credits affiche : initialise depuis la valeur lue au chargement
   // de la page, puis mis a jour en direct par SearchPanel apres chaque
   // debit reussi (voir app/api/analyze), sans recharger toute la page.
   const [liveCredits, setLiveCredits] = useState(credits);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const router = useRouter();
+
+  function setActive(tab: TabValue) {
+    setActiveState(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
   const pendingPack = PACKS.find((p) => p.key === pendingPackKey);
   const [consentPack, setConsentPack] = useState<ConsentPack | null>(
     pendingPack
@@ -241,9 +361,11 @@ export function DashboardShell({
 
   function handleConsentCancel() {
     setConsentPack(null);
-    // Nettoie ?pack= de l'URL pour qu'un rechargement de page ne rouvre
-    // pas la modale indefiniment.
-    router.replace("/dashboard");
+    // Nettoie ?pack= de l'URL (pour qu'un rechargement de page ne rouvre
+    // pas la modale indefiniment) sans perdre ?tab= -- annuler un achat
+    // ne doit pas renvoyer l'utilisateur a l'onglet Recherche s'il etait
+    // ailleurs.
+    router.replace(`/dashboard?tab=${active}`);
   }
 
   // Achat de credits DANS le dashboard (bouton "+" du header ou "Acheter
@@ -287,7 +409,7 @@ export function DashboardShell({
             <AnimatedTabs
               tabs={tabs}
               value={active}
-              onValueChange={setActive}
+              onValueChange={(value) => isTabValue(value) && setActive(value)}
               layoutId="dashboard-tab-indicator"
               className="hidden sm:inline-flex"
             />
@@ -311,7 +433,12 @@ export function DashboardShell({
                   </button>
                 </>
               )}
-              <AccountMenu isDemo={isDemo} onGoToAccount={() => setActive("parametres")} />
+              <AccountMenu
+                isDemo={isDemo}
+                onGoToAccount={() => setActive("account")}
+                onOpenHelp={() => setHelpOpen(true)}
+                onOpenContact={() => setContactOpen(true)}
+              />
             </div>
           </div>
 
@@ -320,7 +447,7 @@ export function DashboardShell({
             <AnimatedTabs
               tabs={tabs}
               value={active}
-              onValueChange={setActive}
+              onValueChange={(value) => isTabValue(value) && setActive(value)}
               layoutId="dashboard-tab-indicator-mobile"
             />
           </div>
@@ -353,7 +480,7 @@ export function DashboardShell({
                   onGoToSearch={() => setActive("recherche")}
                 />
               )}
-              {active === "parametres" && (
+              {active === "account" && (
                 <ParametresPanel
                   email={email}
                   isDemo={isDemo}
@@ -378,6 +505,13 @@ export function DashboardShell({
         pack={consentPack}
         userId={userId}
         onCancel={handleConsentCancel}
+      />
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ContactModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        defaultEmail={isDemo ? undefined : email}
       />
     </InteractiveGrid>
   );

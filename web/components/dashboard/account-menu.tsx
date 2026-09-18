@@ -32,13 +32,23 @@ import {
  * -- les presenter comme des reglages actionnables qui ne font rien au
  * clic serait le genre de fonctionnalite fantome deja retiree ailleurs sur
  * le site (voir passation.md).
+ *
+ * "Aide et paramètres", "Votre compte" et "Service client" menaient tous
+ * les trois au meme endroit (l'onglet Mon compte) avant cette session --
+ * chacun a maintenant sa propre destination reelle : Votre compte bascule
+ * l'onglet dashboard, Aide ouvre une vraie modale FAQ, Service client
+ * ouvre le formulaire de contact SANS quitter le dashboard.
  */
 export function AccountMenu({
   isDemo,
   onGoToAccount,
+  onOpenHelp,
+  onOpenContact,
 }: {
   isDemo: boolean;
   onGoToAccount: () => void;
+  onOpenHelp: () => void;
+  onOpenContact: () => void;
 }) {
   return (
     <DropdownMenu>
@@ -53,7 +63,7 @@ export function AccountMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onGoToAccount}>
+        <DropdownMenuItem onSelect={onOpenHelp}>
           <CircleHelp className="h-4 w-4 text-cyan-300" />
           Aide et paramètres
         </DropdownMenuItem>
@@ -79,11 +89,9 @@ export function AccountMenu({
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild>
-          <Link href="/#contact">
-            <LifeBuoy className="h-4 w-4 text-cyan-300" />
-            Service client
-          </Link>
+        <DropdownMenuItem onSelect={onOpenContact}>
+          <LifeBuoy className="h-4 w-4 text-cyan-300" />
+          Service client
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
