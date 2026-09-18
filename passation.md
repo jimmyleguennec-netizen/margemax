@@ -1,5 +1,39 @@
 # Passation — MargeMax
 
+## UI fix : icônes SVG pour les moyens de paiement du footer (2026-09-18, session "payment icons")
+
+**Badges texte remplacés par de vraies icônes SVG vectorielles**
+(`web/components/ui/payment-icons.tsx`, nouveau fichier) : Apple Pay,
+Google Pay, Visa, Mastercard, CB et Stripe ont chacune leur propre
+composant SVG dessiné à la main, sur un fond clair uniforme (`h-8`,
+`rounded-md`) — les vrais logos de moyens de paiement sont conçus pour un
+fond clair, les poser directement sur le footer sombre les aurait rendus
+illisibles/dénaturés.
+
+**Pourquoi dessinées à la main plutôt qu'une bibliothèque d'icônes
+(react-icons, simple-icons...)** : aucune n'est installée dans ce projet
+(seul `lucide-react` l'est, qui ne contient aucun logo de marque), et il
+n'y a **pas de Node/npm disponible dans cet environnement** pour ajouter
+une dépendance et régénérer `package-lock.json` en toute sécurité —
+contrainte déjà rencontrée et documentée dans les sessions précédentes
+(voir plus bas, `contact@` et le fix Firecrawl). Chaque icône reste une
+**représentation simplifiée et reconnaissable** (formes/couleurs
+caractéristiques) plutôt qu'une reproduction pixel-perfect du fichier de
+logo officiel — pratique standard pour ce type de badge "moyens de
+paiement acceptés".
+
+**Non vérifié visuellement dans un vrai navigateur** : pas de Node/npm
+pour lancer le serveur de dev Next.js, et le rendu HTML de test construit
+en dehors du projet (pour vérifier les tracés SVG à l'œil) n'a pas pu être
+ouvert dans le navigateur intégré de cette session (accès fichier local
+hors dossier projet refusé, et data: URL non supportée par l'outil de
+navigation disponible ici). Le pictogramme "pomme" (Apple Pay) a
+volontairement été simplifié au maximum (ellipse + petite feuille + queue,
+formes géométriques simples) plutôt qu'une courbe complexe dessinée à
+l'aveugle, justement pour limiter le risque de rendu incorrect sans
+pouvoir vérifier visuellement avant déploiement. **À vérifier par
+l'utilisateur après déploiement Vercel.**
+
 ## Bug fix critique : parsing prix/livraison/taxes AliExpress (2026-09-18, session "fix extraction shipping/tax")
 
 **Cause racine trouvée en conditions réelles** (navigateur intégré, vraie
