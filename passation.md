@@ -1,5 +1,58 @@
 # Passation — MargeMax
 
+## Sprint final : webscraping Firecrawl, UI header & harmonisation (2026-09-18, session "sprint final v2")
+
+Cette session avait un accès MCP à Firecrawl côté Claude (outils
+`firecrawl_search`/`firecrawl_developer_search`, un index de recherche
+documentaire/code — **pas** un outil de scrape générique). Utilisé pour
+**vérifier** le fix Firecrawl du tour précédent contre la vraie doc/des
+exemples réels avant de continuer à construire dessus, plutôt que de
+refaire confiance à ma seule mémoire :
+- Confirmé : `waitFor`, `proxy` (`"basic"|"stealth"|"auto"`), `location`,
+  `formats` sont bien les vrais paramètres de l'API Firecrawl `/v1/scrape`
+  — le fix de la session précédente était correctement formé.
+- Confirmé : `https://fr.aliexpress.com/w/wholesale-<slug>.html` est bien
+  l'URL canonique réelle de recherche AliExpress (plusieurs guides de
+  scraping indépendants la documentent, avec le même détail que celui
+  utilisé dans le fix précédent : `?SearchText=` fait un 302 vers cette
+  forme). Toujours **pas d'outil pour scraper une vraie page AliExpress
+  depuis cette session** — impossible de tester le pipeline complet en
+  conditions réelles malgré l'accès Firecrawl.
+
+**Point 1 (recherche Firecrawl temps réel, nettoyage URL, pas de prix en
+dur)** : déjà entièrement traité dans le commit précédent
+(`017619d`) — revérifié intact, aucun changement nécessaire.
+
+**Point 2 — incohérence trouvée et corrigée entre landing et dashboard** :
+le bloc "Comparateur d'offres AliExpress" (Offre 1 vs Offre 2) de
+`demo.tsx` annonçait une fonctionnalité qui n'existe nulle part dans le
+produit — aucun comparateur cote-à-cote de deux annonces n'a jamais été
+construit (le dashboard ne montre qu'UN résultat par recherche). Remplacé
+par un aperçu fidèle du vrai onglet Calculateur de marge, avec **les mêmes
+valeurs par défaut que `calculator-panel.tsx`** (14,49 €/0 €/3,60 € de
+coûts, 29,90 € de prix de vente). En reconciliant les deux, un DEUXIÈME
+problème plus discret a été trouvé : les chiffres de marge/ROI/prix
+conseillé de la fenêtre Mac (21,81 €, 120,6 %, 39,90 €) étaient codés en
+dur depuis avant la centralisation de `lib/margin-estimate.ts` et avaient
+divergé de ce que `computeMarginEstimate()` calcule réellement pour ce
+produit (32,90 € conseillé, pas 39,90 €). Les deux fenêtres de démo
+appellent maintenant `computeMarginEstimate()` directement au lieu de
+chiffres figés — la landing ne peut plus diverger silencieusement de la
+formule réelle du dashboard.
+
+**Point 3 (icônes & dédoublonnement bannières)** :
+- Onglet "Mon compte" : icône engrenage → icône profil (`User`).
+  L'engrenage reste réservé au menu déroulant tout à droite du header
+  (`AccountMenu`, déjà en place depuis une session précédente) — un seul
+  engrenage visible à l'écran désormais.
+- `FirstLaunchHint` (bandeau statique "voici ce que fait chaque onglet",
+  affiché une fois) supprimé : il faisait doublon avec `ActiveTabHint`
+  (bandeau dynamique par onglet, ajouté lors d'une session précédente et
+  désormais toujours présent) — les deux ensemble donnaient l'effet d'un
+  "sous-titre redondant sous la navigation" au premier chargement.
+  `first-launch-hint.tsx` supprimé entièrement (plus aucune référence
+  dans le code).
+
 ## Fix urgent extraction Firecrawl AliExpress (2026-09-18, session "fix Firecrawl")
 
 Symptôme rapporté : recherches par mot-clé ET par URL directe échouaient
