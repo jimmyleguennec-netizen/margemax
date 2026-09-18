@@ -16,10 +16,19 @@ export default function MentionsLegalesPage() {
           par actions simplifiée dont le siège social est situé au 4 rue
           Gustave Delory, 11100 Narbonne, France.
         </p>
-        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
-          À compléter (informations non fournies, ne pas inventer) : numéro
-          SIREN et ville d&apos;immatriculation RCS, montant du capital
-          social, numéro de TVA intracommunautaire, numéro de téléphone.
+        <p className="text-white/50">
+          Numéro SIREN, ville d&apos;immatriculation RCS, capital social,
+          numéro de TVA intracommunautaire et numéro de téléphone : en cours
+          de finalisation, et seront publiés sur cette page. Pour toute
+          question sur l&apos;identité de l&apos;éditeur d&apos;ici là,
+          contactez{" "}
+          <a
+            href="mailto:contact@autoutilshop.com"
+            className="text-cyan-300 hover:underline"
+          >
+            contact@autoutilshop.com
+          </a>
+          .
         </p>
         <p>
           Contact :{" "}
@@ -37,9 +46,9 @@ export default function MentionsLegalesPage() {
           Le directeur de la publication est le représentant légal de la
           société AutOutilShop SAS.
         </p>
-        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
-          À compléter : nom et prénom du directeur de la publication (le
-          Président de la société, nommément désigné).
+        <p className="text-white/50">
+          L&apos;identité nominative du directeur de la publication est en
+          cours de finalisation et sera publiée sur cette page.
         </p>
       </LegalSection>
 
@@ -53,10 +62,10 @@ export default function MentionsLegalesPage() {
 
       <LegalSection title="Propriété intellectuelle">
         <p>
-          L&apos;ensemble des éléments composant la plateforme MargeMax --
+          L&apos;ensemble des éléments composant la plateforme MargeMax —
           notamment son code source, son design, ses interfaces, ses
           animations, son logo et l&apos;ensemble des contenus visuels ou
-          textuels qui y figurent -- est la propriété exclusive
+          textuels qui y figurent — est la propriété exclusive
           d&apos;AutOutilShop SAS ou de ses partenaires, et est protégé à ce
           titre par le droit d&apos;auteur, le droit des marques et, plus
           généralement, l&apos;ensemble des dispositions applicables en

@@ -118,8 +118,9 @@ function EstimateBlock({
       </div>
 
       <p className="mt-4 text-center text-[11px] text-white/30">
-        Estimation calculée à partir du coût réel de cette annonce -- pas
-        une donnée de marché garantie.
+        Estimation calculée à partir du coût de cette annonce (confirmé ou
+        estimé selon les données disponibles) — pas une donnée de marché
+        garantie.
       </p>
     </div>
   );
@@ -181,7 +182,7 @@ export function SearchPanel({
         setErrorMessage(
           response.status === 402
             ? data?.error ?? "Solde de crédits insuffisant."
-            : data?.error ?? "L'analyse a échoué -- réessayez dans un instant."
+            : data?.error ?? "L'analyse a échoué — réessayez dans un instant."
         );
         setStatus("error");
         // Aucun credit debite sur un echec (garanti cote serveur) -- mais
@@ -212,7 +213,7 @@ export function SearchPanel({
     } catch (err) {
       console.error("[SearchPanel] Échec de l'appel /api/analyze :", err);
       setErrorMessage(
-        "Impossible de contacter le service d'analyse -- réessayez dans un instant."
+        "Impossible de contacter le service d'analyse — réessayez dans un instant."
       );
       setStatus("error");
     }
@@ -311,7 +312,7 @@ export function SearchPanel({
           <p className="mt-2 text-xs text-pink-300">
             Solde de crédits épuisé.{" "}
             <Link href="/#pricing" className="font-medium underline-offset-4 hover:underline">
-              Achète un pack
+              Achetez un pack
             </Link>{" "}
             pour continuer à analyser des produits.
           </p>
@@ -415,8 +416,8 @@ export function SearchPanel({
             {(result.shipping === null || result.importFee === null) && (
               <p className="border-t border-white/10 px-5 py-3 text-xs text-white/30">
                 Certains champs (livraison ou frais d&apos;importation) n&apos;ont
-                pas pu être extraits de cette page -- ils sont affichés
-                comme absents plutôt qu&apos;estimés au hasard.
+                pas pu être extraits de cette page — ils sont affichés
+                comme indisponibles plutôt qu&apos;estimés au hasard.
               </p>
             )}
 

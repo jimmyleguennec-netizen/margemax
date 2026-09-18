@@ -87,8 +87,11 @@ function MacDemoWindow() {
             className="pointer-events-none absolute inset-x-0 z-20 h-px bg-cyan-300 shadow-[0_0_12px_3px_rgba(34,211,238,0.9)]"
           />
 
-          {/* Barre de titre style macOS */}
-          <div className="flex items-center gap-1.5 border-b border-white/10 bg-white/[0.03] px-4 py-3">
+          {/* Barre de titre style macOS -- purement decorative */}
+          <div
+            aria-hidden="true"
+            className="flex items-center gap-1.5 border-b border-white/10 bg-white/[0.03] px-4 py-3"
+          >
             <span className="h-2.5 w-2.5 rounded-full bg-pink-500/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-400/70" />
@@ -175,7 +178,9 @@ function MacDemoWindow() {
                 <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
                   <CountUp value={21.81} format={formatEuro} />
                 </p>
-                <p className="text-xs text-white/40">54,7 %</p>
+                <p className="text-xs text-white/40">
+                  Marge sur prix de vente : 54,7 %
+                </p>
               </div>
               <div>
                 <p className="flex items-center gap-1 text-xs text-white/40">
@@ -260,8 +265,8 @@ function WindowsDemoWindow() {
 
           <div className="space-y-4 p-6 text-left">
             <p className="text-sm text-white/50">
-              Même produit, deux annonces AliExpress — MargeMax classe
-              automatiquement le meilleur ROI.
+              Même produit, deux annonces AliExpress — comparez leurs coûts
+              et repérez vous-même la meilleure marge.
             </p>
 
             <div className="space-y-3">

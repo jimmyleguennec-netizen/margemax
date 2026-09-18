@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Calculator, ShieldCheck, BookMarked, Sparkles } from "lucide-react";
+import { Calculator, ShieldCheck, History } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { TiltCard } from "@/components/ui/tilt-card";
@@ -12,7 +12,7 @@ const features = [
     icon: Calculator,
     title: "Calcul de marge instantané",
     description:
-      "Prix produit, livraison et frais d'importation réels combinés pour une marge et un ROI exacts, jamais estimés au hasard.",
+      "Prix produit, livraison et frais d'importation combinés pour une marge et un ROI calculés à partir des données disponibles, en distinguant confirmé, estimé et indisponible.",
     accent: "cyan",
     span: "lg:col-span-2",
   },
@@ -25,20 +25,12 @@ const features = [
     span: "lg:col-span-1",
   },
   {
-    icon: BookMarked,
-    title: "Carnet & comparateur",
+    icon: History,
+    title: "Historique de session",
     description:
-      "Centralisez vos favoris, comparez plusieurs offres et exportez vos analyses en un clic.",
+      "Retrouvez vos dernières analyses dans l'onglet Historique, sans les perdre en changeant d'onglet.",
     accent: "pink",
     span: "lg:col-span-1",
-  },
-  {
-    icon: Sparkles,
-    title: "Générateur de fiche IA",
-    description:
-      "Génère automatiquement une fiche produit prête à publier à partir des données vérifiées.",
-    accent: "purple",
-    span: "lg:col-span-2",
   },
 ];
 
@@ -64,12 +56,6 @@ const accentStyles: Record<
     glow: "group-hover:shadow-[0_0_40px_-12px_rgba(244,114,182,0.6)]",
     tilt: "rgba(244,114,182,0.35)",
   },
-  purple: {
-    icon: "bg-purple-400/10 text-purple-300",
-    border: "hover:border-purple-400/50",
-    glow: "group-hover:shadow-[0_0_40px_-12px_rgba(192,132,252,0.6)]",
-    tilt: "rgba(192,132,252,0.35)",
-  },
 };
 
 const container = {
@@ -88,7 +74,7 @@ export function Features() {
       <SectionGlow />
       <div className="mx-auto mb-14 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Compare les offres et comprends tes coûts
+          Comparez les offres et comprenez vos coûts
         </h2>
         <p className="mt-3 text-white/50">
           Conçu pour les vendeurs qui veulent des chiffres fiables, pas des

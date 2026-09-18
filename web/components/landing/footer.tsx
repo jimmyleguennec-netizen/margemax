@@ -20,12 +20,12 @@ const CONTACT_EMAIL = "contact@autoutilshop.com";
 // n'ont pas de destination reelle dans le produit actuel -- pas de
 // lien vers une page qui n'existe pas.
 const toolLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Calculateur de marge", href: "/dashboard", icon: Calculator },
+  { label: "Calculateur de marge (connexion requise)", href: "/dashboard", icon: Calculator },
   { label: "Calcul des frais de livraison", href: "#demo", icon: Ship },
 ];
 
 const resourceLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Guide pour trouver des fournisseurs", href: "#guide", icon: ScrollText },
+  { label: "Tutoriel MargeMax", href: "#guide", icon: ScrollText },
   { label: "Mentions légales", href: "/mentions-legales", icon: FileText },
   { label: "CGV / CGU", href: "/cgv", icon: FileText },
   { label: "Confidentialité", href: "/confidentialite", icon: FileText },
@@ -85,7 +85,7 @@ export function Footer() {
           />
           <div className="flex flex-col items-center gap-6">
             <h2 className="max-w-2xl bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-              Prêt à dénicher tes vrais produits gagnants ?
+              Prêt à dénicher vos vrais produits gagnants ?
             </h2>
             <p className="max-w-lg text-white/50">
               Rejoignez les e-commerçants qui analysent leurs coûts
@@ -113,8 +113,9 @@ export function Footer() {
           <div>
             <Logo className="h-14 w-auto" />
             <p className="mt-4 max-w-xs text-sm text-white/50">
-              Ton assistant de sourcing AliExpress : coûts réels et marges
-              estimées, sans donnée inventée.
+              Votre assistant de sourcing AliExpress : coûts récupérés ou
+              estimés selon les données disponibles, et marges estimées,
+              sans donnée inventée.
             </p>
           </div>
 

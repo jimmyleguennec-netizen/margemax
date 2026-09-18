@@ -46,15 +46,15 @@ const guideSteps: {
     label: "2. Analyse",
     title: "Analyse instantanée des prix, livraison et taxes d'importation",
     description:
-      "Chaque coût est extrait réellement au checkout -- jamais une estimation au hasard.",
+      "Chaque coût est extrait réellement au checkout, avec un statut confirmé, estimé ou indisponible.",
   },
   {
     id: "marge",
     icon: Sparkles,
     label: "3. Marge",
-    title: "Découverte de la marge nette réelle et de l'indice de fiabilité",
+    title: "Découverte de la marge avant publicité et autres frais, et de l'indice de fiabilité",
     description:
-      "Marge, ROI et un score de fiabilité calculé sur la stabilité des coûts.",
+      "Marge, ROI et un score de fiabilité qui diminue quand la part de frais estimés (non confirmés au checkout) augmente.",
   },
   {
     id: "decision",
@@ -148,6 +148,9 @@ function MarginVisual() {
             className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]"
           />
         </div>
+        <p className="mt-1.5 text-[10px] text-white/30">
+          Exemple illustratif — pas une donnée de marché garantie.
+        </p>
       </div>
     </div>
   );

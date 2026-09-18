@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "MargeMax — Trouvez vos meilleures opportunités de sourcing",
   description:
-    "MargeMax analyse vos produits AliExpress et calcule instantanément marge, ROI et coûts réels d'importation.",
+    "MargeMax analyse vos produits AliExpress et calcule marge, ROI et coûts d'importation récupérés ou estimés selon les données disponibles.",
 };
 
 export default function RootLayout({

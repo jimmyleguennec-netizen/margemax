@@ -14,7 +14,6 @@ const benefits = [
   "Accès direct au lien produit AliExpress",
   "Variantes disponibles : couleurs, tailles et modèles",
   "Analyse de sourcing avec calcul de marge automatique",
-  "Générateur de fiche produit IA",
 ];
 
 const container = {

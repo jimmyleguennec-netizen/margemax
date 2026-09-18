@@ -58,7 +58,7 @@ export default function ConfidentialitePage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Conformité RGPD -- vos droits">
+      <LegalSection title="Conformité RGPD — vos droits">
         <p>
           Conformément au Règlement Général sur la Protection des Données
           (RGPD) et à la loi Informatique et Libertés, tout utilisateur

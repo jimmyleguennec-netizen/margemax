@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 
 const OAUTH_ERROR_MESSAGE =
-  "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
+  "Connexion impossible pour le moment, réessayez ou utilisez votre e-mail.";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (

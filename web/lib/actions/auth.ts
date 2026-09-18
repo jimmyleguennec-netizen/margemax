@@ -67,7 +67,7 @@ export async function login(
     // tableau de bord de demonstration : un echec de connexion ne doit
     // jamais donner l'impression d'avoir reussi.
     return {
-      error: "Connexion impossible pour le moment. Réessaie dans quelques instants.",
+      error: "Connexion impossible pour le moment. Réessayez dans quelques instants.",
     };
   }
 }
@@ -131,7 +131,7 @@ export async function signup(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant l'inscription :", err);
     return {
-      error: "Inscription impossible pour le moment. Réessaie dans quelques instants.",
+      error: "Inscription impossible pour le moment. Réessayez dans quelques instants.",
     };
   }
 }
@@ -150,7 +150,7 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email) {
-    return { error: "Merci de renseigner ton adresse e-mail." };
+    return { error: "Merci de renseigner votre adresse e-mail." };
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -159,7 +159,7 @@ export async function requestPasswordReset(
       "[auth] NEXT_PUBLIC_SITE_URL manquante -- impossible de construire une redirection de récupération sûre."
     );
     return {
-      error: "Récupération impossible pour le moment. Réessaie dans quelques instants.",
+      error: "Récupération impossible pour le moment. Réessayez dans quelques instants.",
     };
   }
 
@@ -184,7 +184,7 @@ export async function requestPasswordReset(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant la demande de récupération :", err);
     return {
-      error: "Récupération impossible pour le moment. Réessaie dans quelques instants.",
+      error: "Récupération impossible pour le moment. Réessayez dans quelques instants.",
     };
   }
 }
@@ -216,7 +216,7 @@ export async function updatePassword(
     if (!user) {
       return {
         error:
-          "Ce lien de récupération est invalide ou a expiré. Refais une demande.",
+          "Ce lien de récupération est invalide ou a expiré. Refaites une demande.",
       };
     }
 
@@ -225,7 +225,7 @@ export async function updatePassword(
       console.error("[auth] updateUser a renvoyé une erreur :", error);
       return {
         error:
-          "Impossible de définir ce mot de passe pour le moment. Réessaie.",
+          "Impossible de définir ce mot de passe pour le moment. Réessayez.",
       };
     }
 
@@ -234,7 +234,7 @@ export async function updatePassword(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant la mise à jour du mot de passe :", err);
     return {
-      error: "Impossible de définir ce mot de passe pour le moment. Réessaie.",
+      error: "Impossible de définir ce mot de passe pour le moment. Réessayez.",
     };
   }
 }

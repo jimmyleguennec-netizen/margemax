@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: "Corps de requête invalide -- JSON attendu ({ query: string })." },
+      { error: "Corps de requête invalide — JSON attendu ({ query: string })." },
       { status: 400 }
     );
   }

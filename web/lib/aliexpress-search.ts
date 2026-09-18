@@ -80,7 +80,7 @@ async function findFirstProductIdFromKeyword(
     // Distinct de "0 resultat" : le fournisseur a bloque/limite la
     // requete, ce n'est pas une absence reelle de resultats.
     throw new AliExpressSearchError(
-      "AliExpress a limité ou bloqué cette recherche pour le moment -- réessaie dans quelques instants, ou colle directement le lien de l'annonce.",
+      "AliExpress a limité ou bloqué cette recherche pour le moment — réessayez dans quelques instants, ou collez directement le lien de l'annonce.",
       503
     );
   }
@@ -95,7 +95,7 @@ async function findFirstProductIdFromKeyword(
 async function fetchHtmlViaScraperApi(targetUrl: string): Promise<string> {
   if (!SCRAPER_API_KEY) {
     throw new AliExpressSearchError(
-      "SCRAPER_API_KEY absente -- configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
+      "SCRAPER_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
       502
     );
   }
@@ -198,7 +198,7 @@ export async function performAliExpressSearch(
 
   if (!productId) {
     throw new AliExpressSearchError(
-      "Aucune annonce trouvée pour ce mot-clé sur AliExpress. Essaie un terme plus précis ou colle un lien produit direct.",
+      "Aucune annonce trouvée pour ce mot-clé sur AliExpress. Essayez un terme plus précis ou collez un lien produit direct.",
       404
     );
   }
@@ -208,7 +208,7 @@ export async function performAliExpressSearch(
 
   if (looksLikeBotBlock(html)) {
     throw new AliExpressSearchError(
-      "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment. Réessaie dans quelques instants.",
+      "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment. Réessayez dans quelques instants.",
       503
     );
   }
@@ -219,7 +219,7 @@ export async function performAliExpressSearch(
 
   if (price === undefined || Number.isNaN(price)) {
     throw new AliExpressSearchError(
-      "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifie le lien, ou réessaie dans quelques instants.",
+      "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifiez le lien, ou réessayez dans quelques instants.",
       502
     );
   }

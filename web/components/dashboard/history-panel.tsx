@@ -28,7 +28,7 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
           Aucune recherche pour l&apos;instant
         </h2>
         <p className="max-w-sm text-sm text-white/50">
-          Lancez une analyse depuis l&apos;onglet Recherche -- elle
+          Lancez une analyse depuis l&apos;onglet Recherche — elle
           apparaîtra ici automatiquement.
         </p>
       </div>
@@ -79,7 +79,7 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
         </table>
       </div>
       <p className="border-t border-white/10 px-5 py-3 text-xs text-white/30">
-        Historique de cette session -- les recherches ne sont pas encore
+        Historique de cette session — les recherches ne sont pas encore
         sauvegardées de façon permanente sur votre compte.
       </p>
     </div>

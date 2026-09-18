@@ -14,17 +14,17 @@ const faqs = [
   {
     question: "Comment fonctionne le calcul des marges réelles ?",
     answer:
-      "MargeMax combine le prix produit, la livraison et les frais d'importation réellement appliqués -- jamais une estimation au hasard. Dès que le total réellement payé au checkout est retrouvé, un badge de vérification croisée confirme que le calcul de marge et de ROI correspond bien à la réalité.",
+      "MargeMax combine le prix produit, la livraison et les frais d'importation réellement appliqués — chaque donnée est marquée confirmée, estimée ou indisponible, jamais devinée. Dès que le total réellement payé au checkout est retrouvé, un badge de vérification croisée confirme que le calcul de marge et de ROI correspond bien à la réalité.",
   },
   {
     question: "Pourquoi acheter des crédits au lieu d'un abonnement ?",
     answer:
-      "Parce que vous ne payez que ce que vous utilisez, sans mensualité qui tourne dans le vide les mois calmes. Aucun engagement, aucun renouvellement automatique -- vous achetez un pack quand vous en avez besoin, point final.",
+      "Parce que vous ne payez que ce que vous utilisez, sans mensualité qui tourne dans le vide les mois calmes. Aucun engagement, aucun renouvellement automatique — vous achetez un pack quand vous en avez besoin, point final.",
   },
   {
     question: "Les crédits ont-ils une date d'expiration ?",
     answer:
-      "Non, jamais. Les crédits achetés vous appartiennent à vie, sans date limite ni compte à rebours -- utilisez-les à votre rythme.",
+      "Non, jamais. Les crédits achetés vous appartiennent à vie, sans date limite ni compte à rebours — utilisez-les à votre rythme.",
   },
   {
     question:
@@ -33,9 +33,9 @@ const faqs = [
       "Vous êtes prévenu immédiatement et aucun crédit n'est débité. MargeMax n'invente jamais une donnée manquante : si une information ne peut pas être récupérée (page indisponible, produit retiré...), elle reste clairement signalée comme absente plutôt que devinée.",
   },
   {
-    question: "Comment fonctionne le générateur de fiches produits IA ?",
+    question: "1 crédit correspond-il toujours à 1 analyse ?",
     answer:
-      "À partir des données déjà vérifiées de votre analyse (titre, image, caractéristiques, prix), il génère en un clic une fiche produit prête à publier -- que vous pouvez ensuite relire et ajuster avant mise en ligne.",
+      "Oui : 1 crédit = 1 analyse complète d'une annonce AliExpress. Les 3 crédits offerts à l'inscription (= 3 analyses) suivent la même règle.",
   },
 ];
 

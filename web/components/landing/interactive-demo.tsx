@@ -36,12 +36,12 @@ const steps = [
     icon: Calculator,
     title: "Calcul instantané des frais réels",
     description:
-      "Prix produit, livraison et frais d'importation réels combinés -- jamais une estimation au hasard.",
+      "Prix produit, livraison et frais d'importation combinés, chacun marqué confirmé, estimé ou indisponible.",
   },
   {
     id: 3,
     icon: BadgeCheck,
-    title: "Obtenez votre marge nette vérifiée",
+    title: "Obtenez votre marge avant publicité et autres frais",
     description:
       "Marge, ROI et badge de vérification croisée avec le total réellement payé au checkout.",
   },
@@ -56,7 +56,10 @@ function MockupWindow({ children }: { children: React.ReactNode }) {
       />
       <div className="rounded-2xl bg-gradient-to-r from-cyan-400/60 via-fuchsia-500/60 to-pink-500/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(217,70,239,0.5)]">
         <div className="overflow-hidden rounded-2xl bg-[#0a0a14]">
-          <div className="flex items-center gap-1.5 border-b border-white/10 bg-white/[0.03] px-4 py-3">
+          <div
+            aria-hidden="true"
+            className="flex items-center gap-1.5 border-b border-white/10 bg-white/[0.03] px-4 py-3"
+          >
             <span className="h-2.5 w-2.5 rounded-full bg-pink-500/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-400/70" />
@@ -90,8 +93,8 @@ function StepOneMockup() {
         <Clipboard className="ml-auto h-4 w-4 shrink-0 text-white/30" />
       </div>
       <p className="text-xs text-white/30">
-        Fonctionne aussi bien avec un simple mot-clé (ex : « chargeur
-        induction iphone ») qu&apos;avec un lien produit direct.
+        Fonctionne aussi bien avec un simple mot-clé (ex : « chargeur à
+        induction pour iPhone ») qu&apos;avec un lien produit direct.
       </p>
     </motion.div>
   );
@@ -220,7 +223,7 @@ export function InteractiveDemo() {
           Trois clics, une marge vérifiée
         </h2>
         <p className="mt-3 text-white/50">
-          Suis le parcours complet, étape par étape.
+          Suivez le parcours complet, étape par étape.
         </p>
       </div>
 

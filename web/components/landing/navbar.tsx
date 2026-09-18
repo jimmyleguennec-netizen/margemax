@@ -8,7 +8,7 @@ import {
   useMotionValueEvent,
   useScroll,
 } from "framer-motion";
-import { Facebook, Instagram, Menu, Twitter, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
@@ -21,18 +21,21 @@ const links = [
   { href: "#contact", label: "Contact" },
 ];
 
-const socials = [
-  { icon: Instagram, href: "#", label: "Instagram" },
-  { icon: Facebook, href: "#", label: "Facebook" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-];
+// Aucun compte reseau social officiel n'existe encore pour MargeMax --
+// pas de lien vide vers "#", on retire les icones tant qu'aucune URL
+// reelle n'est disponible (Instagram/Facebook/X).
 
 const BANNER_TEXT = "🎁 3 analyses offertes à l'inscription";
 
 function ScrollingBanner() {
   return (
-    <div className="relative mx-6 h-4 flex-1 overflow-hidden">
+    <div
+      role="marquee"
+      aria-label={BANNER_TEXT}
+      className="relative mx-6 h-4 flex-1 overflow-hidden"
+    >
       <motion.div
+        aria-hidden="true"
         animate={{ x: ["0%", "-50%"] }}
         transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
         className="absolute inset-y-0 flex w-max items-center gap-16 whitespace-nowrap text-[11px] font-medium text-cyan-200/70"
@@ -47,20 +50,7 @@ function ScrollingBanner() {
 
 function TopBar() {
   return (
-    <div className="hidden w-full items-center justify-between border-b border-white/5 bg-black/60 px-4 py-1.5 sm:flex">
-      <div className="flex items-center gap-3">
-        {socials.map((social) => (
-          <a
-            key={social.label}
-            href={social.href}
-            aria-label={social.label}
-            className="text-white/40 transition-colors duration-200 hover:text-cyan-300 hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
-          >
-            <social.icon className="h-3.5 w-3.5" />
-          </a>
-        ))}
-      </div>
-
+    <div className="hidden w-full items-center justify-end border-b border-white/5 bg-black/60 px-4 py-1.5 sm:flex">
       <ScrollingBanner />
 
       <Link

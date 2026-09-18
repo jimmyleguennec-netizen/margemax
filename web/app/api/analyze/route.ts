@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: "Corps de requête invalide -- JSON attendu ({ query: string })." },
+      { error: "Corps de requête invalide — JSON attendu ({ query: string })." },
       { status: 400 }
     );
   }
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connecte-toi pour lancer une analyse." },
+      { error: "Connectez-vous pour lancer une analyse." },
       { status: 401 }
     );
   }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   if (profileError || !profile) {
     console.error("[api/analyze] profil introuvable pour", user.id, profileError);
     return NextResponse.json(
-      { error: "Impossible de vérifier ton solde de crédits pour le moment." },
+      { error: "Impossible de vérifier votre solde de crédits pour le moment." },
       { status: 502 }
     );
   }
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Solde de crédits insuffisant. Achète un pack pour continuer à analyser des produits.",
+          "Solde de crédits insuffisant. Achetez un pack pour continuer à analyser des produits.",
         credits: profile.credits,
       },
       { status: 402 }

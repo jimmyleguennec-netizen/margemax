@@ -143,7 +143,7 @@ export function CalculatorPanel() {
           Calculateur de marge
         </h2>
         <p className="mt-1 mb-6 text-sm text-white/40">
-          Renseignez vos propres coûts -- le calcul et les estimations se
+          Renseignez vos propres coûts — le calcul et les estimations se
           mettent à jour en direct.
         </p>
 
@@ -181,7 +181,7 @@ export function CalculatorPanel() {
             className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(244,114,182,0.5)]"
           >
             <TrendingDown className="h-3.5 w-3.5" />
-            Appliquer Marge Basse
+            Appliquer prix de vente bas
           </button>
           <button
             type="button"
@@ -189,7 +189,7 @@ export function CalculatorPanel() {
             className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]"
           >
             <TrendingUp className="h-3.5 w-3.5" />
-            Appliquer Marge Haute
+            Appliquer prix de vente haut
           </button>
         </div>
 
@@ -238,7 +238,7 @@ export function CalculatorPanel() {
 
         {!isProfitable && (
           <p className="mt-3 text-center text-xs text-pink-300">
-            Marge négative avec ces chiffres -- augmentez le prix de vente ou
+            Marge négative avec ces chiffres — augmentez le prix de vente ou
             réduisez les coûts.
           </p>
         )}
@@ -254,10 +254,10 @@ export function CalculatorPanel() {
           </span>
         </div>
 
-        {/* Bloc 1 : Couts reels */}
+        {/* Bloc 1 : detail des couts saisis manuellement */}
         <div className="mt-8">
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">
-            Bloc 1 -- Coûts réels
+            Bloc 1 — Détail des coûts
           </h3>
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm">
             <div className="flex items-center justify-between text-white/50">
@@ -292,7 +292,7 @@ export function CalculatorPanel() {
         {/* Bloc 2 : Estimations & Marges */}
         <div className="mt-6">
           <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">
-            Bloc 2 -- Estimations &amp; Marges
+            Bloc 2 — Estimations &amp; Marges
           </h3>
 
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] p-5">
@@ -341,8 +341,9 @@ export function CalculatorPanel() {
             </div>
 
             <p className="mt-4 text-center text-[11px] text-white/30">
-              Estimation calculée à partir de vos coûts réels -- pas une
-              donnée de marché garantie.
+              Estimation calculée à partir des coûts que vous avez saisis —
+              pas une donnée de marché garantie. Le score de fiabilité
+              diminue quand la part de frais estimés augmente.
             </p>
           </div>
         </div>

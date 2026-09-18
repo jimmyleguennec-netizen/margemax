@@ -29,7 +29,7 @@ export function ResetPasswordForm() {
     <div className="w-full max-w-sm rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-[0_0_30px_rgba(0,240,255,0.15)] backdrop-blur-xl">
       <h1 className="text-2xl font-bold text-white">Nouveau mot de passe</h1>
       <p className="mt-1 text-sm text-white/50">
-        Choisis un mot de passe d&apos;au moins 6 caractères.
+        Choisissez un mot de passe d&apos;au moins 6 caractères.
       </p>
 
       {state.success ? (

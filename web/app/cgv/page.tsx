@@ -18,9 +18,10 @@ export default function CgvPage() {
           (« CGV/CGU ») ont pour objet de définir les modalités et
           conditions dans lesquelles la société AutOutilShop SAS, éditrice
           du service MargeMax, fournit à ses clients des services
-          d&apos;analyse de données de sourcing e-commerce -- notamment le
-          calcul du coût réel d&apos;un produit (prix, livraison, frais
-          d&apos;importation) et de la marge associée -- au moyen d&apos;un
+          d&apos;analyse de données de sourcing e-commerce — notamment le
+          calcul du coût d&apos;un produit (prix, livraison, frais
+          d&apos;importation, confirmés ou estimés selon les données
+          disponibles) et de la marge associée — au moyen d&apos;un
           système de crédits à l&apos;acte.
         </p>
         <p>
@@ -61,18 +62,15 @@ export default function CgvPage() {
           et avoir expressément renoncé à son droit de rétractation pour
           cet achat précis. Cette demande et cette renonciation doivent
           chacune résulter d&apos;une action distincte et non précochée du
-          client au moment de la commande -- elles ne peuvent pas résulter
+          client au moment de la commande — elles ne peuvent pas résulter
           de la seule acceptation générale des présentes CGV/CGU.
         </p>
-        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
-          À finaliser : le parcours de commande doit effectivement proposer
-          cette demande d&apos;exécution immédiate et cette renonciation
-          comme deux cases à cocher séparées, non précochées, avec
-          enregistrement côté serveur de l&apos;horodatage et de la version
-          du texte acceptée. Tant que ce parcours n&apos;est pas en place,
-          aucune renonciation ne doit être considérée comme acquise et le
-          délai de rétractation de 14 jours s&apos;applique pleinement à
-          toute commande.
+        <p>
+          Le parcours de commande actuel ne propose pas encore ces deux
+          cases à cocher séparées. En conséquence, aucune renonciation
+          n&apos;est considérée comme acquise et le délai de rétractation de
+          14 jours s&apos;applique pleinement à toute commande passée sur
+          MargeMax à ce jour.
         </p>
         <p>
           Pour exercer ce droit ou pour toute question, le client peut
@@ -113,10 +111,10 @@ export default function CgvPage() {
           écrite préalable restée infructueuse auprès d&apos;AutOutilShop
           SAS.
         </p>
-        <p className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-amber-200">
-          À compléter (médiateur non encore désigné, ne pas inventer une
-          adhésion) : nom, adresse postale et site internet du médiateur de
-          la consommation effectivement désigné par AutOutilShop SAS.
+        <p className="text-white/50">
+          Le nom, l&apos;adresse postale et le site internet du médiateur de
+          la consommation désigné par AutOutilShop SAS sont en cours de
+          finalisation et seront publiés sur cette page.
         </p>
       </LegalSection>
 

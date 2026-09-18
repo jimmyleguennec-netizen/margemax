@@ -22,7 +22,7 @@ type FormDispatch = (payload: FormData) => void;
 const initialState: AuthActionState = {};
 
 const CALLBACK_ERROR_MESSAGE =
-  "Connexion impossible pour le moment. Réessaie ou utilise ton e-mail.";
+  "Connexion impossible pour le moment, réessayez ou utilisez votre e-mail.";
 
 const ACCOUNT_NOT_FOUND_MESSAGE =
   "Aucun compte MargeMax associé à cet e-mail. Veuillez d'abord vous inscrire.";
@@ -298,11 +298,22 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
           <div className="relative grid min-h-[560px] md:grid-cols-2">
             {/* Desktop : les deux formulaires sont toujours montes cote a
                 cote, l'overlay glisse pour ne laisser voir que l'un des
-                deux. */}
-            <div className="hidden items-center justify-center p-8 sm:p-10 md:flex">
+                deux -- le formulaire masque par l'overlay est rendu
+                "inert" (non focusable au clavier, ignore des lecteurs
+                d'ecran) pour qu'aucun champ ni icone residuelle du
+                formulaire cache ne reste accessible par Tab. */}
+            <div
+              className="hidden items-center justify-center p-8 sm:p-10 md:flex"
+              aria-hidden={mode !== "login"}
+              inert={mode !== "login" ? true : undefined}
+            >
               <LoginForm action={loginActionFn} state={loginState} idPrefix="desktop" />
             </div>
-            <div className="hidden items-center justify-center p-8 sm:p-10 md:flex">
+            <div
+              className="hidden items-center justify-center p-8 sm:p-10 md:flex"
+              aria-hidden={mode !== "signup"}
+              inert={mode !== "signup" ? true : undefined}
+            >
               <SignupForm action={signupActionFn} state={signupState} idPrefix="desktop" />
             </div>
 

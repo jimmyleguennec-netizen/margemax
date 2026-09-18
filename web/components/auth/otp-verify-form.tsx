@@ -62,7 +62,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       if (error) {
         console.error("[otp] verifyOtp a renvoyé une erreur :", error);
         setErrorMessage(
-          `Code incorrect ou expiré. Vérifie les ${OTP_LENGTH} chiffres, ou demande un nouveau code.`
+          `Code incorrect ou expiré. Vérifiez les ${OTP_LENGTH} chiffres, ou demandez un nouveau code.`
         );
         setStatus("error");
         return;
@@ -71,7 +71,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       setStatus("verified");
     } catch (err) {
       console.error("[otp] Exception réseau pendant verifyOtp :", err);
-      setErrorMessage("Validation impossible pour le moment. Réessaie dans quelques instants.");
+      setErrorMessage("Validation impossible pour le moment. Réessayez dans quelques instants.");
       setStatus("error");
     }
   }
@@ -103,7 +103,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       >
         <CheckCircle2 className="h-10 w-10 text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.8)]" />
         <p className="text-sm text-white/70">
-          Adresse confirmée. Redirection vers ton espace...
+          Adresse confirmée. Redirection vers votre espace...
         </p>
       </motion.div>
     );
@@ -112,9 +112,9 @@ export function OtpVerifyForm({ email }: { email: string }) {
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-white">Vérifie ton e-mail</h2>
+        <h2 className="text-2xl font-bold text-white">Vérifiez votre e-mail</h2>
         <p className="mt-1 text-sm text-white/50">
-          Entre le code à {OTP_LENGTH} chiffres envoyé à{" "}
+          Entrez le code à {OTP_LENGTH} chiffres envoyé à{" "}
           <span className="text-cyan-300">{email}</span>.
         </p>
       </div>
