@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { CircularGauge } from "@/components/ui/circular-gauge";
 import { CountUp } from "@/components/ui/count-up";
+import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { SectionGlow } from "@/components/ui/section-glow";
+import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -24,6 +25,19 @@ function formatEuro(n: number): string {
 function formatPct(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
+
+// Memes chiffres d'exemple que components/landing/demo.tsx (voir son
+// commentaire) : jamais une marge/ROI/fiabilite recalculee ou inventee a
+// la main ici, toujours computeMarginEstimate(), la fonction partagee
+// reellement utilisee par le Calculateur et la Recherche du dashboard.
+// L'ancien "Indice de fiabilité : 94 %" etait un pourcentage fixe sans
+// methode reelle derriere (la vraie fiabilite est qualitative -- eleve/
+// moyen/faible -- voir lib/margin-estimate.ts, reliabilityTierFromImportRatio) :
+// remplace par le meme badge ReliabilityBadge que l'app reelle.
+const SUBTOTAL = 14.49;
+const IMPORT_FEE = 3.6;
+const TOTAL_COST = SUBTOTAL + IMPORT_FEE;
+const MARGIN_EXAMPLE = computeMarginEstimate(TOTAL_COST, IMPORT_FEE);
 
 const guideSteps: {
   id: string;
@@ -123,33 +137,29 @@ function MarginVisual() {
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
       <div className="flex items-center gap-4">
-        <CircularGauge value={94} size={52} strokeWidth={4} />
         <div>
-          <p className="text-xs text-white/40">Marge avant pub</p>
+          <p className="text-xs text-white/40">Marge avant pub (prix conseillé)</p>
           <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-            <CountUp value={21.81} format={formatEuro} />
+            <CountUp value={MARGIN_EXAMPLE.marginHigh} format={formatEuro} />
           </p>
           <p className="text-xs text-white/40">
-            ROI <CountUp value={120.6} format={formatPct} />
+            ROI{" "}
+            {MARGIN_EXAMPLE.roiHigh !== null ? (
+              <CountUp value={MARGIN_EXAMPLE.roiHigh} format={formatPct} />
+            ) : (
+              "non calculable"
+            )}
           </p>
         </div>
       </div>
       <div>
         <div className="flex items-center justify-between text-[11px] text-white/40">
-          <span>Indice de fiabilité</span>
-          <span className="font-medium text-cyan-300">94 %</span>
-        </div>
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/5">
-          <motion.div
-            initial={{ width: 0 }}
-            whileInView={{ width: "94%" }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]"
-          />
+          <span>Fiabilité</span>
+          <ReliabilityBadge tier={MARGIN_EXAMPLE.reliability} />
         </div>
         <p className="mt-1.5 text-[10px] text-white/30">
-          Exemple illustratif — pas une donnée de marché garantie.
+          Exemple illustratif — palier qualitatif, pas un pourcentage
+          précis ni une donnée de marché garantie.
         </p>
       </div>
     </div>

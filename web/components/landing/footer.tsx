@@ -6,7 +6,6 @@ import {
   Calculator,
   FileText,
   Mail,
-  PartyPopper,
   ScrollText,
   Ship,
   type LucideIcon,
@@ -47,11 +46,15 @@ const PAYMENT_METHODS: { label: string; Icon: (props: { className?: string }) =>
 // lien vers une page qui n'existe pas.
 const toolLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Calculateur de marge (connexion requise)", href: "/dashboard", icon: Calculator },
-  { label: "Calcul des frais de livraison", href: "#demo", icon: Ship },
+  { label: "Voir la démo", href: "#demo", icon: Ship },
 ];
 
+// "Voir la démo" pointait vers #guide (le guide en 4 etapes) au lieu de
+// #demo (la vraie section de demonstration) -- lien technique valide (les
+// deux ancres existent reellement sur la page) mais mal etiquete. Corrige
+// ici : #demo pour "Voir la démo", #guide sous son propre libelle distinct.
 const resourceLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Voir la démo", href: "#guide", icon: ScrollText },
+  { label: "Comment ça marche (guide en 4 étapes)", href: "#guide", icon: ScrollText },
   { label: "Mentions légales", href: "/mentions-legales", icon: FileText },
   { label: "CGV / CGU", href: "/cgv", icon: FileText },
   { label: "Confidentialité", href: "/confidentialite", icon: FileText },
@@ -114,8 +117,9 @@ export function Footer() {
               Prêt à dénicher vos vrais produits gagnants ?
             </h2>
             <p className="max-w-lg text-white/50">
-              Rejoignez les e-commerçants qui analysent leurs coûts
-              d&apos;importation au centime près.{" "}
+              Rejoignez les e-commerçants qui estiment leurs coûts
+              d&apos;importation à partir des données réellement
+              disponibles.{" "}
               <span className="font-bold text-amber-300">
                 3 crédits offerts
               </span>{" "}
@@ -171,22 +175,6 @@ export function Footer() {
               <Icon key={label} className="opacity-90 transition-opacity hover:opacity-100" />
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Avertissement humoristique -- ton volontairement decontracte,
-          distinct des mentions legales serieuses juste en dessous. */}
-      <div className="border-t border-white/5 bg-white/[0.02] py-5">
-        <div className="container flex items-start gap-2.5 text-xs text-white/40 sm:items-center">
-          <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300/70 sm:mt-0" />
-          <p>
-            <span className="font-semibold text-white/60">Avertissement :</span>{" "}
-            ce site a été connu pour provoquer une expérience époustouflante.
-            Nous vous recommandons de vous préparer mentalement et si
-            possible d&apos;être assis. Les effets secondaires peuvent
-            inclure l&apos;économie d&apos;argent, laisser échapper un rire
-            et un klaxon sporadique.
-          </p>
         </div>
       </div>
 

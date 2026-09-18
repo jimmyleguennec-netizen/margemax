@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 
@@ -113,8 +114,21 @@ export function Pricing() {
         ))}
       </motion.div>
 
+      {/* "Paiement sécurisé" seul ne prouve rien au client -- complete par
+          des elements verifiables : qui encaisse reellement (Stripe, jamais
+          MargeMax qui ne voit aucune donnee de carte), et un acces direct
+          aux mentions legales/CGV pour verifier l'identite de l'entreprise
+          facturante plutot que de se fier a un slogan. */}
       <p className="mt-8 text-center text-xs text-white/30">
-        Paiement 100 % sécurisé via Stripe.
+        Paiement traité par Stripe — MargeMax ne stocke aucune donnée de
+        carte bancaire.{" "}
+        <Link href="/mentions-legales" className="underline-offset-4 hover:underline hover:text-white/50">
+          Mentions légales
+        </Link>{" "}
+        ·{" "}
+        <Link href="/cgv" className="underline-offset-4 hover:underline hover:text-white/50">
+          CGV
+        </Link>
       </p>
 
       <CheckoutConsentDialog

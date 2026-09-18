@@ -26,7 +26,9 @@ const links = [
 // pas de lien vide vers "#", on retire les icones tant qu'aucune URL
 // reelle n'est disponible (Instagram/Facebook/X).
 
-const BANNER_TEXT = "🎁 3 analyses offertes à l'inscription";
+// "crédits" partout (pas "analyses") : coherent avec le vocabulaire reel
+// du produit (solde de credits affiche au dashboard, 1 credit = 1 analyse).
+const BANNER_TEXT = "🎁 3 crédits offerts à l'inscription";
 
 function ScrollingBanner() {
   return (

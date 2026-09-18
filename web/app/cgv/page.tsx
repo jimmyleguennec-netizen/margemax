@@ -129,9 +129,19 @@ export default function CgvPage() {
           SAS.
         </p>
         <p className="text-white/50">
-          Le nom, l&apos;adresse postale et le site internet du médiateur de
-          la consommation désigné par AutOutilShop SAS sont en cours de
-          finalisation et seront publiés sur cette page.
+          <strong className="text-amber-300">
+            Aucun médiateur de la consommation n&apos;est à ce jour désigné
+            pour AutOutilShop SAS.
+          </strong>{" "}
+          Or l&apos;article L.616-1 impose à tout professionnel de garantir à
+          ses clients consommateurs un accès effectif à un dispositif de
+          médiation — cette désignation reste à effectuer (adhésion à un
+          médiateur agréé, ex. via une fédération professionnelle ou un
+          médiateur sectoriel) et le nom, l&apos;adresse postale et le site
+          internet du médiateur retenu seront publiés ici dès qu&apos;ils
+          seront connus. En attendant, tout client consommateur conserve le
+          droit d&apos;adresser sa réclamation écrite directement à
+          AutOutilShop SAS (voir Contact ci-dessous).
         </p>
       </LegalSection>
 

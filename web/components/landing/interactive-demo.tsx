@@ -14,6 +14,7 @@ import {
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
+import { computeMarginEstimate } from "@/lib/margin-estimate";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -22,6 +23,16 @@ function formatEuro(n: number): string {
 function formatPct(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
+
+// Memes chiffres d'exemple que components/landing/demo.tsx et quick-guide.tsx
+// (Station de charge 3-en-1, sous-total 14,49 € + taxes 3,60 € = 18,09 €) --
+// marge/ROI toujours recalcules via computeMarginEstimate(), jamais une
+// valeur fixe recopiee a la main (d'anciens chiffres 21,81 €/120,6 % ici
+// dataient d'une formule de marge anterieure, desynchronisee de la vraie
+// methode -- voir lib/margin-estimate.ts).
+const DEMO_TOTAL_COST = 18.09;
+const DEMO_IMPORT_FEE = 3.6;
+const DEMO_ESTIMATE = computeMarginEstimate(DEMO_TOTAL_COST, DEMO_IMPORT_FEE);
 
 const steps = [
   {
@@ -185,13 +196,13 @@ function StepThreeMockup() {
         <div>
           <p className="text-xs text-white/40">Total checkout</p>
           <p className="text-xl font-bold text-white">
-            <CountUp value={18.09} format={formatEuro} />
+            <CountUp value={DEMO_TOTAL_COST} format={formatEuro} />
           </p>
         </div>
         <div>
           <p className="text-xs text-white/40">Marge avant pub</p>
           <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-            <CountUp value={21.81} format={formatEuro} />
+            <CountUp value={DEMO_ESTIMATE.marginHigh} format={formatEuro} />
           </p>
         </div>
         <div>
@@ -199,7 +210,11 @@ function StepThreeMockup() {
             <TrendingUp className="h-3.5 w-3.5" /> ROI
           </p>
           <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-            <CountUp value={120.6} format={formatPct} />
+            {DEMO_ESTIMATE.roiHigh !== null ? (
+              <CountUp value={DEMO_ESTIMATE.roiHigh} format={formatPct} />
+            ) : (
+              "—"
+            )}
           </p>
         </div>
         <div>
@@ -220,7 +235,7 @@ export function InteractiveDemo() {
     <section className="container py-20 sm:py-28">
       <div className="mx-auto mb-14 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Trois clics, une marge vérifiée
+          Trois clics, une marge estimée
         </h2>
         <p className="mt-3 text-white/50">
           Suivez le parcours complet, étape par étape.

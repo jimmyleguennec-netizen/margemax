@@ -154,7 +154,7 @@ function SignupForm({
         icon={Building2}
         autoComplete="organization"
         required={false}
-        placeholder="Nom de ton empire e-commerce (ou ton futur empire)"
+        placeholder="Nom de votre entreprise (facultatif)"
       />
       <PasswordInput
         id={`${idPrefix}-signup-password`}
@@ -162,7 +162,7 @@ function SignupForm({
         label="Mot de passe"
         autoComplete="new-password"
         minLength={6}
-        hint="Minimum 6 caractères (ou « 123456 » si tu aimes vivre dangereusement — non, évite quand même !)"
+        hint="Minimum 6 caractères."
       />
       <PasswordInput
         id={`${idPrefix}-signup-confirm`}
