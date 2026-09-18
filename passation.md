@@ -1,5 +1,66 @@
 # Passation — MargeMax
 
+## Bug fix critique : parsing prix/livraison/taxes AliExpress (2026-09-18, session "fix extraction shipping/tax")
+
+**Cause racine trouvée en conditions réelles** (navigateur intégré, vraie
+fiche produit `fr.aliexpress.com/item/...` ouverte en direct) — deux
+problèmes distincts empilés :
+
+**1. Faux positif de frais de port ("1,00 €" au lieu du vrai montant).**
+L'ancien regex de `extractShippingAndImportFee` (`web/lib/aliexpress-search.ts`)
+cherchait le mot "Livraison"/"Shipping" sur la page HTML **entière**, sans
+se limiter au produit réellement analysé. Or une fiche produit AliExpress
+contient toujours plus bas un bloc "Vous aimerez aussi" (recommandations)
+avec DES PRIX ET DES BADGES "Livraison gratuite" **d'articles complètement
+différents** — vérifié en direct : le tout premier "Livraison gratuite"
+rencontré sur une vraie fiche appartenait à un smartphone recommandé sans
+aucun rapport avec le produit analysé. **Fix : le HTML est maintenant
+tronqué avant le premier bloc "hors produit" (avis clients, recommandations,
+articles similaires) avant toute extraction** (`isolateMainProductHtml`),
+et l'extraction balaie désormais TOUTES les occurrences valides plutôt que
+de s'arrêter sur la première (`findFirstValidAmount`) — un bandeau promo
+rejeté ("Livraison gratuite **dès** 10€ d'achat", texte à seuil/condition,
+détecté et exclu via `THRESHOLD_WORDS`) n'empêche plus de trouver un
+montant réel plus loin dans le même bloc produit.
+
+**2. Taxes d'importation "manquant" en permanence — CE N'EST PAS UN BUG
+D'EXTRACTION, c'est une limite réelle du site.** Vérifié en direct sur une
+vraie fiche produit : AliExpress affiche littéralement **"Les droits de
+douane sont calculés lors du paiement"** — ce montant n'existe nulle part
+avant l'étape de paiement réelle (identifiants + adresse + panier), donc
+strictement inaccessible à un scraper anonyme (Firecrawl inclus, quel que
+soit le réglage). **Fix : repli explicite sur une estimation TVA France 20 %
+du sous-total** (`estimateImportFee`, demandé explicitement par le
+brief) quand aucun vrai montant n'est lisible — mais **toujours marqué**
+via le nouveau champ `importFeeEstimated: true` sur `AliExpressSearchResult`,
+jamais confondu avec une valeur confirmée. Le coût total inclut désormais
+cette estimation (ne sous-estime plus systématiquement le vrai montant
+payé), et l'UI (`search-panel.tsx`) distingue clairement 3 états sur la
+ligne "Taxes d'importation" : **manquant** (ambre, rien trouvé, pas
+d'estimation) / **estimé (TVA 20 %)** (cyan, repli TVA) / **confirmé**
+(vert, vraie valeur lue sur la page) — le badge d'en-tête "Vérifié" exige
+maintenant les trois conditions (frais de port ET taxes ET taxes NON
+estimées) pour s'afficher, sinon "Partiellement vérifié".
+
+**Frais de port : toujours `null`/"manquant" si non trouvé, PAS
+d'estimation par défaut** — conforme à la demande explicite du brief
+("les frais de livraison réels... au lieu de valeurs par défaut/fallback"),
+contrairement aux taxes d'importation où une estimation a été explicitement
+demandée. Sur la fiche produit testée en direct, le vrai coût de livraison
+de CE produit n'apparaissait nulle part non plus (uniquement une date de
+livraison, "sep. 23-26", pas un prix) — un "manquant" honnête reste
+préférable à un prix inventé.
+
+**Non testable de bout en bout depuis cet environnement** : pas de clé
+`FIRECRAWL_API_KEY` ni d'appel Firecrawl réel disponible ici, et pas de
+Node/npm pour builder. Le diagnostic et la nouvelle logique de scoping/
+validation ont été vérifiés contre le VRAI HTML d'une fiche produit
+AliExpress live (via le navigateur intégré), mais le comportement de
+Firecrawl sur cette même page (avec `rawHtml`, `waitFor: 3000`, `proxy:
+"auto"`) reste à confirmer par l'utilisateur après déploiement, avec un
+vrai produit dont le total attendu est connu (comme l'exemple du brief :
+sous-total 11,19€ / livraison 5,41€ / droits 3,61€ / total 20,21€).
+
 ## Sprint urgent mobile : écran noir au scroll & menu burger (2026-09-18, session "fix mobile scroll")
 
 **Cause racine identifiée pour l'écran noir au scroll : `web/components/landing/hero.tsx`.**
