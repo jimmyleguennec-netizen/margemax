@@ -1,0 +1,63 @@
+# Passation — MargeMax
+
+## Objectif du projet & état actuel
+
+MargeMax est une SaaS de sourcing/calcul de marge pour l'e-commerce AliExpress : un utilisateur colle un mot-clé ou un lien produit AliExpress, l'app récupère le coût réel (prix, livraison, taxes d'importation) via ScraperAPI, et calcule marge/ROI/prix de vente conseillé. Le modèle économique est un système de crédits prépayés à l'acte (1 crédit = 1 analyse), sans abonnement, avec 3 crédits offerts à l'inscription.
+
+- Stack : Next.js 14 (App Router) / React / TypeScript / Tailwind / Framer Motion, dans `web/`.
+- Auth : Supabase (`@supabase/ssr`, cookies), avec OTP par e-mail à l'inscription, OAuth Google (Apple non affiché tant qu'il n'est pas configuré), reset de mot de passe fonctionnel (`/forgot-password` → `/auth/callback` → `/reset-password`).
+- Paiement : Stripe **Payment Links** statiques (pas encore de Stripe Checkout Sessions dynamiques) + webhook (`app/api/webhooks/stripe/route.ts`) qui crédite atomiquement via une RPC Postgres (`consume_credit` / `add_credits`), avec déduplication sur `stripe_webhook_events.event_id` et `credit_purchases.stripe_session_id`.
+- Dépôt : `jimmyleguennec-netizen/margemax`, branche `main`, déployé sur Vercel : https://margemax-esse-beta.vercel.app/
+- **Contrainte d'environnement** : cet environnement de travail n'a ni Node/npm/npx, ni accès réseau sortant. Impossible d'exécuter `npm run build`, lint, tests, ou de vérifier quoi que ce soit en conditions réelles (Stripe test mode, Supabase live, rendu mobile réel). Toutes les corrections sont faites par lecture/relecture du code source, jamais testées en exécution dans cette session.
+- État global : le parcours email → dashboard → 3 crédits fonctionne et a été confirmé par l'utilisateur. Le pack "Avancé" (`/login?pack=avance`) fonctionne. Une recherche "iphone" provoquait "Aucune annonce trouvée" sans debit visible (bug confirmé, corrigé au niveau code cette session — voir section Bugs).
+
+## Dernières modifications apportées
+
+Dernier commit poussé : `097c347` — "fix(landing+auth+legal): honest copy, vouvoiement, vaporware removal, a11y" (27 fichiers).
+
+Résumé des lots livrés dans cette session (du plus ancien au plus récent) :
+
+1. **`b5b9418`** — distinction des vrais modes d'échec de recherche AliExpress (blocage anti-bot vs vraie absence de résultat), correction du bug d'arrondi ROI 120,5 % → 120,6 %, première passe de tutoiement.
+2. **`728a20f`** — suppression du faux formulaire de carte bancaire décoratif dans Paramètres, remplacé par le solde réel + historique d'achats réel (table `credit_purchases`).
+3. **`2c26456`** — recommandation réelle de combinaison de packs au-delà de 200 crédits (algorithme glouton dans `lib/packs.ts`), vérifiée sur l'exemple 220 crédits = Ultimate + Essentiel + Starter = 70,97 €.
+4. **`097c347`** (dernier) — gros lot correctif suite à un nouveau brief détaillé (11 sections) :
+   - Suppression des icônes sociales factices (aucune URL réelle) et correction du lien "Guide" → "Tutoriel MargeMax".
+   - **Suppression de fonctionnalités marketing fantômes** : "Générateur de fiche IA" et "Carnet & comparateur (favoris/export)" étaient vendus en marketing (hero, pricing, features, FAQ) sans aucune implémentation réelle côté produit — retirés, remplacés par une description honnête de l'historique de session (qui, lui, existe réellement mais est non persistant).
+   - Accessibilité : bandeau répété rendu accessible (`role=marquee` + `aria-hidden`), formulaire auth masqué par l'overlay rendu `inert`, fausses barres de fenêtre macOS des démos en `aria-hidden`.
+   - Libellés trompeurs corrigés : "marge nette (vérifiée)" → "marge avant publicité et autres frais", boutons "Appliquer Marge Basse/Haute" → "Appliquer prix de vente bas/haut" (ce sont des prix, pas des marges).
+   - **Repasse complète en vouvoiement** partout (annule une passe de tutoiement faite par erreur plus tôt dans la session — attention, ce point a fait l'aller-retour plusieurs fois selon les briefs reçus, voir section Bugs).
+   - Formulaire de contact : vraie validation (regex e-mail, erreurs locales), anti double-soumission.
+   - Pages légales (`mentions-legales`, `cgv`) : les notes internes "À compléter (ne pas inventer)" étaient visibles publiquement — retirées et reformulées en "en cours de finalisation", **sans bloquer les achats** (décision explicite de l'utilisateur, qui a refusé l'option de bloquer les ventes).
+
+## Fichiers clés travaillés
+
+- `web/lib/packs.ts` — source unique de vérité des 5 packs (Starter/Essentiel/Avancé/Pro/Ultimate) + `recommendPackCombinationForVolume()`.
+- `web/lib/stripe-links.ts` — construit l'URL de checkout ; sans utilisateur connu, force systématiquement `/login?pack=<clé>` avant tout lien Stripe (conservation du pack à travers connexion/inscription).
+- `web/lib/margin-estimate.ts` — formules de marge/ROI/indice de fiabilité partagées entre le calculateur manuel et les résultats de recherche réels. **Le score de fiabilité est une heuristique** (`97 - importRatio*35`, borné 60–99), pas une donnée de marché — c'est explicité dans l'UI.
+- `web/lib/aliexpress-search.ts` — scraping/extraction partagé entre `/api/search` (public) et `/api/analyze` (crédité), avec détection de blocage anti-bot (`looksLikeBotBlock`).
+- `web/lib/actions/auth.ts` — Server Actions login/signup/reset password, anti-énumération de comptes.
+- `web/app/api/analyze/route.ts` — parcours crédité réel : vérifie session → lit solde → lance l'analyse → débite 1 crédit atomiquement via RPC `consume_credit` (jamais si l'analyse échoue).
+- `web/app/api/webhooks/stripe/route.ts` — webhook Stripe idempotent, crédite via RPC.
+- `web/components/auth/neon-auth-panel.tsx` — panneau login/signup avec bascule overlay ; contient la logique de reprise du pack après connexion.
+- `web/components/dashboard/search-panel.tsx` / `calculator-panel.tsx` — UI dashboard réelle (recherche créditée / calculateur manuel).
+- `web/components/landing/*` — toute la page d'accueil marketing (hero, features, pricing, credit-calculator, demo, interactive-demo, quick-guide, faq, contact, footer, navbar).
+- `web/app/mentions-legales/page.tsx`, `web/app/cgv/page.tsx` — pages légales, encore incomplètes sur des points factuels (voir Bugs).
+
+## Problématiques/Bugs en cours à résoudre
+
+- **Paiement encore sur Stripe Payment Links, pas Stripe Checkout Sessions.** Le brief le plus récent demande explicitement une migration vers Stripe Checkout (sessions dynamiques créées côté serveur). L'architecture actuelle (Payment Links + webhook + RPC atomique) est fonctionnellement sûre côté serveur, mais ce n'est pas ce qui a été demandé littéralement. Non fait par prudence : gros changement d'architecture de paiement, impossible à tester en live dans cet environnement, risque de casser un parcours d'achat qui fonctionne.
+- **Cases à cocher légales manquantes au paiement.** Le parcours de commande ne propose pas encore les deux cases obligatoires (exécution immédiate du service / renonciation au droit de rétractation). La page CGV le dit maintenant honnêtement : tant que ces cases n'existent pas, le délai de rétractation de 14 jours s'applique pleinement à toute commande.
+- **Mentions légales incomplètes.** SIREN, ville RCS, capital social, TVA intracommunautaire, téléphone, nom du Président, et l'identité du médiateur de la consommation sont absents — remplacés par des mentions "en cours de finalisation" (visibles publiquement mais honnêtes) au lieu d'inventer des valeurs. **Ces informations réelles doivent être fournies par l'utilisateur pour compléter la page.**
+- **Contradictions répétées entre briefs successifs sur tutoiement vs vouvoiement.** Le site est actuellement en vouvoiement partout (dernier état demandé), mais ce point a déjà fait plusieurs allers-retours dans la session — vérifier avec l'utilisateur avant de relancer une passe de style si un nouveau brief le redemande.
+- **Aucun test automatisé dans le dépôt** (pas de framework de test installé). Le brief demande des tests unitaires (calculs, arrondis, limites de packs, webhook répété, etc.) — jamais écrits faute de framework en place.
+- **Recherche "iphone" → "Aucune annonce trouvée"** : correction faite au niveau code (distinction blocage anti-bot / échec de parsing / vrai zéro résultat), mais **jamais vérifiée en conditions réelles** (pas de clé ScraperAPI ni d'accès réseau dans cet environnement). À confirmer en production.
+- **`OTP_LENGTH = 8`** dans `otp-verify-form.tsx` doit correspondre exactement à la longueur de code configurée côté Supabase (Authentication → Settings). Non vérifiable depuis cet environnement — si la config Supabase envoie des codes à 6 chiffres, l'écran de vérification refusera un code pourtant valide.
+- **Historique des recherches non persistant** : l'onglet "Historique" du dashboard est purement en mémoire côté client (reset au rechargement de page), ce n'est pas une vraie sauvegarde en base. C'est maintenant documenté honnêtement dans l'UI, mais reste une limite produit réelle.
+
+## Prochaines étapes prioritaires
+
+1. **Demander à l'utilisateur les informations légales réelles** (SIREN, RCS, capital social, TVA, téléphone, Président, médiateur de la consommation) pour compléter `mentions-legales` et `cgv` — actuellement bloqué par l'absence de ces données, jamais inventées.
+2. **Décider avec l'utilisateur** si la migration Stripe Payment Links → Checkout Sessions dynamiques doit être faite maintenant (gros chantier, nécessite un test réel en mode Stripe test, donc probablement hors de cet environnement).
+3. **Ajouter les deux cases à cocher obligatoires** (exécution immédiate / renonciation rétractation) dans le parcours d'achat, avec enregistrement serveur de l'horodatage et de la version du texte accepté.
+4. **Vérifier en conditions réelles** (déploiement Vercel + Supabase + Stripe live) : recherche "iphone", les 5 packs, le parcours OTP (longueur de code), le reset de mot de passe, le webhook Stripe en mode test avec replay.
+5. Si un futur brief redemande un changement de tutoiement/vouvoiement, **clarifier explicitement avec l'utilisateur** lequel est définitif avant de relancer une passe complète, pour éviter un nouvel aller-retour.
