@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
     apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
   },
+  // Search Console : verification par fichier (public/google5cc6340a4389f791.html,
+  // methode fiable) + balise meta ci-dessous.
+  verification: {
+    google: "5cc6340a4389f791",
+  },
   openGraph: {
     type: "website",
     url: SITE_URL,
