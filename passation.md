@@ -1248,3 +1248,11 @@ Audit demandé par l'utilisateur sur 5 points, résultat point par point :
 8. **Balayage de contraste complet** (P2) : seuls quelques `text-white/30` du dashboard ont été relevés à `/40` cette session ; le reste du site (landing notamment) n'a pas été audité visuellement — nécessite un vrai rendu navigateur, impossible ici.
 9. Si un futur brief redemande un changement de tutoiement/vouvoiement, **clarifier explicitement avec l'utilisateur** lequel est définitif avant de relancer une passe complète, pour éviter un nouvel aller-retour.
 10. Stripe Payment Links → Checkout Sessions : mis en pause sur décision explicite de l'utilisateur, ne pas relancer sans confirmation.
+
+## Session 2026-09-20 — 4 points critiques (recherche, guide, logos, checkout)
+
+- **Checkout Stripe** : `/api/checkout` crée désormais une Checkout Session côté serveur (`lib/stripe-checkout.ts`, `STRIPE_SECRET_KEY`, prix issus de `PACKS`, `client_reference_id "<pack>:<userId>"` compatible webhook) ; le Payment Link `NEXT_PUBLIC_STRIPE_LINK_*` ne sert plus que de secours. Erreur « Ce pack n'est pas disponible » remplacée par un message générique + log serveur explicite. **À vérifier en réel** : `STRIPE_SECRET_KEY` (mode test puis live), `STRIPE_WEBHOOK_SECRET`, endpoint webhook `/api/webhooks/stripe` écoutant `checkout.session.completed`.
+- **Recherche par mot-clé** : chaîne de secours dans `lib/aliexpress-search.ts` (page /w/wholesale → variante /wholesale?SearchText= en proxy stealth + mobile + en-têtes tournants → Firecrawl `/v1/search` restreint à aliexpress.com/item). Jamais de résultat inventé ; si tout est bloqué, 503 explicite sans débit de crédit. Non testé en conditions réelles.
+- **QuickGuide** : grille 4 colonnes (lg+) / carrousel scroll-snap avec points (< lg).
+- **Logos de paiement** : Visa, Mastercard, Apple Pay (simple-icons), Google Pay recolorisé, CB redessiné (aucun SVG officiel libre) ; Stripe retiré du footer.
+- Toujours **jamais exécuté** : `npm install && npm run lint && npm run build && npm test` (pas de Node ici).

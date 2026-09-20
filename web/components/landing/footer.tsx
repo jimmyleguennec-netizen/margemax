@@ -17,7 +17,6 @@ import {
   CarteBancaireIcon,
   GooglePayIcon,
   MastercardIcon,
-  StripeIcon,
   VisaIcon,
 } from "@/components/ui/payment-icons";
 
@@ -37,7 +36,6 @@ const PAYMENT_METHODS: { label: string; Icon: (props: { className?: string }) =>
   { label: "Visa", Icon: VisaIcon },
   { label: "Mastercard", Icon: MastercardIcon },
   { label: "CB", Icon: CarteBancaireIcon },
-  { label: "Stripe", Icon: StripeIcon },
 ];
 
 // "Générateur de fiche IA" et "Carnet de notes" retirés : ces

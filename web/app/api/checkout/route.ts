@@ -3,12 +3,16 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PACKS } from "@/lib/packs";
 import { buildStripeCheckoutUrl } from "@/lib/stripe-links";
+import { buildCheckoutSessionParams } from "@/lib/stripe-checkout";
+import { getStripeClient } from "@/lib/stripe";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Resout <packKey> + utilisateur CONNECTE (session serveur, jamais un
+
+ * Cree une Checkout Session Stripe serveur (secours : Payment Link) pour <packKey> + utilisateur CONNECTE (session serveur, jamais un
  * user.id fourni par le client) en URL Stripe reelle.
  *
  * Avant ce endpoint, CheckoutConsentDialog construisait l'URL Stripe
@@ -51,19 +55,41 @@ export async function POST(request: Request) {
     );
   }
 
-  const url = buildStripeCheckoutUrl(pack.key, user.id);
-  if (!url) {
-    console.error(
-      `[api/checkout] Lien Stripe manquant ou invalide pour le pack "${pack.key}" (NEXT_PUBLIC_STRIPE_LINK_${pack.key.toUpperCase()} absente ou mal formee en production).`
-    );
-    return NextResponse.json(
-      {
-        error:
-          "Ce pack n'est pas disponible à l'achat pour le moment. Contacte le support ou réessaie plus tard.",
-      },
-      { status: 502 }
-    );
+  // 1) Voie principale : Checkout Session creee cote serveur avec
+  //    STRIPE_SECRET_KEY -- prix issu de PACKS (source unique), aucune
+  //    variable NEXT_PUBLIC_STRIPE_LINK_* requise.
+  if (process.env.STRIPE_SECRET_KEY) {
+    try {
+      const session = await getStripeClient().checkout.sessions.create(
+        buildCheckoutSessionParams(pack, user.id, getSiteUrl(), user.email)
+      );
+      if (session.url) {
+        return NextResponse.json({ url: session.url });
+      }
+      console.error(`[api/checkout] Session Stripe ${session.id} creee sans URL.`);
+    } catch (err) {
+      console.error(
+        `[api/checkout] Echec creation Checkout Session (pack "${pack.key}") :`,
+        err instanceof Error ? err.message : err
+      );
+      // On tente quand meme le Payment Link ci-dessous s'il existe.
+    }
   }
 
-  return NextResponse.json({ url });
+  // 2) Secours : Payment Link statique historique.
+  const linkUrl = buildStripeCheckoutUrl(pack.key, user.id);
+  if (linkUrl) {
+    return NextResponse.json({ url: linkUrl });
+  }
+
+  console.error(
+    `[api/checkout] Aucun moyen de paiement disponible pour "${pack.key}" : STRIPE_SECRET_KEY absente ou invalide ET NEXT_PUBLIC_STRIPE_LINK_${pack.key.toUpperCase()} absente. Verifie les variables d'environnement Vercel.`
+  );
+  return NextResponse.json(
+    {
+      error:
+        "Le paiement est momentanément indisponible. Réessaie dans quelques instants — aucun montant n'a été débité.",
+    },
+    { status: 502 }
+  );
 }

@@ -6,7 +6,9 @@
 
 import { createHmac } from "crypto";
 
-const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+// Lu a l'appel (pas a l'import) : evite de figer la valeur au chargement du
+// module (tests, rechargement a chaud) -- meme comportement en production.
+const getFirecrawlKey = () => process.env.FIRECRAWL_API_KEY;
 const ALIEXPRESS_APP_KEY = process.env.ALIEXPRESS_APP_KEY;
 const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
 
@@ -180,32 +182,172 @@ function looksLikeBotBlock(html: string): boolean {
   return BOT_BLOCK_MARKERS.some((marker) => marker.test(html));
 }
 
+// Formes rencontrees dans le HTML de résultats AliExpress : lien absolu
+// (https://...item/ID.html), protocol-relative (//...item/ID.html),
+// simple chemin (/item/ID.html), ou echappe dans un bloc JSON inline
+// (...item\/ID.html, present dans certains etats React/Vue serialises)
+// selon la page/le rendu -- \\? rend le antislash d'echappement optionnel.
+// Pas de borne haute sur le nombre de chiffres (voir extractProductId
+// ci-dessus) : les ID produit reels font 16 chiffres aujourd'hui.
+function findProductIdInHtml(html: string): string | null {
+  const match = html.match(/item\\?\/(\d{9,})\.html/);
+  return match ? match[1] : null;
+}
+
+// Rotation d'en-tetes : un User-Agent/Accept-Language different d'une
+// strategie de secours a l'autre, pour ne pas presenter la meme empreinte
+// que la tentative precedente deja bloquee.
+const ROTATING_USER_AGENTS = [
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+];
+const ROTATING_ACCEPT_LANGUAGES = [
+  "fr-FR,fr;q=0.9,en;q=0.5",
+  "fr,fr-FR;q=0.9,en-US;q=0.6",
+  "fr-FR,fr;q=0.8,en-GB;q=0.5,en;q=0.3",
+];
+
+export function pickRotatingHeaders(rotation: number): Record<string, string> {
+  const i = Math.abs(Math.trunc(rotation));
+  return {
+    "User-Agent": ROTATING_USER_AGENTS[i % ROTATING_USER_AGENTS.length],
+    "Accept-Language": ROTATING_ACCEPT_LANGUAGES[i % ROTATING_ACCEPT_LANGUAGES.length],
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  };
+}
+
+// Temps a garder pour scraper la fiche produit une fois l'ID trouve : les
+// strategies de secours ne demarrent que s'il reste de quoi les enchainer.
+const PRODUCT_PAGE_RESERVE_MS = 12000;
+
+function searchBlockedError(): AliExpressSearchError {
+  return new AliExpressSearchError(
+    "AliExpress limite les recherches par mot-clé pour le moment (protection anti-robots). Réessaie dans quelques instants, ou colle directement le lien de l'annonce — aucun crédit n'a été débité.",
+    503
+  );
+}
+
+/** Recherche via l'API /v1/search de Firecrawl (moteur de recherche web :
+ * pas de page de resultats AliExpress a scraper, donc insensible a son
+ * blocage anti-bot). Ne renvoie que de VRAIS liens d'annonces. */
+async function searchProductIdViaFirecrawlSearch(
+  keyword: string,
+  deadline: number
+): Promise<string | null> {
+  if (!getFirecrawlKey()) return null;
+  const remaining = deadline - Date.now();
+  if (remaining < MIN_ATTEMPT_MS) return null;
+
+  const response = await fetch("https://api.firecrawl.dev/v1/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getFirecrawlKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `site:aliexpress.com/item ${keyword}`,
+      limit: 8,
+      lang: "fr",
+      country: "fr",
+      timeout: Math.max(3000, Math.min(15000, remaining - PRODUCT_PAGE_RESERVE_MS)),
+    }),
+    signal: AbortSignal.timeout(Math.max(3000, Math.min(18000, remaining - 1000))),
+  });
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as {
+    success?: boolean;
+    data?: { url?: string }[];
+  };
+  if (!payload.success || !Array.isArray(payload.data)) return null;
+  for (const hit of payload.data) {
+    const id = hit.url ? extractProductId(hit.url) : null;
+    if (id) return id;
+  }
+  return null;
+}
+
+/**
+ * Trouve l'ID du premier produit pour un mot-cle, avec une chaine de
+ * secours quand AliExpress bloque la page de resultats :
+ *   1. page de resultats "jolie" (/w/wholesale-<slug>.html), proxy auto ;
+ *   2. variante /wholesale?SearchText=, proxy "stealth" + mobile +
+ *      en-tetes tournants (une seule tentative) ;
+ *   3. Firecrawl /v1/search restreint a aliexpress.com/item.
+ * Jamais de resultat invente : chaque ID vient d'un vrai lien d'annonce.
+ * `null` = recherche propre sans aucun resultat ; blocage persistant de
+ * toutes les strategies = 503 explicite (aucun credit debite en amont).
+ */
 async function findFirstProductIdFromKeyword(
   keyword: string,
   deadline: number
 ): Promise<string | null> {
-  const searchHtml = await fetchHtmlViaFirecrawl(buildSearchUrl(keyword), deadline);
+  let blocked = false;
+  let lastError: AliExpressSearchError | null = null;
 
-  if (looksLikeBotBlock(searchHtml)) {
-    // Distinct de "0 resultat" : le fournisseur a bloque/limite la
-    // requete, ce n'est pas une absence reelle de resultats.
-    throw new AliExpressSearchError(
-      "AliExpress a limité ou bloqué cette recherche pour le moment — réessaie dans quelques instants, ou colle directement le lien de l'annonce.",
-      503
-    );
+  const scrapeStrategies: { url: string; options: ScrapeOptions }[] = [
+    {
+      url: buildSearchUrl(keyword),
+      options: { proxy: "auto", maxAttemptMs: 20000 },
+    },
+    {
+      url: `https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(keyword.trim())}`,
+      options: {
+        proxy: "stealth",
+        mobile: true,
+        headers: pickRotatingHeaders(Date.now() % 997),
+        maxAttemptMs: 25000,
+        maxAttempts: 1,
+      },
+    },
+  ];
+
+  for (let i = 0; i < scrapeStrategies.length; i++) {
+    // La 1re strategie s'execute toujours ; les secours seulement s'il
+    // reste de quoi scraper ensuite la fiche produit.
+    if (i > 0 && deadline - Date.now() < MIN_ATTEMPT_MS + PRODUCT_PAGE_RESERVE_MS) break;
+
+    try {
+      const html = await fetchHtmlViaFirecrawl(
+        scrapeStrategies[i].url,
+        deadline,
+        scrapeStrategies[i].options
+      );
+      if (looksLikeBotBlock(html)) {
+        blocked = true;
+        continue;
+      }
+      const id = findProductIdInHtml(html);
+      if (id) return id;
+      // Page propre sans lien d'annonce : soit vraiment 0 resultat, soit
+      // coquille JS non rendue -- on laisse les secours trancher.
+    } catch (err) {
+      if (!(err instanceof AliExpressSearchError)) throw err;
+      // Cle absente : aucune strategie ne peut fonctionner.
+      if (/FIRECRAWL_API_KEY/.test(err.message)) throw err;
+      lastError = err;
+    }
   }
 
-  // Formes rencontrees dans le HTML de résultats AliExpress : lien absolu
-  // (https://...item/ID.html), protocol-relative (//...item/ID.html),
-  // simple chemin (/item/ID.html), ou echappe dans un bloc JSON inline
-  // (...item\/ID.html, present dans certains etats React/Vue serialises)
-  // selon la page/le rendu -- \\? rend le antislash d'echappement optionnel.
-  // Pas de borne haute sur le nombre de chiffres (voir extractProductId
-  // ci-dessus) : les ID produit reels font 16 chiffres aujourd'hui, contre
-  // 15 max ici avant correctif -- cause reelle du bug "Aucune annonce
-  // trouvée" sur toute recherche par mot-clé constate en production.
-  const match = searchHtml.match(/item\\?\/(\d{9,})\.html/);
-  return match ? match[1] : null;
+  // Derniere chance : moteur de recherche (ne dependant pas de la page de
+  // resultats bloquee).
+  if (deadline - Date.now() >= MIN_ATTEMPT_MS + PRODUCT_PAGE_RESERVE_MS) {
+    try {
+      const id = await searchProductIdViaFirecrawlSearch(keyword, deadline);
+      if (id) return id;
+    } catch (err) {
+      console.warn(
+        "[aliexpress-search] recherche de secours (Firecrawl /search) echouee :",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  if (blocked) throw searchBlockedError();
+  if (lastError) throw lastError;
+  return null;
 }
 
 // Doit laisser de la marge sous maxDuration (voir app/api/search/route.ts
@@ -223,11 +365,22 @@ type FirecrawlScrapeResponse = {
   error?: string;
 };
 
+type ScrapeOptions = {
+  proxy?: "basic" | "stealth" | "auto";
+  headers?: Record<string, string>;
+  mobile?: boolean;
+  /** Plafond de duree d'une tentative (ms), sous FIRECRAWL_TIMEOUT_MS. */
+  maxAttemptMs?: number;
+  /** Nombre max de tentatives (defaut MAX_ATTEMPTS). */
+  maxAttempts?: number;
+};
+
 async function firecrawlAttempt(
   targetUrl: string,
-  timeoutMs: number
+  timeoutMs: number,
+  options: ScrapeOptions = {}
 ): Promise<string> {
-  if (!FIRECRAWL_API_KEY) {
+  if (!getFirecrawlKey()) {
     throw new AliExpressSearchError(
       "FIRECRAWL_API_KEY absente — configure cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
       502
@@ -239,7 +392,7 @@ async function firecrawlAttempt(
     response = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+        Authorization: `Bearer ${getFirecrawlKey()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -259,7 +412,9 @@ async function firecrawlAttempt(
         // blocage -- jamais systematiquement, pour ne pas payer ce cout
         // sur chaque recherche qui passe deja sans probleme.
         waitFor: 3000,
-        proxy: "auto",
+        proxy: options.proxy ?? "auto",
+        ...(options.headers ? { headers: options.headers } : {}),
+        ...(options.mobile ? { mobile: true } : {}),
         // Doit rester sous timeoutMs (l'AbortSignal ci-dessous) : sinon
         // notre propre abort coupe la requete avant que Firecrawl n'ait la
         // chance de renvoyer sa propre erreur de timeout, geree plus
@@ -336,25 +491,29 @@ async function firecrawlAttempt(
  */
 async function fetchHtmlViaFirecrawl(
   targetUrl: string,
-  deadline: number
+  deadline: number,
+  options: ScrapeOptions = {}
 ): Promise<string> {
   let lastError: AliExpressSearchError | null = null;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  const maxAttempts = options.maxAttempts ?? MAX_ATTEMPTS;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const remaining = deadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) break;
 
     try {
       return await firecrawlAttempt(
         targetUrl,
-        Math.min(FIRECRAWL_TIMEOUT_MS, remaining - 1000)
+        Math.min(options.maxAttemptMs ?? FIRECRAWL_TIMEOUT_MS, remaining - 1000),
+        options
       );
     } catch (err) {
       if (!(err instanceof AliExpressSearchError)) throw err;
       lastError = err;
-      if (!err.retryable || attempt === MAX_ATTEMPTS) throw err;
+      if (!err.retryable || attempt === maxAttempts) throw err;
       console.warn(
-        `[aliexpress-search] tentative ${attempt}/${MAX_ATTEMPTS} echouee (${err.status}) -- nouvelle tentative`
+        `[aliexpress-search] tentative ${attempt}/${maxAttempts} echouee (${err.status}) -- nouvelle tentative`
       );
       await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
     }

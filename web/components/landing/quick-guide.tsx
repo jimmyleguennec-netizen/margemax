@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Calculator,
   CheckCircle2,
@@ -188,14 +188,57 @@ const visuals: Record<string, () => JSX.Element> = {
 };
 
 export function QuickGuide() {
-  const [active, setActive] = useState(guideSteps[0].id);
-  const activeStep = guideSteps.find((step) => step.id === active) ?? guideSteps[0];
-  const ActiveVisual = visuals[activeStep.id];
+  const trackRef = useRef<HTMLUListElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Carrousel (< lg) : l'indicateur suit la carte la plus proche du bord
+  // gauche ; sur la derniere carte (defilement en butee) on force le
+  // dernier point, sinon une carte plus etroite que le pas ne l'atteindrait
+  // jamais. Sur lg+, la liste est une grille : l'etat est simplement ignore.
+  const syncActive = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || track.children.length === 0) return;
+    const first = track.children[0] as HTMLElement;
+    const second = track.children[1] as HTMLElement | undefined;
+    const stride = second ? second.offsetLeft - first.offsetLeft : first.offsetWidth;
+    if (stride <= 0) return;
+    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
+    const next = atEnd
+      ? guideSteps.length - 1
+      : Math.min(guideSteps.length - 1, Math.max(0, Math.round(track.scrollLeft / stride)));
+    setActiveIndex(next);
+  }, []);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(syncActive);
+    };
+    track.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      track.removeEventListener("scroll", onScroll);
+    };
+  }, [syncActive]);
+
+  function goTo(index: number) {
+    const card = trackRef.current?.children[index] as HTMLElement | undefined;
+    if (!card) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    card.scrollIntoView({
+      behavior: reduce ? "auto" : "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }
 
   return (
     <section id="guide" className="container relative scroll-mt-20 py-20 sm:py-28">
       <SectionGlow />
-      <div className="mx-auto mb-14 max-w-2xl text-center">
+      <div className="mx-auto mb-12 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
           Prends en main l&apos;outil en 30 secondes
         </h2>
@@ -204,118 +247,60 @@ export function QuickGuide() {
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-[220px_1fr] lg:hidden">
-        <div className="relative flex flex-row gap-2 overflow-x-auto sm:flex-col sm:gap-1 sm:overflow-visible">
-          {guideSteps.map((step) => {
-            const isActive = step.id === active;
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => setActive(step.id)}
-                className={cn(
-                  "relative flex shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition-colors duration-200",
-                  isActive ? "text-white" : "text-white/60 hover:text-white/70"
-                )}
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="quick-guide-indicator"
-                    className="absolute inset-0 rounded-lg bg-white/5 sm:border-l-2 sm:border-cyan-400 sm:shadow-[inset_0_0_20px_-8px_rgba(34,211,238,0.6)]"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <step.icon
-                  className={cn(
-                    "relative z-10 h-4 w-4 shrink-0",
-                    isActive ? "text-cyan-300" : "text-white/60"
-                  )}
-                />
-                <span className="relative z-10 whitespace-nowrap sm:whitespace-normal">
+      {/* Mobile/tablette : carrousel horizontal tactile (scroll-snap natif,
+          donc fluide au doigt et sans JS pour le glissement). Desktop (lg+) :
+          grille 4 colonnes, les 4 etapes visibles d'un coup, sans defilement. */}
+      <ul
+        ref={trackRef}
+        aria-label="Les 4 étapes pour analyser un produit"
+        className="-mx-8 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-8 px-8 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-auto lg:grid lg:max-w-6xl lg:snap-none lg:grid-cols-4 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
+      >
+        {guideSteps.map((step, index) => {
+          const Visual = visuals[step.id];
+          return (
+            <li
+              key={step.id}
+              aria-label={`Étape ${index + 1} sur ${guideSteps.length}`}
+              className="flex w-[82%] shrink-0 snap-center flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm sm:w-[46%] lg:w-auto lg:shrink"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 text-cyan-300">
+                  <step.icon aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
                   {step.label}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="relative min-h-[320px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeStep.id}
-              initial={{ opacity: 0, x: 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -16 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 text-cyan-300 shadow-[0_0_20px_-6px_rgba(34,211,238,0.6)]">
-                <activeStep.icon className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-semibold text-white">
-                {activeStep.title}
+              <h3 className="mt-4 text-base font-semibold leading-snug text-white">
+                {step.title}
               </h3>
-              <p className="mt-2 max-w-md text-sm text-white/70">
-                {activeStep.description}
-              </p>
-              <ActiveVisual />
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
+              <p className="mt-2 text-sm text-white/70">{step.description}</p>
+              <div className="mt-auto pt-1">
+                <Visual />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
-      {/* Ecran large : "scrollytelling" -- la demo visuelle reste epinglee
-          (sticky) a gauche pendant que les etapes defilent a droite ; l'etape
-          qui traverse le milieu de l'ecran pilote la demo affichee. En
-          dessous de lg, les onglets ci-dessus restent utilises. */}
-      <div className="mx-auto hidden max-w-5xl grid-cols-2 gap-14 lg:grid">
-        <div>
-          <div className="sticky top-28">
-            <div className="relative min-h-[360px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 shadow-[0_0_60px_-20px_rgba(34,211,238,0.35)] backdrop-blur-sm">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeStep.id}
-                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.98 }}
-                  transition={{ duration: 0.35 }}
-                >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 text-cyan-300 shadow-[0_0_20px_-6px_rgba(34,211,238,0.6)]">
-                    <activeStep.icon aria-hidden="true" className="h-6 w-6" />
-                  </div>
-                  <ActiveVisual />
-                </motion.div>
-              </AnimatePresence>
-            </div>
-            <div aria-hidden="true" className="mt-4 flex justify-center gap-2">
-              {guideSteps.map((step) => (
-                <motion.span
-                  key={step.id}
-                  animate={{ width: step.id === active ? 28 : 8, opacity: step.id === active ? 1 : 0.4 }}
-                  className="h-2 rounded-full bg-cyan-300"
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          {guideSteps.map((step) => (
-            <motion.div
-              key={step.id}
-              onViewportEnter={() => setActive(step.id)}
-              viewport={{ margin: "-45% 0px -45% 0px" }}
-              animate={{ opacity: step.id === active ? 1 : 0.35, x: step.id === active ? 0 : 12 }}
-              transition={{ duration: 0.4 }}
-              className="flex min-h-[65vh] flex-col justify-center"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                {step.label}
-              </p>
-              <h3 className="mt-2 text-2xl font-semibold text-white">{step.title}</h3>
-              <p className="mt-3 max-w-md text-white/70">{step.description}</p>
-            </motion.div>
-          ))}
-        </div>
+      <div className="mt-5 flex justify-center gap-2 lg:hidden">
+        {guideSteps.map((step, index) => (
+          <button
+            key={step.id}
+            type="button"
+            onClick={() => goTo(index)}
+            aria-label={`Aller à l'étape ${index + 1}`}
+            aria-current={index === activeIndex ? "true" : undefined}
+            className="flex h-6 w-6 items-center justify-center"
+          >
+            <span
+              className={cn(
+                "h-2 rounded-full bg-cyan-300 transition-all duration-300",
+                index === activeIndex ? "w-6 opacity-100" : "w-2 opacity-40"
+              )}
+            />
+          </button>
+        ))}
       </div>
     </section>
   );

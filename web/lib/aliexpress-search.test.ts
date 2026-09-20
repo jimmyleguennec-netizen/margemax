@@ -347,3 +347,96 @@ describe("performAliExpressSearch — erreurs d'URL distinctes d'une absence de 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("performAliExpressSearch — chaîne de secours de la recherche par mot-clé", () => {
+  const SEARCH_LINKS = `<a href="//fr.aliexpress.com/item/1005012690129627.html">x</a>`;
+  const listingPage = `<html><body>${"x".repeat(2500)}${SEARCH_LINKS}</body></html>`;
+  const productPage = fakeProductHtml({
+    price: "11.19",
+    offerName: "Chargeur induction 15W - Coloris blanc",
+    shippingLine: "Livraison : 5,41 €",
+    taxLine: "Droits de douane : 3,61 €",
+  });
+
+  /** Route les appels Firecrawl selon l'URL scrapée / l'endpoint. */
+  function mockRouter(handlers: {
+    prettySearch: () => string;
+    altSearch: () => string;
+    searchApi?: () => unknown;
+  }) {
+    const fetchMock = vi.fn(async (endpoint: string, init?: { body?: string }) => {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      if (endpoint.endsWith("/v1/search")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => handlers.searchApi?.() ?? { success: true, data: [] },
+        };
+      }
+      const url: string = body.url;
+      let rawHtml: string;
+      if (url.includes("/item/")) rawHtml = productPage;
+      else if (url.includes("/w/wholesale-")) rawHtml = handlers.prettySearch();
+      else rawHtml = handlers.altSearch();
+      return { ok: true, status: 200, json: async () => ({ success: true, data: { rawHtml } }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "test-key");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("page de résultats bloquée -> la variante stealth/mobile trouve l'annonce", async () => {
+    const fetchMock = mockRouter({
+      prettySearch: () => "Access Denied",
+      altSearch: () => listingPage,
+    });
+
+    const result = await performAliExpressSearch("chargeur induction");
+    expect(result.url).toBe(PRODUCT_URL);
+
+    const altCall = fetchMock.mock.calls
+      .map(([, init]) => JSON.parse((init as { body: string }).body))
+      .find((b) => typeof b.url === "string" && b.url.includes("SearchText="));
+    expect(altCall.proxy).toBe("stealth");
+    expect(altCall.mobile).toBe(true);
+    expect(altCall.headers["User-Agent"]).toBeTruthy();
+  });
+
+  it("toutes les pages de résultats bloquées -> le moteur Firecrawl /search fournit un vrai lien", async () => {
+    mockRouter({
+      prettySearch: () => "Access Denied",
+      altSearch: () => "Access Denied",
+      searchApi: () => ({ success: true, data: [{ url: PRODUCT_URL }] }),
+    });
+
+    const result = await performAliExpressSearch("chargeur induction");
+    expect(result.url).toBe(PRODUCT_URL);
+  });
+
+  it("tout est bloqué et aucun secours ne répond -> 503 explicite, aucun résultat inventé", async () => {
+    mockRouter({
+      prettySearch: () => "Access Denied",
+      altSearch: () => "Access Denied",
+    });
+
+    await expect(performAliExpressSearch("chargeur induction")).rejects.toMatchObject({
+      status: 503,
+    });
+  });
+});
+
+describe("pickRotatingHeaders", () => {
+  it("fait varier le User-Agent d'une rotation à l'autre", async () => {
+    const { pickRotatingHeaders } = await import("./aliexpress-search");
+    const agents = new Set([0, 1, 2, 3].map((i) => pickRotatingHeaders(i)["User-Agent"]));
+    expect(agents.size).toBe(4);
+  });
+});

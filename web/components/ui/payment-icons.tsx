@@ -15,10 +15,9 @@
 //   #FF5F00, tel que specifie dans les brand guidelines Mastercard) --
 //   dessines ici en formes geometriques simples avec CES couleurs
 //   exactes, plus fidele au vrai logo qu'une silhouette a un seul ton.
-// - CB (Groupement des Cartes Bancaires) n'a pas de tracé officiel
-//   disponible dans simple-icons (marque française de niche, non
-//   couverte) : reste un badge stylise "CB", pas un tracé officiel --
-//   voir passation.md.
+// - CB (Cartes Bancaires) : pas de SVG officiel librement disponible --
+//   redessine en vectoriel (voir CarteBancaireIcon), pas un fichier officiel.
+// - Google Pay : tracé simple-icons recolore aux couleurs de la marque.
 //
 // Toutes les icones partagent la meme hauteur de badge (h-8) sur un fond
 // blanc uniforme : les logos de paiement sont concus pour un fond clair,
@@ -78,25 +77,29 @@ export function MastercardIcon({ className }: PaymentIconProps) {
   );
 }
 
-// Pas de tracé officiel CB (Cartes Bancaires) disponible dans
-// simple-icons -- badge stylise, pas un logo officiel. Voir passation.md.
+// Logo "Cartes Bancaires" (CB) : AUCUN fichier SVG officiel n'est publie
+// librement (ni simple-icons, ni dans un paquet npm) -- celui-ci est donc
+// redessine en vectoriel propre d'apres l'identite visuelle du logo (carte
+// au degrade bleu -> vert, monogramme « CB » blanc), pas un fichier
+// officiel du Groupement. A remplacer par le fichier fourni par le GIE CB
+// si un accord de marque est signe.
 export function CarteBancaireIcon({ className }: PaymentIconProps) {
   return (
-    <Chip className={className} label="Carte Bancaire">
-      <svg viewBox="0 0 48 20" className="h-4 w-auto" aria-hidden="true">
-        <path d="M2 4h20a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V4Z" fill="#0055A4" />
-        <path d="M23 4h20a3 3 0 0 1 3 3v3H23V4Z" fill="#FF7900" opacity="0.9" />
-        <text
-          x="14"
-          y="14.5"
-          textAnchor="middle"
-          fontFamily="Arial, Helvetica, sans-serif"
-          fontWeight="800"
-          fontSize="9"
-          fill="#fff"
-        >
-          CB
-        </text>
+    <Chip className={className} label="Carte Bancaire (CB)">
+      <svg viewBox="0 0 40 26" className="h-5 w-auto" aria-hidden="true">
+        <defs>
+          <linearGradient id="cb-gradient" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#0B3D91" />
+            <stop offset="1" stopColor="#00A388" />
+          </linearGradient>
+        </defs>
+        <rect x="0.5" y="0.5" width="39" height="25" rx="4.5" fill="url(#cb-gradient)" />
+        <g transform="translate(-2 0)" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+          {/* C */}
+          <path d="M17.6 9.4a5 5 0 1 0 0 7.2" />
+          {/* B */}
+          <path d="M22.4 8.4v9.2M22.4 8.4h3.6a2.4 2.4 0 0 1 0 4.8h-3.6M22.4 13.2h4.1a2.2 2.2 0 0 1 0 4.4h-4.1" />
+        </g>
       </svg>
     </Chip>
   );
@@ -127,12 +130,29 @@ export function ApplePayIcon({ className }: PaymentIconProps) {
 }
 
 // Tracé officiel exact (simple-icons, slug "googlepay", logo complet
-// "G Pay"), couleur officielle #4285F4.
+// "G Pay"). simple-icons fournit un seul ton ; on le recolore ici aux
+// couleurs de la marque : « G » quadrichrome (rouge #EA4335, bleu #4285F4,
+// vert #34A853, jaune #FBBC04 -- decoupe par quadrants du meme tracé) et
+// « Pay » en gris #5F6368, comme le logo Google Pay sur fond clair.
 export function GooglePayIcon({ className }: PaymentIconProps) {
   return (
     <Chip className={className} label="Google Pay">
-      <svg viewBox="0 0 24 24" className="h-4 w-auto" fill="#4285F4" aria-hidden="true">
-        <path d="M3.963 7.235A3.963 3.963 0 00.422 9.419a3.963 3.963 0 000 3.559 3.963 3.963 0 003.541 2.184c1.07 0 1.97-.352 2.627-.957.748-.69 1.18-1.71 1.18-2.916a4.722 4.722 0 00-.07-.806H3.964v1.526h2.14a1.835 1.835 0 01-.79 1.205c-.356.241-.814.379-1.35.379-1.034 0-1.911-.697-2.225-1.636a2.375 2.375 0 010-1.517c.314-.94 1.191-1.636 2.225-1.636a2.152 2.152 0 011.52.594l1.132-1.13a3.808 3.808 0 00-2.652-1.033zm6.501.55v6.9h.886V11.89h1.465c.603 0 1.11-.196 1.522-.588a1.911 1.911 0 00.635-1.464 1.92 1.92 0 00-.635-1.456 2.125 2.125 0 00-1.522-.598zm2.427.85a1.156 1.156 0 01.823.365 1.176 1.176 0 010 1.686 1.171 1.171 0 01-.877.357H11.35V8.635h1.487a1.156 1.156 0 01.054 0zm4.124 1.175c-.842 0-1.477.308-1.907.925l.781.491c.288-.417.68-.626 1.175-.626a1.255 1.255 0 01.856.323 1.009 1.009 0 01.366.785v.202c-.34-.193-.774-.289-1.3-.289-.617 0-1.11.145-1.479.434-.37.288-.554.677-.554 1.165a1.476 1.476 0 00.525 1.156c.35.308.785.463 1.305.463.61 0 1.098-.27 1.465-.81h.038v.655h.848v-2.909c0-.61-.19-1.09-.568-1.44-.38-.35-.896-.525-1.551-.525zm2.263.154l1.946 4.422-1.098 2.38h.915L24 9.963h-.965l-1.368 3.391h-.02l-1.406-3.39zm-2.146 2.368c.494 0 .88.11 1.156.33 0 .372-.147.696-.44.973a1.413 1.413 0 01-.997.414 1.081 1.081 0 01-.69-.232.708.708 0 01-.293-.578c0-.257.12-.47.363-.647.24-.173.54-.26.9-.26Z" />
+      <svg viewBox="0 6 24 11" className="h-4 w-auto" aria-hidden="true">
+        <defs>
+          <clipPath id="gpay-g">
+            <path d="M3.963 7.235A3.963 3.963 0 00.422 9.419a3.963 3.963 0 000 3.559 3.963 3.963 0 003.541 2.184c1.07 0 1.97-.352 2.627-.957.748-.69 1.18-1.71 1.18-2.916a4.722 4.722 0 00-.07-.806H3.964v1.526h2.14a1.835 1.835 0 01-.79 1.205c-.356.241-.814.379-1.35.379-1.034 0-1.911-.697-2.225-1.636a2.375 2.375 0 010-1.517c.314-.94 1.191-1.636 2.225-1.636a2.152 2.152 0 011.52.594l1.132-1.13a3.808 3.808 0 00-2.652-1.033z" />
+          </clipPath>
+        </defs>
+        <g clipPath="url(#gpay-g)">
+          <polygon points="4,11.2 -5.8,4.3 12.5,2.7" fill="#EA4335" />
+          <polygon points="4,11.2 12.5,2.7 12.5,19.7" fill="#4285F4" />
+          <polygon points="4,11.2 12.5,19.7 -5.2,18.9" fill="#34A853" />
+          <polygon points="4,11.2 -5.2,18.9 -5.8,4.3" fill="#FBBC04" />
+        </g>
+        <path
+          fill="#5F6368"
+          d="M10.464 7.785v6.9h.886V11.89h1.465c.603 0 1.11-.196 1.522-.588a1.911 1.911 0 00.635-1.464 1.92 1.92 0 00-.635-1.456 2.125 2.125 0 00-1.522-.598zm2.427.85a1.156 1.156 0 01.823.365 1.176 1.176 0 010 1.686 1.171 1.171 0 01-.877.357H11.35V8.635h1.487a1.156 1.156 0 01.054 0zm4.124 1.175c-.842 0-1.477.308-1.907.925l.781.491c.288-.417.68-.626 1.175-.626a1.255 1.255 0 01.856.323 1.009 1.009 0 01.366.785v.202c-.34-.193-.774-.289-1.3-.289-.617 0-1.11.145-1.479.434-.37.288-.554.677-.554 1.165a1.476 1.476 0 00.525 1.156c.35.308.785.463 1.305.463.61 0 1.098-.27 1.465-.81h.038v.655h.848v-2.909c0-.61-.19-1.09-.568-1.44-.38-.35-.896-.525-1.551-.525zm2.263.154l1.946 4.422-1.098 2.38h.915L24 9.963h-.965l-1.368 3.391h-.02l-1.406-3.39zm-2.146 2.368c.494 0 .88.11 1.156.33 0 .372-.147.696-.44.973a1.413 1.413 0 01-.997.414 1.081 1.081 0 01-.69-.232.708.708 0 01-.293-.578c0-.257.12-.47.363-.647.24-.173.54-.26.9-.26Z"
+        />
       </svg>
     </Chip>
   );
