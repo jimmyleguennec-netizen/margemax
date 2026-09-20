@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { CountUp } from "@/components/ui/count-up";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { SectionGlow } from "@/components/ui/section-glow";
-import { computeMarginEstimate } from "@/lib/margin-estimate";
+import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -73,9 +73,9 @@ const guideSteps: {
     id: "decision",
     icon: TrendingUp,
     label: "4. Décision",
-    title: "Sélection de l'offre la plus rentable",
+    title: "Prends ta décision avec les vrais chiffres",
     description:
-      "Compare plusieurs annonces AliExpress et garde la meilleure automatiquement.",
+      "Valide ton produit avec ton prix conseillé et lance ta vente en toute confiance.",
   },
 ];
 
@@ -157,25 +157,37 @@ function MarginVisual() {
   );
 }
 
+// Meme exemple que les cartes 2 et 3 : prix conseille et marge issus des
+// fonctions partagees (computeMarginEstimate / computeSaleMetrics), pas de
+// chiffres ecrits a la main. "Marge avant pub" (et non "nette") : le calcul
+// ne deduit ni publicite ni frais de transaction ni impots.
+const DECISION_METRICS = computeSaleMetrics(TOTAL_COST, MARGIN_EXAMPLE.recommendedPrice);
+const DECISION_IS_PROFITABLE = DECISION_METRICS.marginBeforeAds > 0;
+
 function DecisionVisual() {
   return (
-    <div className="mt-4 space-y-1.5">
-      <div className="flex items-center justify-between rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] px-3 py-2 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
-        <span className="flex items-center gap-1.5 text-white">
-          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-          Offre n° 1
-          <span
-            className="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-300"
-          >
-            Meilleur choix
-          </span>
-        </span>
-        <span className="font-medium text-cyan-300">120,6 % ROI</span>
-      </div>
-      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70">
-        <span>Offre n° 2</span>
-        <span>60,2 % ROI</span>
-      </div>
+    <div className="mt-4 rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] p-3 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
+      <p className="flex items-center gap-1.5 font-semibold text-white">
+        <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+        {DECISION_IS_PROFITABLE ? "Produit rentable" : "Produit non rentable"}
+      </p>
+      <dl className="mt-2.5 space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-white/60">Marge avant pub</dt>
+          <dd className="font-semibold text-cyan-300">
+            {formatEuro(DECISION_METRICS.marginBeforeAds)}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-white/60">Prix conseillé</dt>
+          <dd className="font-semibold text-white">
+            {formatEuro(MARGIN_EXAMPLE.recommendedPrice)}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2.5 text-[10px] text-white/50">
+        Exemple illustratif — tes chiffres dépendent du produit analysé.
+      </p>
     </div>
   );
 }
