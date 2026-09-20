@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getStripeClient } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,16 +55,7 @@ export async function POST() {
     );
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!siteUrl) {
-    console.error(
-      "[api/stripe/billing-portal] NEXT_PUBLIC_SITE_URL manquante -- impossible de construire une URL de retour sûre."
-    );
-    return NextResponse.json(
-      { error: "Portail de facturation indisponible pour le moment. Réessayez plus tard." },
-      { status: 502 }
-    );
-  }
+  const siteUrl = getSiteUrl();
 
   try {
     const stripe = getStripeClient();

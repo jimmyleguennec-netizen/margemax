@@ -263,3 +263,64 @@ describe("performAliExpressSearch — erreurs", () => {
     );
   });
 });
+
+describe("performAliExpressSearch — retry sur panne transitoire du fournisseur", () => {
+  const ok = () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, data: { rawHtml: fakeProductHtml({ price: "11.19" }) } }),
+  });
+  const httpError = (status: number) => ({ ok: false, status, json: async () => ({}) });
+
+  beforeEach(() => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "test-key");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("502 du fournisseur puis succès -> une seule nouvelle tentative, résultat renvoyé", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(httpError(502)).mockResolvedValueOnce(ok());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(PRODUCT_URL)).resolves.toMatchObject({ subtotal: 11.19 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("timeout puis succès -> résultat renvoyé après retry", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("timeout", "TimeoutError"))
+      .mockResolvedValueOnce(ok());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(PRODUCT_URL)).resolves.toMatchObject({ subtotal: 11.19 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("500 deux fois de suite -> abandon après 2 tentatives maximum, erreur 502 (aucun résultat inventé)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(httpError(500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(PRODUCT_URL)).rejects.toMatchObject({ status: 502 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("429 (limitation de débit) -> jamais retenté", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(httpError(429));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(PRODUCT_URL)).rejects.toMatchObject({ status: 502 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("401 (clé invalide) -> jamais retenté", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(httpError(401));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(PRODUCT_URL)).rejects.toMatchObject({ status: 502 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

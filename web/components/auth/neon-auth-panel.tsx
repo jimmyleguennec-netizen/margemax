@@ -28,8 +28,9 @@ const initialState: AuthActionState = {};
 const CALLBACK_ERROR_MESSAGE =
   "Connexion impossible pour le moment, réessayez ou utilisez votre e-mail.";
 
-const ACCOUNT_NOT_FOUND_MESSAGE =
-  "Aucun compte MargeMax associé à cet e-mail. Veuillez d'abord vous inscrire.";
+// Meme message que login() (lib/actions/auth.ts) : ne jamais reveler, via
+// l'interface, si une adresse e-mail possede ou non un compte.
+const ACCOUNT_NOT_FOUND_MESSAGE = "Email ou mot de passe incorrect.";
 
 /**
  * Garde-fou anti double-soumission : `useFormStatus().pending` (dans

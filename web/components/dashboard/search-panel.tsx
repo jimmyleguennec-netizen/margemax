@@ -433,14 +433,14 @@ export function SearchPanel({
           Mots-clés ou lien AliExpress
         </label>
         <motion.div animate={shakeControls} className="relative mt-2 flex items-center gap-2">
-          <div className="relative flex flex-1 items-center">
+          <div className="relative flex min-w-0 flex-1 items-center">
             <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
             <input
               id="search-query"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="ex : chargeur à induction pour iPhone, ou aliexpress.com/item/..."
-              className={`w-full rounded-lg border bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
+              className={`w-full min-w-0 rounded-lg border bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
                 status === "error"
                   ? "border-pink-500/60 shadow-[0_0_20px_-2px_rgba(244,63,94,0.6)]"
                   : "border-cyan-400/20 focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
@@ -450,7 +450,7 @@ export function SearchPanel({
           <button
             type="submit"
             disabled={status === "loading" || !query.trim() || credits === 0}
-            className="relative flex min-w-[128px] origin-center items-center justify-center gap-2 overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-x-100"
+            className="relative flex min-w-[128px] shrink-0 origin-center items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 bg-[length:200%_100%] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-all duration-300 [@media(hover:hover)]:hover:scale-x-105 hover:bg-[position:100%_0] hover:shadow-[0_0_28px_-2px_rgba(34,211,238,0.9)] disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:disabled:hover:scale-x-100"
           >
             <AnimatePresence mode="wait" initial={false}>
               {showPlane ? (

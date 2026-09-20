@@ -73,13 +73,29 @@ export type AliExpressSearchResult = {
 
 export class AliExpressSearchError extends Error {
   status: number;
+  /** true = panne probablement transitoire cote fournisseur (timeout,
+   * reseau, 5xx) : fetchHtmlViaFirecrawl peut retenter une fois. Jamais
+   * pour une config manquante, un 4xx (cle/quota) ou un 429. */
+  retryable: boolean;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryable = false) {
     super(message);
     this.name = "AliExpressSearchError";
     this.status = status;
+    this.retryable = retryable;
   }
 }
+
+// Budget total d'UNE analyse (tous appels + retries confondus), volontairement
+// sous maxDuration=60 des routes API : sans ce plafond partage, un retry apres
+// un premier appel lent depasserait la limite Vercel et le client recevrait un
+// 504 brut de la plateforme au lieu d'un message clair.
+const ANALYSIS_BUDGET_MS = 55000;
+const RETRY_BACKOFF_MS = 600;
+// En dessous, inutile de retenter : un appel Firecrawl n'aurait pas le temps
+// d'aboutir.
+const MIN_ATTEMPT_MS = 8000;
+const MAX_ATTEMPTS = 2;
 
 // Bug reel constate en production : toute recherche par mot-cle echouait
 // avec "Aucune annonce trouvee", meme sur des termes tres courants. Cause
@@ -165,9 +181,10 @@ function looksLikeBotBlock(html: string): boolean {
 }
 
 async function findFirstProductIdFromKeyword(
-  keyword: string
+  keyword: string,
+  deadline: number
 ): Promise<string | null> {
-  const searchHtml = await fetchHtmlViaFirecrawl(buildSearchUrl(keyword));
+  const searchHtml = await fetchHtmlViaFirecrawl(buildSearchUrl(keyword), deadline);
 
   if (looksLikeBotBlock(searchHtml)) {
     // Distinct de "0 resultat" : le fournisseur a bloque/limite la
@@ -206,7 +223,10 @@ type FirecrawlScrapeResponse = {
   error?: string;
 };
 
-async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
+async function firecrawlAttempt(
+  targetUrl: string,
+  timeoutMs: number
+): Promise<string> {
   if (!FIRECRAWL_API_KEY) {
     throw new AliExpressSearchError(
       "FIRECRAWL_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
@@ -240,13 +260,13 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
         // sur chaque recherche qui passe deja sans probleme.
         waitFor: 3000,
         proxy: "auto",
-        // Doit rester sous FIRECRAWL_TIMEOUT_MS (l'AbortSignal ci-dessous) :
-        // sinon notre propre abort coupe la requete avant que Firecrawl
-        // n'ait la chance de renvoyer sa propre erreur de timeout, geree
-        // plus proprement (voir !payload.success plus bas).
-        timeout: 22000,
+        // Doit rester sous timeoutMs (l'AbortSignal ci-dessous) : sinon
+        // notre propre abort coupe la requete avant que Firecrawl n'ait la
+        // chance de renvoyer sa propre erreur de timeout, geree plus
+        // proprement (voir !payload.success plus bas).
+        timeout: Math.max(3000, timeoutMs - 3000),
       }),
-      signal: AbortSignal.timeout(FIRECRAWL_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     // AbortSignal.timeout() declenche une DOMException "TimeoutError" dont
@@ -260,12 +280,14 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
     if (isTimeout) {
       throw new AliExpressSearchError(
         "Le fournisseur de données met trop de temps à répondre (délai dépassé). Réessayez dans quelques instants.",
-        504
+        504,
+        true
       );
     }
     throw new AliExpressSearchError(
       "Impossible de contacter le fournisseur de données pour le moment. Réessayez dans quelques instants.",
-      502
+      502,
+      true
     );
   }
 
@@ -274,7 +296,10 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
       response.status === 429
         ? "Trop de recherches en cours — le fournisseur limite temporairement les requêtes. Réessayez dans quelques instants."
         : `Le fournisseur de données a répondu avec une erreur (code ${response.status}). Réessayez dans quelques instants.`,
-      502
+      502,
+      // 5xx = panne transitoire ; 4xx (cle invalide, quota) et 429 ne
+      // guerissent pas en retentant immediatement.
+      response.status >= 500
     );
   }
 
@@ -284,7 +309,8 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
   } catch {
     throw new AliExpressSearchError(
       "Réponse du fournisseur de données illisible. Réessayez dans quelques instants.",
-      502
+      502,
+      true
     );
   }
 
@@ -293,11 +319,56 @@ async function fetchHtmlViaFirecrawl(targetUrl: string): Promise<string> {
       payload.error
         ? `Le fournisseur de données n'a pas pu récupérer cette page (${payload.error}).`
         : "Le fournisseur de données n'a pas pu récupérer cette page. Réessayez dans quelques instants.",
-      502
+      502,
+      true
     );
   }
 
   return payload.data.rawHtml;
+}
+
+/**
+ * Appelle Firecrawl avec au plus MAX_ATTEMPTS tentatives sur panne
+ * transitoire (timeout, reseau, 5xx), sans jamais depasser `deadline`
+ * (budget global partage par tous les appels d'une meme analyse).
+ * Quand elle echoue definitivement, l'erreur remonte telle quelle : aucun
+ * resultat invente, et l'appelant (api/analyze) ne debite rien.
+ */
+async function fetchHtmlViaFirecrawl(
+  targetUrl: string,
+  deadline: number
+): Promise<string> {
+  let lastError: AliExpressSearchError | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < MIN_ATTEMPT_MS) break;
+
+    try {
+      return await firecrawlAttempt(
+        targetUrl,
+        Math.min(FIRECRAWL_TIMEOUT_MS, remaining - 1000)
+      );
+    } catch (err) {
+      if (!(err instanceof AliExpressSearchError)) throw err;
+      lastError = err;
+      if (!err.retryable || attempt === MAX_ATTEMPTS) throw err;
+      console.warn(
+        `[aliexpress-search] tentative ${attempt}/${MAX_ATTEMPTS} echouee (${err.status}) -- nouvelle tentative`
+      );
+      await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+    }
+  }
+
+  // Budget epuise avant d'avoir pu (re)tenter : renvoie la derniere erreur
+  // reelle si on en a une, sinon un timeout explicite.
+  throw (
+    lastError ??
+    new AliExpressSearchError(
+      "L'analyse a pris trop de temps. Réessayez dans quelques instants — aucun crédit n'a été débité.",
+      504
+    )
+  );
 }
 
 function parseNumber(raw: string | undefined | null): number | null {
@@ -526,8 +597,10 @@ function estimateImportFee(subtotal: number): number {
 export async function performAliExpressSearch(
   query: string
 ): Promise<AliExpressSearchResult> {
+  const deadline = Date.now() + ANALYSIS_BUDGET_MS;
   const directProductId = extractProductId(query);
-  const productId = directProductId ?? (await findFirstProductIdFromKeyword(query));
+  const productId =
+    directProductId ?? (await findFirstProductIdFromKeyword(query, deadline));
 
   if (!productId) {
     throw new AliExpressSearchError(
@@ -537,7 +610,7 @@ export async function performAliExpressSearch(
   }
 
   const targetUrl = buildProductUrl(productId);
-  const html = await fetchHtmlViaFirecrawl(targetUrl);
+  const html = await fetchHtmlViaFirecrawl(targetUrl, deadline);
 
   // La page peut etre veritablement bloquee (verification anti-bot,
   // longueur quasi nulle) OU seulement partiellement rendue -- dans les

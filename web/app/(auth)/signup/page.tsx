@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { NeonAuthPanel } from "@/components/auth/neon-auth-panel";
+import { NeonAuthPanelClient } from "@/components/auth/neon-auth-panel-client";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +15,24 @@ export default async function SignupPage({
 }: {
   searchParams: { pack?: string };
 }) {
-  // Voir app/(auth)/login/page.tsx : meme garde, un utilisateur deja
-  // connecte n'a rien a faire sur le formulaire d'inscription.
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    redirect(searchParams.pack ? `/dashboard?pack=${searchParams.pack}` : "/dashboard");
+  // Voir app/(auth)/login/page.tsx : meme garde et meme isolation d'erreur.
+  let isLoggedIn = false;
+  try {
+    const {
+      data: { user },
+    } = await createClient().auth.getUser();
+    isLoggedIn = Boolean(user);
+  } catch (err) {
+    console.error("[signup] Vérification de session impossible :", err);
   }
 
-  return <NeonAuthPanel initialMode="signup" />;
+  if (isLoggedIn) {
+    redirect(
+      searchParams.pack
+        ? `/dashboard?pack=${encodeURIComponent(searchParams.pack)}`
+        : "/dashboard"
+    );
+  }
+
+  return <NeonAuthPanelClient initialMode="signup" />;
 }

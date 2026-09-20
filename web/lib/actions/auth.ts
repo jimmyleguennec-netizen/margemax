@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 import {
   RATE_LIMITS,
   RATE_LIMIT_MESSAGE,
@@ -136,7 +137,7 @@ export async function signup(
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
+        emailRedirectTo: `${getSiteUrl()}/auth/callback`,
         ...(company ? { data: { company_name: company } } : {}),
       },
     });
@@ -195,15 +196,7 @@ export async function requestPasswordReset(
     return { error: "Merci de renseigner votre adresse e-mail." };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!siteUrl) {
-    console.error(
-      "[auth] NEXT_PUBLIC_SITE_URL manquante -- impossible de construire une redirection de récupération sûre."
-    );
-    return {
-      error: "Récupération impossible pour le moment. Réessayez dans quelques instants.",
-    };
-  }
+  const siteUrl = getSiteUrl();
 
   // Limite meme sur ce parcours "sans risque de mot de passe" : sans elle,
   // ce formulaire devient un moyen gratuit de spammer la boite mail d'une

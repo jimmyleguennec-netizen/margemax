@@ -484,7 +484,7 @@ export function DashboardShell({
           <ActiveTabHint active={active} />
         </header>
 
-        <main className="relative z-10 container py-10 pointer-events-auto">
+        <main className="relative z-10 container overflow-x-clip py-10 pointer-events-auto">
           <AnimatePresence mode="wait">
             <motion.div
               key={active}
