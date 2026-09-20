@@ -45,7 +45,7 @@ export function ProductThumbnail({
           className="h-full w-full object-cover"
         />
       ) : (
-        <Package className="h-8 w-8 text-cyan-300/50" />
+        <Package aria-hidden="true" className="h-8 w-8 text-cyan-300/50" />
       )}
     </div>
   );

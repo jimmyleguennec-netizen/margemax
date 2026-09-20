@@ -23,7 +23,7 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connectez-vous pour accéder à vos factures." },
+      { error: "Connecte-toi pour accéder à tes factures." },
       { status: 401 }
     );
   }
@@ -37,7 +37,7 @@ export async function POST() {
   if (profileError) {
     console.error("[api/stripe/billing-portal] lecture profil échouée:", profileError);
     return NextResponse.json(
-      { error: "Impossible de récupérer vos informations de facturation pour le moment." },
+      { error: "Impossible de récupérer tes informations de facturation pour le moment." },
       { status: 502 }
     );
   }
@@ -49,7 +49,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error:
-          "Aucun historique de facturation pour le moment. Il apparaîtra ici après votre premier achat de crédits.",
+          "Aucun historique de facturation pour le moment. Il apparaîtra ici après ton premier achat de crédits.",
       },
       { status: 404 }
     );
@@ -74,7 +74,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error:
-          "Impossible d'ouvrir le portail de facturation pour le moment. Réessayez, ou contactez le support.",
+          "Impossible d'ouvrir le portail de facturation pour le moment. Réessaie, ou contacte le support.",
       },
       { status: 502 }
     );

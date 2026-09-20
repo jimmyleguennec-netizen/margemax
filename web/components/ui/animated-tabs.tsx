@@ -46,7 +46,7 @@ export function AnimatedTabs({
               "relative z-10 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200",
               isActive
                 ? "text-white"
-                : "text-white/50 hover:-translate-y-px hover:text-white/80"
+                : "text-white/70 hover:-translate-y-px hover:text-white/80"
             )}
           >
             {isActive && (

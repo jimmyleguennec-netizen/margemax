@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useDialogA11y } from "@/lib/hooks/use-dialog-a11y";
 import { X, Zap } from "lucide-react";
 
 import { PACKS, formatEuro, formatPricePerCredit, type Pack } from "@/lib/packs";
@@ -23,6 +24,8 @@ export function BuyCreditsModal({
   onClose: () => void;
   onChoosePack: (pack: Pack) => void;
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose);
+
   return (
     <AnimatePresence>
       {open && (
@@ -32,7 +35,9 @@ export function BuyCreditsModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="buy-credits-title"
         >
@@ -47,18 +52,18 @@ export function BuyCreditsModal({
               type="button"
               onClick={onClose}
               aria-label="Fermer"
-              className="absolute right-4 top-4 text-white/40 transition-colors hover:text-white"
+              className="absolute right-4 top-4 text-white/60 transition-colors hover:text-white"
             >
-              <X className="h-5 w-5" />
+              <X aria-hidden="true" className="h-5 w-5" />
             </button>
 
             <div className="flex items-center gap-2 text-cyan-300">
-              <Zap className="h-5 w-5" />
+              <Zap aria-hidden="true" className="h-5 w-5" />
               <h2 id="buy-credits-title" className="text-lg font-bold text-white">
                 Acheter des crédits
               </h2>
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Sans abonnement — les crédits n&apos;expirent pas.
             </p>
 
@@ -75,7 +80,7 @@ export function BuyCreditsModal({
                   <span className="mt-2 text-lg font-bold text-white">
                     {formatEuro(pack.priceEuros)}
                   </span>
-                  <span className="mt-0.5 text-[11px] text-white/30">
+                  <span className="mt-0.5 text-[11px] text-white/50">
                     {formatPricePerCredit(pack)}
                   </span>
                 </button>

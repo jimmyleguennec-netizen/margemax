@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { MotionProvider } from "@/components/motion-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "MargeMax — Trouvez vos meilleures opportunités de sourcing",
+  title: "MargeMax — Trouve tes meilleures opportunités de sourcing",
   description:
-    "MargeMax analyse vos produits AliExpress et calcule marge, ROI et coûts d'importation récupérés ou estimés selon les données disponibles.",
+    "MargeMax analyse tes produits AliExpress et calcule marge, ROI et coûts d'importation récupérés ou estimés selon les données disponibles.",
 };
 
 export default function RootLayout({
@@ -35,7 +36,7 @@ export default function RootLayout({
               "try{if('scrollRestoration' in history){history.scrollRestoration='manual';}if(!window.location.hash){window.scrollTo(0,0);}}catch(e){}",
           }}
         />
-        {children}
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

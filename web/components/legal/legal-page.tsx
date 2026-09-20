@@ -27,7 +27,7 @@ export function LegalPage({
           <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-2 text-sm text-white/40">
+          <p className="mt-2 text-sm text-white/60">
             Dernière mise à jour : {updatedAt}
           </p>
 
@@ -37,7 +37,7 @@ export function LegalPage({
         </main>
 
         <footer className="border-t border-white/10 py-8">
-          <div className="container flex flex-col items-center justify-between gap-4 text-sm text-white/40 sm:flex-row">
+          <div className="container flex flex-col items-center justify-between gap-4 text-sm text-white/60 sm:flex-row">
             <p>© {new Date().getFullYear()} MargeMax. Tous droits réservés.</p>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               <Link href="/mentions-legales" className="hover:text-white">

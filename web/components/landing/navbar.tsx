@@ -110,7 +110,7 @@ function MobileMenu({
                 aria-label="Fermer le menu"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:bg-white/5"
               >
-                <X className="h-5 w-5" />
+                <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
 
@@ -300,7 +300,7 @@ export function Navbar() {
             // navigateur.
             className="relative z-50 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 pointer-events-auto transition-colors hover:bg-cyan-400/10 sm:hidden"
           >
-            <Menu className="h-5 w-5" />
+            <Menu aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
       </div>

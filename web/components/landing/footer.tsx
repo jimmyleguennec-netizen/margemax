@@ -77,7 +77,7 @@ function FooterColumn({
           <li key={item.label}>
             <Link
               href={item.href}
-              className="flex items-center gap-2 text-sm text-white/50 transition-colors hover:text-cyan-300"
+              className="flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-cyan-300"
             >
               <item.icon className="h-3.5 w-3.5 shrink-0" />
               {item.label}
@@ -114,10 +114,10 @@ export function Footer() {
           />
           <div className="flex flex-col items-center gap-6">
             <h2 className="max-w-2xl bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-              Prêt à dénicher vos vrais produits gagnants ?
+              Prêt à dénicher tes vrais produits gagnants ?
             </h2>
-            <p className="max-w-lg text-white/50">
-              Rejoignez les e-commerçants qui estiment leurs coûts
+            <p className="max-w-lg text-white/70">
+              Rejoins les e-commerçants qui estiment leurs coûts
               d&apos;importation à partir des données réellement
               disponibles.{" "}
               <span className="font-bold text-amber-300">
@@ -142,8 +142,8 @@ export function Footer() {
         <div className="grid gap-10 border-t border-white/10 pt-12 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Logo className="h-14 w-auto" />
-            <p className="mt-4 max-w-xs text-sm text-white/50">
-              Votre assistant de sourcing AliExpress : coûts récupérés ou
+            <p className="mt-4 max-w-xs text-sm text-white/70">
+              Ton assistant de sourcing AliExpress : coûts récupérés ou
               estimés selon les données disponibles, et marges estimées,
               sans donnée inventée.
             </p>
@@ -158,9 +158,9 @@ export function Footer() {
             </h3>
             <a
               href={`mailto:${CONTACT_EMAIL}`}
-              className="mt-4 flex items-center gap-2 text-sm text-white/50 transition-colors hover:text-cyan-300"
+              className="mt-4 flex items-center gap-2 text-sm text-white/70 transition-colors hover:text-cyan-300"
             >
-              <Mail className="h-3.5 w-3.5 shrink-0" />
+              <Mail aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
               {CONTACT_EMAIL}
             </a>
           </div>
@@ -179,9 +179,12 @@ export function Footer() {
       </div>
 
       <div className="border-t border-white/5 py-6">
-        <div className="container flex flex-col items-center justify-between gap-3 text-center text-xs text-white/30 sm:flex-row sm:text-left">
+        <div className="container flex flex-col items-center justify-between gap-3 text-center text-xs text-white/50 sm:flex-row sm:text-left">
           <p>© {new Date().getFullYear()} MargeMax. Tous droits réservés.</p>
           <p>MargeMax est un service édité par AutOutilShop SAS.</p>
+          <p className="w-full text-center text-[11px] italic text-white/60 sm:order-last">
+            Ce site a été connu pour provoquer une expérience époustouflante.
+          </p>
         </div>
       </div>
     </footer>

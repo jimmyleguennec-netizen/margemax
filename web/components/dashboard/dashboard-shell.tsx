@@ -21,7 +21,11 @@ import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tab
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 import { Logo } from "@/components/ui/logo";
 import { RgbLoader } from "@/components/ui/rgb-loader";
-import { SearchPanel } from "@/components/dashboard/search-panel";
+import {
+  SearchPanel,
+  historyEntryToResult,
+  type ApiResult,
+} from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
 import { BuyCreditsModal } from "@/components/dashboard/buy-credits-modal";
@@ -67,19 +71,19 @@ const tabs: AnimatedTabItem[] = [
 const TAB_HELP: Record<string, { title: string; body: string }> = {
   recherche: {
     title: "Recherche & Sourcing",
-    body: "Entrez un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit par analyse réussie).",
+    body: "Entre un mot-clé ou un lien AliExpress pour analyser les coûts réels (1 crédit par analyse réussie).",
   },
   calculateur: {
     title: "Calculateur de Marge",
-    body: "Simulez vos coûts et marges en temps réel. Utilisable à volonté sans consommer de crédit.",
+    body: "Simule tes coûts et marges en temps réel. Utilisable à volonté sans consommer de crédit.",
   },
   historique: {
     title: "Historique des analyses",
-    body: "Retrouvez et réexaminez les produits analysés lors de cette session.",
+    body: "Retrouve et réexamine les produits analysés lors de cette session.",
   },
   account: {
     title: "Mon compte",
-    body: "Gérez votre compte, consultez votre solde et rechargez vos crédits d'analyse.",
+    body: "Gère ton compte, consulte ton solde et recharge tes crédits d'analyse.",
   },
 };
 
@@ -97,7 +101,7 @@ function ActiveTabHint({ active }: { active: string }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.2 }}
-            className="text-xs text-white/50"
+            className="text-xs text-white/70"
           >
             <strong className="font-semibold text-cyan-200">{hint.title}</strong>
             {" — "}
@@ -138,7 +142,7 @@ function BillingPortalButton() {
       window.location.href = data.url;
     } catch (err) {
       console.error("[BillingPortalButton] Échec de l'appel /api/stripe/billing-portal :", err);
-      setError("Impossible de contacter le serveur pour le moment. Réessayez.");
+      setError("Impossible de contacter le serveur pour le moment. Réessaie.");
       setLoading(false);
     }
   }
@@ -151,7 +155,7 @@ function BillingPortalButton() {
         disabled={loading}
         className="flex items-center gap-2 rounded-full border border-cyan-400/30 px-5 py-2.5 text-sm font-medium text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? <RgbLoader size={16} /> : <Receipt className="h-4 w-4" />}
+        {loading ? <RgbLoader size={16} /> : <Receipt aria-hidden="true" className="h-4 w-4" />}
         {loading ? "Ouverture..." : "Gérer mes factures"}
       </button>
       {error && <p className="mt-2 text-xs text-pink-300">{error}</p>}
@@ -181,7 +185,7 @@ function ParametresPanel({
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
         <div>
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-white/60">
             {isDemo ? "Aperçu de démonstration" : "Connecté en tant que"}
           </p>
           <p className="text-lg font-medium text-white">{email}</p>
@@ -199,7 +203,7 @@ function ParametresPanel({
               type="submit"
               className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white/80 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(244,114,182,0.5)]"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut aria-hidden="true" className="h-4 w-4" />
               Se déconnecter
             </button>
           </form>
@@ -212,7 +216,7 @@ function ParametresPanel({
             Crédits
           </h3>
           <p className="flex items-center gap-1.5 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
-            <Zap className="h-5 w-5" />
+            <Zap aria-hidden="true" className="h-5 w-5" />
             {credits ?? "--"}
             {creditsMax !== null ? ` / ${creditsMax}` : ""}
           </p>
@@ -234,17 +238,17 @@ function ParametresPanel({
           <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-6 text-center">
             <div>
               <p className="text-lg font-bold text-white">{creditsPurchasedTotal}</p>
-              <p className="text-[11px] text-white/40">Crédits achetés</p>
+              <p className="text-[11px] text-white/60">Crédits achetés</p>
             </div>
             <div>
               <p className="text-lg font-bold text-white">{purchases.length}</p>
-              <p className="text-[11px] text-white/40">
+              <p className="text-[11px] text-white/60">
                 Achat{purchases.length > 1 ? "s" : ""}
               </p>
             </div>
             <div>
               <p className="text-lg font-bold text-white">{formatEuro(amountSpentTotal)}</p>
-              <p className="text-[11px] text-white/40">Dépensé au total</p>
+              <p className="text-[11px] text-white/60">Dépensé au total</p>
             </div>
           </div>
         )}
@@ -256,9 +260,9 @@ function ParametresPanel({
             <h3 className="text-sm font-medium uppercase tracking-wider text-cyan-200/70">
               Moyen de paiement &amp; factures
             </h3>
-            <p className="max-w-sm text-xs text-white/40">
-              Consultez vos factures et gérez le moyen de paiement utilisé
-              pour vos achats de crédits, via le portail sécurisé de Stripe.
+            <p className="max-w-sm text-xs text-white/60">
+              Consulte tes factures et gère le moyen de paiement utilisé
+              pour tes achats de crédits, via le portail sécurisé de Stripe.
             </p>
             <BillingPortalButton />
           </div>
@@ -270,7 +274,7 @@ function ParametresPanel({
           Achats
         </h3>
         {purchases.length === 0 ? (
-          <p className="text-center text-sm text-white/40">
+          <p className="text-center text-sm text-white/60">
             Aucun achat pour le moment.
           </p>
         ) : (
@@ -281,10 +285,10 @@ function ParametresPanel({
                 className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm"
               >
                 <span className="flex items-center gap-2 text-white/70">
-                  <CreditCard className="h-3.5 w-3.5 text-cyan-300" />
+                  <CreditCard aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
                   Pack {purchase.pack_key} · {purchase.credits} crédits
                 </span>
-                <span className="text-right text-white/40">
+                <span className="text-right text-white/60">
                   <span className="block font-medium text-white">
                     {formatEuro(purchase.amount_total / 100)}
                   </span>
@@ -331,6 +335,7 @@ export function DashboardShell({
     return isTabValue(fromUrl) ? fromUrl : "recherche";
   });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [reopened, setReopened] = useState<ApiResult | null>(null);
   // false tant qu'on n'a pas confirmé que l'historique lu vient vraiment
   // de Supabase (migration_search_history_details.sql exécutée) -- pilote
   // l'avertissement "non sauvegardé" dans HistoryPanel. Chargé une seule
@@ -447,7 +452,7 @@ export function DashboardShell({
               {liveCredits !== null && (
                 <>
                   <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)] sm:gap-1.5 sm:px-3 sm:py-1.5">
-                    <Zap className="h-3.5 w-3.5 shrink-0" />
+                    <Zap aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                     {liveCredits}
                     {creditsMax !== null ? ` / ${creditsMax}` : ""}
                     <span className="hidden sm:inline">&nbsp;crédits</span>
@@ -459,7 +464,7 @@ export function DashboardShell({
                     title="Acheter des crédits"
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 text-white shadow-[0_0_14px_-4px_rgba(217,70,239,0.8)] transition-transform hover:scale-110"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus aria-hidden="true" className="h-4 w-4" />
                   </button>
                 </>
               )}
@@ -498,6 +503,8 @@ export function DashboardShell({
                 <SearchPanel
                   credits={liveCredits}
                   onCreditsChange={setLiveCredits}
+                  reopen={reopened}
+                  onReopenConsumed={() => setReopened(null)}
                   onResult={(entry) =>
                     setHistory((prev) => [entry, ...prev])
                   }
@@ -509,6 +516,12 @@ export function DashboardShell({
                   entries={history}
                   onGoToSearch={() => setActive("recherche")}
                   persisted={historyPersisted}
+                  onReopen={(entry) => {
+                    const result = historyEntryToResult(entry);
+                    if (!result) return;
+                    setReopened(result);
+                    setActive("recherche");
+                  }}
                 />
               )}
               {active === "account" && (

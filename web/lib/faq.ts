@@ -11,18 +11,18 @@ export const faqs = [
   {
     question: "Pourquoi acheter des crédits au lieu d'un abonnement ?",
     answer:
-      "Parce que vous ne payez que ce que vous utilisez, sans mensualité qui tourne dans le vide les mois calmes. Aucun engagement, aucun renouvellement automatique — vous achetez un pack quand vous en avez besoin, point final.",
+      "Parce que tu ne paies que ce que tu utilises, sans mensualité qui tourne dans le vide les mois calmes. Aucun engagement, aucun renouvellement automatique — tu achètes un pack quand tu en as besoin, point final.",
   },
   {
     question: "Les crédits ont-ils une date d'expiration ?",
     answer:
-      "Non, jamais. Les crédits achetés vous appartiennent à vie, sans date limite ni compte à rebours — utilisez-les à votre rythme.",
+      "Non, jamais. Les crédits achetés t'appartiennent à vie, sans date limite ni compte à rebours — utilise-les à ton rythme.",
   },
   {
     question:
       "Que se passe-t-il si un produit AliExpress ne peut pas être analysé ?",
     answer:
-      "Vous êtes prévenu immédiatement et aucun crédit n'est débité. MargeMax n'invente jamais une donnée manquante : si une information ne peut pas être récupérée (page indisponible, produit retiré...), elle reste clairement signalée comme absente plutôt que devinée.",
+      "Tu es prévenu immédiatement et aucun crédit n'est débité. MargeMax n'invente jamais une donnée manquante : si une information ne peut pas être récupérée (page indisponible, produit retiré...), elle reste clairement signalée comme absente plutôt que devinée.",
   },
   {
     question: "1 crédit correspond-il toujours à 1 analyse ?",

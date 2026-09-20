@@ -72,9 +72,9 @@ export function Hero() {
               Marre de perdre de l&apos;argent avec de fausses marges ?
             </span>
             <span className="block text-4xl font-extrabold text-white sm:text-6xl">
-              Comparez les offres AliExpress et{" "}
+              Compare les offres AliExpress et{" "}
               <span className="bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-indigo-400 bg-clip-text font-black text-transparent drop-shadow-[0_0_30px_rgba(0,240,255,0.5)]">
-                estimez votre marge avant de vendre
+                estime ta marge avant de vendre
               </span>
               .
             </span>
@@ -85,8 +85,8 @@ export function Hero() {
           variants={item}
           className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1.5 text-sm font-medium text-cyan-100 shadow-[0_0_20px_-4px_rgba(34,211,238,0.6)] backdrop-blur-sm"
         >
-          <CheckCircle2 className="h-4 w-4 text-cyan-300" />
-          Comprenez les coûts avant de choisir un produit.
+          <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+          Comprends les coûts avant de choisir un produit.
         </motion.div>
 
         <motion.div
@@ -122,9 +122,9 @@ export function Hero() {
                 C&apos;est quoi, MargeMax ?
               </h2>
               <p className="mt-1 text-sm text-white/60">
-                MargeMax est votre assistant intelligent connecté à
+                MargeMax est ton assistant intelligent connecté à
                 AliExpress. En quelques secondes, il scanne le marché et
-                déniche pour vous :
+                déniche pour toi :
               </p>
             </div>
           </div>
@@ -134,7 +134,7 @@ export function Hero() {
                 key={bullet}
                 className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3.5 py-2 text-sm text-white/70 transition-colors duration-300 hover:border-cyan-400/40"
               >
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-cyan-400" />
+                <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-400" />
                 {bullet}
               </li>
             ))}

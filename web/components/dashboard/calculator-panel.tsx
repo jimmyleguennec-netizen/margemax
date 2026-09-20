@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useAnimation } from "framer-motion";
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 
-import { computeMarginEstimate, parseDecimalInput } from "@/lib/margin-estimate";
+import {
+  computeMarginEstimate,
+  computeSaleMetrics,
+  parseDecimalInput,
+  roundCents,
+} from "@/lib/margin-estimate";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
 
@@ -64,13 +69,13 @@ function NeonNumberField({
           onChange={(e) => onChange(e.target.value)}
           placeholder="0,00"
           aria-invalid={invalid}
-          className={`w-full rounded-lg border bg-white/5 py-2.5 pl-3 pr-10 text-sm text-white placeholder:text-white/30 outline-none transition-all ${
+          className={`w-full rounded-lg border bg-white/5 py-2.5 pl-3 pr-10 text-sm text-white placeholder:text-white/50 outline-none transition-all ${
             invalid
               ? "border-pink-500/60 shadow-[0_0_20px_-2px_rgba(244,63,94,0.6)]"
               : "border-cyan-400/20 focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
           }`}
         />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30">
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/50">
           €
         </span>
       </div>
@@ -131,12 +136,15 @@ export function CalculatorPanel() {
       return null;
     }
 
-    const totalCost = parsed.p + parsed.s + parsed.t;
-    const margin = parsed.sale - totalCost;
-    // Denominateur nul (prix de vente ou cout total a 0) -> non
-    // calculable, jamais un faux "0 %".
-    const marginPct = parsed.sale > 0 ? (margin / parsed.sale) * 100 : null;
-    const roiPct = totalCost > 0 ? (margin / totalCost) * 100 : null;
+    const totalCost = roundCents(parsed.p + parsed.s + parsed.t);
+    // Marge, taux de marge sur vente, ROI sur cout et budget pub : formules
+    // centralisees (lib/margin-estimate.ts), calculees sur le prix de vente
+    // SAISI, denominateur nul -> null ("Non calculable").
+    const metrics = computeSaleMetrics(totalCost, parsed.sale);
+    const margin = metrics.marginBeforeAds;
+    const marginPct = metrics.marginRatePct;
+    const roiPct = metrics.roiPct;
+    const adBudgetMax = metrics.adBudgetMax;
 
     const priceEstimate = computeMarginEstimate(totalCost, parsed.t);
 
@@ -145,6 +153,7 @@ export function CalculatorPanel() {
       margin,
       marginPct,
       roiPct,
+      adBudgetMax,
       ...priceEstimate,
     };
   }, [parsed]);
@@ -169,8 +178,8 @@ export function CalculatorPanel() {
         <h2 className="text-lg font-semibold text-white">
           Calculateur de marge
         </h2>
-        <p className="mt-1 mb-6 text-sm text-white/40">
-          Renseignez vos propres coûts — le calcul et les estimations se
+        <p className="mt-1 mb-6 text-sm text-white/60">
+          Renseigne tes propres coûts — le calcul et les estimations se
           mettent à jour en direct.
         </p>
 
@@ -207,8 +216,8 @@ export function CalculatorPanel() {
 
         {hasInvalidInput && (
           <p className="mt-3 flex items-start gap-2 rounded-lg border border-pink-400/30 bg-pink-400/10 p-3 text-xs text-pink-200">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Saisissez des nombres valides et positifs ou nuls (virgule ou
+            <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Saisis des nombres valides et positifs ou nuls (virgule ou
             point accepté comme séparateur décimal) dans tous les champs
             pour voir les résultats.
           </p>
@@ -225,19 +234,19 @@ export function CalculatorPanel() {
                 Tes coûts
               </h3>
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm">
-                <div className="flex items-center justify-between text-white/50">
+                <div className="flex items-center justify-between text-white/70">
                   <span>Prix produit</span>
                   <span className="font-medium text-white">
                     {formatEuro(parsed.p ?? 0)}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-white/50">
+                <div className="mt-2 flex items-center justify-between text-white/70">
                   <span>Livraison</span>
                   <span className="font-medium text-white">
                     {formatEuro(parsed.s ?? 0)}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-white/50">
+                <div className="mt-2 flex items-center justify-between text-white/70">
                   <span>Taxes / import</span>
                   <span className="font-medium text-white">
                     {formatEuro(parsed.t ?? 0)}
@@ -269,7 +278,7 @@ export function CalculatorPanel() {
                 }`}
               >
                 <div>
-                  <p className="text-xs text-white/40">Marge</p>
+                  <p className="text-xs text-white/60">Marge avant pub</p>
                   <AnimatedNumber
                     value={formatEuro(estimate.margin)}
                     className={`mt-1 text-lg font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] ${
@@ -278,15 +287,15 @@ export function CalculatorPanel() {
                   />
                 </div>
                 <div>
-                  <p className="text-xs text-white/40">Marge %</p>
+                  <p className="text-xs text-white/60">Taux de marge (sur vente)</p>
                   <AnimatedNumber
                     value={formatPct(estimate.marginPct)}
                     className="mt-1 text-lg font-bold text-white"
                   />
                 </div>
                 <div>
-                  <p className="flex items-center gap-1 text-xs text-white/40">
-                    <TrendingUp className="h-3 w-3" /> ROI
+                  <p className="flex items-center gap-1 text-xs text-white/60">
+                    <TrendingUp aria-hidden="true" className="h-3 w-3" /> ROI (sur coût)
                   </p>
                   <AnimatedNumber
                     value={formatPct(estimate.roiPct)}
@@ -297,26 +306,26 @@ export function CalculatorPanel() {
 
               {!isProfitable && (
                 <p className="mt-3 text-center text-xs text-pink-300">
-                  Marge négative avec ces chiffres — augmentez le prix de
-                  vente ou réduisez les coûts.
+                  Marge négative avec ces chiffres — augmente le prix de
+                  vente ou réduis les coûts.
                 </p>
               )}
 
               <div className="mt-3 rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-white/50">Budget pub maximum par vente (TikTok/Meta)</span>
+                  <span className="text-white/70">Budget pub maximum par vente (TikTok/Meta)</span>
                   <span
                     className={`font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.6)] ${
                       isProfitable ? "text-fuchsia-300" : "text-pink-400"
                     }`}
                   >
-                    {formatEuro(Math.max(0, estimate.margin))}
+                    {formatEuro(estimate.adBudgetMax)}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] text-white/40">
+                <p className="mt-1.5 text-[11px] text-white/60">
                   Ne déduit ni frais de transaction (Stripe, PayPal...), ni
                   commissions publicitaires, ni impôts sur le profit — à
-                  soustraire vous-même avant de fixer un budget réel.
+                  soustraire toi-même avant de fixer un budget réel.
                 </p>
               </div>
 
@@ -326,7 +335,7 @@ export function CalculatorPanel() {
                   onClick={() => setSalePrice(toInputValue(estimate.lowPrice))}
                   className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-pink-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(244,114,182,0.5)]"
                 >
-                  <TrendingDown className="h-3.5 w-3.5" />
+                  <TrendingDown aria-hidden="true" className="h-3.5 w-3.5" />
                   Appliquer prix de vente bas
                 </button>
                 <button
@@ -334,7 +343,7 @@ export function CalculatorPanel() {
                   onClick={() => setSalePrice(toInputValue(estimate.highPrice))}
                   className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/70 transition-all hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]"
                 >
-                  <TrendingUp className="h-3.5 w-3.5" />
+                  <TrendingUp aria-hidden="true" className="h-3.5 w-3.5" />
                   Appliquer prix de vente haut
                 </button>
               </div>
@@ -342,7 +351,7 @@ export function CalculatorPanel() {
               <div className="mt-4 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.05] p-5">
                 <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
                   <div>
-                    <p className="flex items-center gap-1.5 text-xs text-white/40">
+                    <p className="flex items-center gap-1.5 text-xs text-white/60">
                       Prix de vente recommandé estimé
                     </p>
                     <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">
@@ -354,36 +363,36 @@ export function CalculatorPanel() {
 
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                    <p className="flex items-center gap-1.5 text-xs text-white/40">
-                      <TrendingDown className="h-3.5 w-3.5 text-pink-300" />
+                    <p className="flex items-center gap-1.5 text-xs text-white/60">
+                      <TrendingDown aria-hidden="true" className="h-3.5 w-3.5 text-pink-300" />
                       Prix de vente bas (fourchette prudente)
                     </p>
                     <AnimatedNumber
                       value={formatEuro(estimate.lowPrice)}
                       className="mt-1 text-lg font-bold text-white"
                     />
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className="mt-1 text-xs text-white/60">
                       Marge {formatEuro(estimate.marginLow)} ·{" "}
                       {formatPct(estimate.roiLow)} ROI
                     </p>
                   </div>
                   <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                    <p className="flex items-center gap-1.5 text-xs text-white/40">
-                      <TrendingUp className="h-3.5 w-3.5 text-cyan-300" />
+                    <p className="flex items-center gap-1.5 text-xs text-white/60">
+                      <TrendingUp aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
                       Prix de vente haut (fourchette premium)
                     </p>
                     <AnimatedNumber
                       value={formatEuro(estimate.highPrice)}
                       className="mt-1 text-lg font-bold text-white"
                     />
-                    <p className="mt-1 text-xs text-white/40">
+                    <p className="mt-1 text-xs text-white/60">
                       Marge {formatEuro(estimate.marginHigh)} ·{" "}
                       {formatPct(estimate.roiHigh)} ROI
                     </p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-center text-[11px] text-white/40">
+                <p className="mt-4 text-center text-[11px] text-white/60">
                   Méthode : prix bas = coût × 1,5, prix conseillé = coût ×
                   1,8, prix haut = coût × 2,3, arrondis au 0,90 €
                   psychologique le plus proche — coefficients fixes, pas

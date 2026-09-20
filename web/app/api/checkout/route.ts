@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connectez-vous pour finaliser cet achat." },
+      { error: "Connecte-toi pour finaliser cet achat." },
       { status: 401 }
     );
   }
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Ce pack n'est pas disponible à l'achat pour le moment. Contactez le support ou réessayez plus tard.",
+          "Ce pack n'est pas disponible à l'achat pour le moment. Contacte le support ou réessaie plus tard.",
       },
       { status: 502 }
     );

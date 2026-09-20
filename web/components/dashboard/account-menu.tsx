@@ -33,9 +33,9 @@ import {
  * clic serait le genre de fonctionnalite fantome deja retiree ailleurs sur
  * le site (voir passation.md).
  *
- * "Aide et paramètres", "Votre compte" et "Service client" menaient tous
+ * "Aide et paramètres", "Ton compte" et "Service client" menaient tous
  * les trois au meme endroit (l'onglet Mon compte) avant cette session --
- * chacun a maintenant sa propre destination reelle : Votre compte bascule
+ * chacun a maintenant sa propre destination reelle : Ton compte bascule
  * l'onglet dashboard, Aide ouvre une vraie modale FAQ, Service client
  * ouvre le formulaire de contact SANS quitter le dashboard.
  */
@@ -59,38 +59,38 @@ export function AccountMenu({
           title="Menu du compte"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:border-cyan-400/40 hover:text-white"
         >
-          <Settings className="h-4 w-4" />
+          <Settings aria-hidden="true" className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={onOpenHelp}>
-          <CircleHelp className="h-4 w-4 text-cyan-300" />
+          <CircleHelp aria-hidden="true" className="h-4 w-4 text-cyan-300" />
           Aide et paramètres
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onGoToAccount}>
-          <UserRound className="h-4 w-4 text-cyan-300" />
-          Votre compte
+          <UserRound aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+          Ton compte
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuStaticRow>
-          <Globe className="h-4 w-4" />
+          <Globe aria-hidden="true" className="h-4 w-4" />
           Langue : Français
         </DropdownMenuStaticRow>
         <DropdownMenuStaticRow>
-          <MapPin className="h-4 w-4" />
+          <MapPin aria-hidden="true" className="h-4 w-4" />
           Pays : France
         </DropdownMenuStaticRow>
         <DropdownMenuStaticRow>
-          <Wallet className="h-4 w-4" />
+          <Wallet aria-hidden="true" className="h-4 w-4" />
           Devise : Euro (€)
         </DropdownMenuStaticRow>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuItem onSelect={onOpenContact}>
-          <LifeBuoy className="h-4 w-4 text-cyan-300" />
+          <LifeBuoy aria-hidden="true" className="h-4 w-4 text-cyan-300" />
           Service client
         </DropdownMenuItem>
 
@@ -99,7 +99,7 @@ export function AccountMenu({
         {isDemo ? (
           <DropdownMenuItem asChild>
             <Link href="/login">
-              <LogIn className="h-4 w-4 text-cyan-300" />
+              <LogIn aria-hidden="true" className="h-4 w-4 text-cyan-300" />
               Se connecter
             </Link>
           </DropdownMenuItem>
@@ -109,7 +109,7 @@ export function AccountMenu({
           // qu'elle declenche cote serveur est reconnu et applique par le
           // client Next.js meme hors soumission de formulaire.
           <DropdownMenuItem onSelect={() => void logout()}>
-            <LogOut className="h-4 w-4 text-pink-300" />
+            <LogOut aria-hidden="true" className="h-4 w-4 text-pink-300" />
             Se déconnecter
           </DropdownMenuItem>
         )}

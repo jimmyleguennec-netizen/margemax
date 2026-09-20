@@ -117,3 +117,43 @@ export function computeMarginEstimate(
     reliability,
   };
 }
+
+/** Arrondi au centime -- evite les artefacts flottants (0,1 + 0,2) dans les
+ * totaux et marges affiches. */
+export function roundCents(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+export type SaleMetrics = {
+  /** Prix de vente sur lequel TOUT ce qui suit est calcule. */
+  salePrice: number;
+  /** vente - cout, AVANT publicite, frais de transaction et impots. */
+  marginBeforeAds: number;
+  /** Taux de marge SUR LA VENTE (marge / prix de vente, en %) ; null si le
+   * prix de vente est nul (denominateur nul -> "Non calculable"). */
+  marginRatePct: number | null;
+  /** ROI SUR LE COUT (marge / cout, en %) ; null si le cout est nul. */
+  roiPct: number | null;
+  /** Budget pub maximum par vente = marge avant pub, jamais negatif. */
+  adBudgetMax: number;
+};
+
+/**
+ * Source unique des trois grandeurs qu'on confondait : marge (en €),
+ * taux de marge sur vente et ROI sur cout, plus le budget pub -- tous
+ * calcules sur le prix de vente REELLEMENT retenu (saisi ou selectionne),
+ * jamais sur le prix haut par defaut. Partage par le Calculateur et la
+ * carte de resultat de recherche.
+ */
+export function computeSaleMetrics(totalCost: number, salePrice: number): SaleMetrics {
+  const cost = roundCents(totalCost);
+  const sale = roundCents(salePrice);
+  const margin = roundCents(sale - cost);
+  return {
+    salePrice: sale,
+    marginBeforeAds: margin,
+    marginRatePct: sale > 0 ? (margin / sale) * 100 : null,
+    roiPct: cost > 0 ? (margin / cost) * 100 : null,
+    adBudgetMax: Math.max(0, margin),
+  };
+}

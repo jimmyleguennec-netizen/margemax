@@ -28,8 +28,8 @@ export function ResetPasswordForm() {
   return (
     <div className="w-full max-w-sm rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-[0_0_30px_rgba(0,240,255,0.15)] backdrop-blur-xl">
       <h1 className="text-2xl font-bold text-white">Nouveau mot de passe</h1>
-      <p className="mt-1 text-sm text-white/50">
-        Choisissez un mot de passe d&apos;au moins 6 caractères.
+      <p className="mt-1 text-sm text-white/70">
+        Choisis un mot de passe d&apos;au moins 6 caractères.
       </p>
 
       {state.success ? (
@@ -38,7 +38,7 @@ export function ResetPasswordForm() {
           animate={{ opacity: 1, y: 0 }}
           className="mt-6 flex items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-3 py-2.5 text-sm text-cyan-200"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />
           Mot de passe mis à jour. Redirection vers la connexion...
         </motion.div>
       ) : (

@@ -26,7 +26,7 @@ type FormDispatch = (payload: FormData) => void;
 const initialState: AuthActionState = {};
 
 const CALLBACK_ERROR_MESSAGE =
-  "Connexion impossible pour le moment, réessayez ou utilisez votre e-mail.";
+  "Connexion impossible pour le moment, réessaie ou utilise ton e-mail.";
 
 // Meme message que login() (lib/actions/auth.ts) : ne jamais reveler, via
 // l'interface, si une adresse e-mail possede ou non un compte.
@@ -74,8 +74,8 @@ function LoginForm({
     <form action={action} onSubmit={guardSubmit} className="w-full max-w-sm space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-white">Connexion</h2>
-        <p className="mt-1 text-sm text-white/50">
-          Accédez à votre espace MargeMax.
+        <p className="mt-1 text-sm text-white/70">
+          Accède à ton espace MargeMax.
         </p>
       </div>
       <NeonField
@@ -135,8 +135,8 @@ function SignupForm({
     <form action={action} onSubmit={guardSubmit} className="w-full max-w-sm space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-white">Créer un compte</h2>
-        <p className="mt-1 text-sm text-white/50">
-          Commencez à calculer vos marges en quelques secondes.
+        <p className="mt-1 text-sm text-white/70">
+          Commence à calculer tes marges en quelques secondes.
         </p>
       </div>
       <NeonField
@@ -155,7 +155,7 @@ function SignupForm({
         icon={Building2}
         autoComplete="organization"
         required={false}
-        placeholder="Nom de votre entreprise (facultatif)"
+        placeholder="Nom de ton entreprise (facultatif)"
       />
       <PasswordInput
         id={`${idPrefix}-signup-password`}
@@ -163,7 +163,7 @@ function SignupForm({
         label="Mot de passe"
         autoComplete="new-password"
         minLength={6}
-        hint="Minimum 6 caractères."
+        hint="Minimum 6 caractères. 123456 si tu aimes vivre dangereusement… Non, choisis plutôt un mot de passe solide !"
       />
       <PasswordInput
         id={`${idPrefix}-signup-confirm`}
@@ -286,7 +286,7 @@ function SuccessOverlay({ statusText }: { statusText: string }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="text-xs text-white/50"
+        className="text-xs text-white/70"
       >
         {statusText}
       </motion.p>
@@ -438,7 +438,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                       <OverlayFace
                         key="to-signup"
                         title="Nouveau ici ?"
-                        text="Créez votre compte et recevez 3 crédits offerts pour analyser vos premiers produits."
+                        text="Crée ton compte et reçois 3 crédits offerts pour analyser tes premiers produits."
                         cta="S'inscrire"
                         onClick={() => setMode("signup")}
                       />
@@ -446,7 +446,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                       <OverlayFace
                         key="to-login"
                         title="Déjà un compte ?"
-                        text="Connectez-vous pour retrouver votre carnet de sourcing et vos crédits."
+                        text="Connecte-toi pour retrouver ton carnet de sourcing et tes crédits."
                         cta="Se connecter"
                         onClick={() => setMode("login")}
                       />
@@ -499,7 +499,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                 <SuccessOverlay
                   statusText={
                     consentPack
-                      ? "Finalisation de votre commande..."
+                      ? "Finalisation de ta commande..."
                       : "Redirection en cours..."
                   }
                 />
@@ -515,8 +515,8 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
         onCancel={handleConsentCancel}
       />
 
-      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-white/30">
-        <ShieldCheck className="h-3.5 w-3.5" />
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-white/50">
+        <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
         Connexion sécurisée via Supabase
       </p>
     </div>

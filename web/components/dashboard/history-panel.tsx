@@ -21,6 +21,18 @@ export type HistoryEntry = {
   partialTotal: number;
   isComplete: boolean;
   currency?: string;
+  /** Detail persiste (lignes de cout + statuts) permettant de rouvrir le
+   * resultat complet sans nouvelle analyse ni credit. */
+  detail?: HistoryDetail;
+};
+
+export type HistoryDetail = {
+  subtotal: number | null;
+  shipping: number | null;
+  shippingStatus: string | null;
+  importFee: number | null;
+  importFeeStatus: string | null;
+  variantStatus: string | null;
 };
 
 function formatTime(ts: number) {
@@ -63,7 +75,7 @@ function PersistenceNotice({ persisted }: { persisted: boolean }) {
   if (persisted) return null;
   return (
     <div className="flex items-start gap-2 border-b border-amber-400/20 bg-amber-400/[0.06] px-5 py-3 text-xs text-amber-200">
-      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>
         Historique non sauvegardé de façon permanente pour le moment — les
         recherches de cette session disparaîtront au rechargement de la
@@ -77,9 +89,12 @@ export function HistoryPanel({
   entries,
   onGoToSearch,
   persisted = false,
+  onReopen,
 }: {
   entries: HistoryEntry[];
   onGoToSearch?: () => void;
+  /** Rouvre le resultat complet dans l'onglet Recherche (aucun credit). */
+  onReopen?: (entry: HistoryEntry) => void;
   /** true quand l'historique est réellement lu depuis le compte (Supabase)
    * -- false tant que la migration n'a pas été exécutée ou que la lecture
    * a échoué, auquel cas seules les entrées de cette session s'affichent. */
@@ -90,12 +105,12 @@ export function HistoryPanel({
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
         <PersistenceNotice persisted={persisted} />
         <div className="flex flex-col items-center gap-3 p-12 text-center">
-          <HistoryIcon className="h-6 w-6 text-cyan-400/60" />
+          <HistoryIcon aria-hidden="true" className="h-6 w-6 text-cyan-400/60" />
           <h2 className="text-lg font-semibold text-white">
             Aucune recherche pour l&apos;instant
           </h2>
-          <p className="max-w-sm text-sm text-white/50">
-            Lancez une analyse depuis l&apos;onglet Recherche — elle
+          <p className="max-w-sm text-sm text-white/70">
+            Lance une analyse depuis l&apos;onglet Recherche — elle
             apparaîtra ici automatiquement.
           </p>
           {onGoToSearch && (
@@ -125,12 +140,21 @@ export function HistoryPanel({
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-white">{entry.title}</p>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-white/60">
                 Recherché : « {entry.query} » · {formatTime(entry.timestamp)}
               </p>
             </div>
             <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
               <EntryTotal entry={entry} />
+              {entry.detail && onReopen && (
+                <button
+                  type="button"
+                  onClick={() => onReopen(entry)}
+                  className="rounded-full border border-cyan-400/30 px-3 py-1 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-400/10"
+                >
+                  Rouvrir
+                </button>
+              )}
               {entry.url && (
                 <Link
                   href={entry.url}
@@ -139,7 +163,7 @@ export function HistoryPanel({
                   className="inline-flex items-center gap-1 text-cyan-300 transition-colors hover:text-cyan-200"
                 >
                   Voir
-                  <ExternalLink className="h-3 w-3" />
+                  <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </Link>
               )}
             </div>
@@ -147,8 +171,8 @@ export function HistoryPanel({
         ))}
       </div>
       {persisted && (
-        <p className="border-t border-white/10 px-5 py-3 text-xs text-white/30">
-          Historique lié à votre compte — conservé après reconnexion (les{" "}
+        <p className="border-t border-white/10 px-5 py-3 text-xs text-white/50">
+          Historique lié à ton compte — conservé après reconnexion (les{" "}
           {HISTORY_DISPLAY_LIMIT} analyses les plus récentes).
         </p>
       )}

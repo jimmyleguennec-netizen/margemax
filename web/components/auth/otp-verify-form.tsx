@@ -62,7 +62,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       if (error) {
         console.error("[otp] verifyOtp a renvoyé une erreur :", error);
         setErrorMessage(
-          `Code incorrect ou expiré. Vérifiez les ${OTP_LENGTH} chiffres, ou demandez un nouveau code.`
+          `Code incorrect ou expiré. Vérifie les ${OTP_LENGTH} chiffres, ou demande un nouveau code.`
         );
         setStatus("error");
         return;
@@ -71,7 +71,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
       setStatus("verified");
     } catch (err) {
       console.error("[otp] Exception réseau pendant verifyOtp :", err);
-      setErrorMessage("Validation impossible pour le moment. Réessayez dans quelques instants.");
+      setErrorMessage("Validation impossible pour le moment. Réessaie dans quelques instants.");
       setStatus("error");
     }
   }
@@ -101,9 +101,9 @@ export function OtpVerifyForm({ email }: { email: string }) {
         animate={{ opacity: 1, y: 0 }}
         className="flex w-full max-w-sm flex-col items-center gap-3 text-center"
       >
-        <CheckCircle2 className="h-10 w-10 text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.8)]" />
+        <CheckCircle2 aria-hidden="true" className="h-10 w-10 text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.8)]" />
         <p className="text-sm text-white/70">
-          Adresse confirmée. Redirection vers votre espace...
+          Adresse confirmée. Redirection vers ton espace...
         </p>
       </motion.div>
     );
@@ -112,9 +112,9 @@ export function OtpVerifyForm({ email }: { email: string }) {
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-white">Vérifiez votre e-mail</h2>
-        <p className="mt-1 text-sm text-white/50">
-          Entrez le code à {OTP_LENGTH} chiffres envoyé à{" "}
+        <h2 className="text-2xl font-bold text-white">Vérifie ton e-mail</h2>
+        <p className="mt-1 text-sm text-white/70">
+          Entre le code à {OTP_LENGTH} chiffres envoyé à{" "}
           <span className="text-cyan-300">{email}</span>.
         </p>
       </div>
@@ -165,7 +165,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
         disabled={resendState === "sending" || cooldown > 0}
         className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-cyan-300 underline-offset-4 transition-opacity hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
       >
-        {resendState === "sending" ? <RgbLoader size={12} /> : <RotateCw className="h-3 w-3" />}
+        {resendState === "sending" ? <RgbLoader size={12} /> : <RotateCw aria-hidden="true" className="h-3 w-3" />}
         {cooldown > 0
           ? `Renvoyer le code (${cooldown}s)`
           : resendState === "sent"

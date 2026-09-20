@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const message = body.message?.trim();
 
   if (!name) {
-    return NextResponse.json({ error: "Merci d'indiquer votre nom." }, { status: 400 });
+    return NextResponse.json({ error: "Merci d'indiquer ton nom." }, { status: 400 });
   }
   if (!email || !EMAIL_PATTERN.test(email)) {
     return NextResponse.json(
@@ -68,6 +68,12 @@ export async function POST(request: Request) {
   }
   if (!message) {
     return NextResponse.json({ error: "Merci d'écrire un message." }, { status: 400 });
+  }
+  if (name.length > 100 || message.length > 5000) {
+    return NextResponse.json(
+      { error: "Ton message est trop long (5000 caractères maximum, 100 pour le nom)." },
+      { status: 400 }
+    );
   }
 
   const ipAllowed = await checkRateLimit(
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
 
   if (!RESEND_API_KEY) {
     console.error(
-      "[api/contact] RESEND_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer l'envoi réel."
+      "[api/contact] RESEND_API_KEY absente — configure cette variable (Vercel -> Environment Variables) pour activer l'envoi réel."
     );
     return NextResponse.json(
       {
@@ -113,7 +119,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Impossible d'envoyer votre message pour le moment. Réessayez, ou écrivez-nous directement à contact@autoutilshop.fr.",
+          "Impossible d'envoyer ton message pour le moment. Réessaie, ou écris-nous directement à contact@autoutilshop.fr.",
       },
       { status: 502 }
     );

@@ -51,7 +51,7 @@ export async function login(
   const rememberMe = readRememberMe(formData);
 
   if (!email || !password) {
-    return { error: "Merci de renseigner votre email et votre mot de passe." };
+    return { error: "Merci de renseigner ton email et ton mot de passe." };
   }
 
   const emailKey = `login:email:${email.toLowerCase()}`;
@@ -92,7 +92,7 @@ export async function login(
     // tableau de bord de demonstration : un echec de connexion ne doit
     // jamais donner l'impression d'avoir reussi.
     return {
-      error: "Connexion impossible pour le moment. Réessayez dans quelques instants.",
+      error: "Connexion impossible pour le moment. Réessaie dans quelques instants.",
     };
   }
 }
@@ -112,7 +112,7 @@ export async function signup(
   const company = String(formData.get("company") ?? "").trim();
 
   if (!email || !password) {
-    return { error: "Merci de renseigner votre email et votre mot de passe." };
+    return { error: "Merci de renseigner ton email et ton mot de passe." };
   }
   if (password.length < 6) {
     return { error: "Le mot de passe doit contenir au moins 6 caractères." };
@@ -155,7 +155,7 @@ export async function signup(
     if (error) {
       console.error("[auth] signUp a renvoyé une erreur :", error);
       return {
-        message: "Compte créé ! Un code de confirmation vous a été envoyé par e-mail.",
+        message: "Compte créé ! Un code de confirmation t'a été envoyé par e-mail.",
         pendingEmail: email,
       };
     }
@@ -164,7 +164,7 @@ export async function signup(
     // n'est ouverte immédiatement : meme bascule vers l'OTP.
     if (data.user && !data.session) {
       return {
-        message: "Compte créé ! Un code de confirmation vous a été envoyé par e-mail.",
+        message: "Compte créé ! Un code de confirmation t'a été envoyé par e-mail.",
         pendingEmail: email,
       };
     }
@@ -174,7 +174,7 @@ export async function signup(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant l'inscription :", err);
     return {
-      error: "Inscription impossible pour le moment. Réessayez dans quelques instants.",
+      error: "Inscription impossible pour le moment. Réessaie dans quelques instants.",
     };
   }
 }
@@ -193,7 +193,7 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email) {
-    return { error: "Merci de renseigner votre adresse e-mail." };
+    return { error: "Merci de renseigner ton adresse e-mail." };
   }
 
   const siteUrl = getSiteUrl();
@@ -234,7 +234,7 @@ export async function requestPasswordReset(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant la demande de récupération :", err);
     return {
-      error: "Récupération impossible pour le moment. Réessayez dans quelques instants.",
+      error: "Récupération impossible pour le moment. Réessaie dans quelques instants.",
     };
   }
 }
@@ -275,7 +275,7 @@ export async function updatePassword(
       console.error("[auth] updateUser a renvoyé une erreur :", error);
       return {
         error:
-          "Impossible de définir ce mot de passe pour le moment. Réessayez.",
+          "Impossible de définir ce mot de passe pour le moment. Réessaie.",
       };
     }
 
@@ -284,7 +284,7 @@ export async function updatePassword(
     if (isNextRedirectError(err)) throw err;
     console.error("[auth] Exception reseau pendant la mise à jour du mot de passe :", err);
     return {
-      error: "Impossible de définir ce mot de passe pour le moment. Réessayez.",
+      error: "Impossible de définir ce mot de passe pour le moment. Réessaie.",
     };
   }
 }

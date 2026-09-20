@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useDialogA11y } from "@/lib/hooks/use-dialog-a11y";
 import { LifeBuoy, X } from "lucide-react";
 
 import { ContactForm } from "@/components/shared/contact-form";
@@ -22,6 +23,8 @@ export function ContactModal({
   onClose: () => void;
   defaultEmail?: string;
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, onClose);
+
   return (
     <AnimatePresence>
       {open && (
@@ -31,7 +34,9 @@ export function ContactModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="contact-modal-title"
         >
@@ -46,18 +51,18 @@ export function ContactModal({
               type="button"
               onClick={onClose}
               aria-label="Fermer"
-              className="absolute right-4 top-4 text-white/40 transition-colors hover:text-white"
+              className="absolute right-4 top-4 text-white/60 transition-colors hover:text-white"
             >
-              <X className="h-5 w-5" />
+              <X aria-hidden="true" className="h-5 w-5" />
             </button>
 
             <div className="flex items-center gap-2 text-cyan-300">
-              <LifeBuoy className="h-5 w-5" />
+              <LifeBuoy aria-hidden="true" className="h-5 w-5" />
               <h2 id="contact-modal-title" className="text-lg font-bold text-white">
                 Service client
               </h2>
             </div>
-            <p className="mt-1 text-sm text-white/50">
+            <p className="mt-1 text-sm text-white/70">
               Réponse sous 24 h ouvrées.
             </p>
 

@@ -103,7 +103,7 @@ export function AnimatedBuyButton({
             transition={{ duration: 0.25 }}
             className="flex items-center gap-2"
           >
-            <ShoppingCart className="h-4 w-4" />
+            <ShoppingCart aria-hidden="true" className="h-4 w-4" />
             {label}
           </motion.span>
         ) : (
@@ -120,7 +120,7 @@ export function AnimatedBuyButton({
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="flex"
             >
-              <Check className="h-4 w-4" />
+              <Check aria-hidden="true" className="h-4 w-4" />
             </motion.span>
             {successLabel}
           </motion.span>

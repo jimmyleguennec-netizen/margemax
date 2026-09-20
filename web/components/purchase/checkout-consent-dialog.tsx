@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useDialogA11y } from "@/lib/hooks/use-dialog-a11y";
 import { ShieldAlert, X } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,7 +65,7 @@ export function CheckoutConsentDialog({
       });
       if (!consentRes.ok) {
         setError(
-          "Impossible d'enregistrer votre consentement pour le moment. Réessayez."
+          "Impossible d'enregistrer ton consentement pour le moment. Réessaie."
         );
         setSubmitting(false);
         return;
@@ -82,7 +83,7 @@ export function CheckoutConsentDialog({
       if (!checkoutRes.ok || !checkoutData.url) {
         setError(
           checkoutData.error ??
-            "Impossible de démarrer le paiement pour le moment. Réessayez."
+            "Impossible de démarrer le paiement pour le moment. Réessaie."
         );
         setSubmitting(false);
         return;
@@ -93,11 +94,13 @@ export function CheckoutConsentDialog({
       window.location.href = checkoutData.url;
     } catch {
       setError(
-        "Impossible de démarrer le paiement pour le moment. Réessayez."
+        "Impossible de démarrer le paiement pour le moment. Réessaie."
       );
       setSubmitting(false);
     }
   }
+
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(pack), handleCancel);
 
   return (
     <AnimatePresence>
@@ -108,7 +111,9 @@ export function CheckoutConsentDialog({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="checkout-consent-title"
         >
@@ -123,41 +128,41 @@ export function CheckoutConsentDialog({
               type="button"
               onClick={handleCancel}
               aria-label="Fermer"
-              className="absolute right-4 top-4 text-white/40 transition-colors hover:text-white"
+              className="absolute right-4 top-4 text-white/60 transition-colors hover:text-white"
             >
-              <X className="h-5 w-5" />
+              <X aria-hidden="true" className="h-5 w-5" />
             </button>
 
             <div className="flex items-center gap-2 text-cyan-300">
-              <ShieldAlert className="h-5 w-5" />
+              <ShieldAlert aria-hidden="true" className="h-5 w-5" />
               <h2 id="checkout-consent-title" className="text-lg font-bold text-white">
-                Confirmer votre commande
+                Confirmer ta commande
               </h2>
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-white/50">Pack</span>
+                <span className="text-white/70">Pack</span>
                 <span className="font-medium text-white">{pack.label}</span>
               </div>
               <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-white/50">Crédits</span>
+                <span className="text-white/70">Crédits</span>
                 <span className="font-medium text-white">{pack.credits} crédits</span>
               </div>
               <div className="mt-1.5 flex items-center justify-between border-t border-white/10 pt-1.5">
-                <span className="text-white/50">Montant dû</span>
+                <span className="text-white/70">Montant dû</span>
                 <span className="font-bold text-cyan-300">{formatEuro(pack.priceEuros)}</span>
               </div>
             </div>
 
-            <p className="mt-3 text-sm text-white/50">
-              Le paiement crédite immédiatement votre compte, mais le
+            <p className="mt-3 text-sm text-white/70">
+              Le paiement crédite immédiatement ton compte, mais le
               service lui-même (l&apos;analyse de sourcing) s&apos;exécute
-              progressivement, à chaque fois que vous utilisez un crédit —
+              progressivement, à chaque fois que tu utilises un crédit —
               pas en une seule fois au moment du paiement. Conformément à
               l&apos;article L.221-28 du Code de la consommation, cocher la
               case ci-dessous constitue une action distincte demandant le
-              début immédiat de cette exécution et renonçant à votre droit
+              début immédiat de cette exécution et renonçant à ton droit
               de rétractation de 14 jours pour cet achat.
             </p>
 

@@ -23,7 +23,7 @@ const TIER_CONFIG: Record<ReliabilityTier, { label: string; className: string }>
 export function ReliabilityBadge({ tier }: { tier: ReliabilityTier | null }) {
   if (!tier) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/40">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/60">
         Fiabilité non calculable
       </span>
     );

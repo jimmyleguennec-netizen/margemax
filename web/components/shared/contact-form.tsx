@@ -44,7 +44,7 @@ export function ContactForm({
     if (sending) return;
 
     if (!name.trim()) {
-      setFormError("Merci d'indiquer votre nom.");
+      setFormError("Merci d'indiquer ton nom.");
       return;
     }
     if (!EMAIL_PATTERN.test(email.trim())) {
@@ -69,7 +69,7 @@ export function ContactForm({
 
       if (!res.ok || !data.ok) {
         setFormError(
-          data.error ?? "Impossible d'envoyer votre message pour le moment. Réessayez."
+          data.error ?? "Impossible d'envoyer ton message pour le moment. Réessaie."
         );
         setSending(false);
         return;
@@ -84,7 +84,7 @@ export function ContactForm({
     } catch (err) {
       console.error("[ContactForm] Échec de l'appel /api/contact :", err);
       setFormError(
-        "Impossible de contacter le serveur pour le moment. Réessayez dans quelques instants."
+        "Impossible de contacter le serveur pour le moment. Réessaie dans quelques instants."
       );
       setSending(false);
     }
@@ -100,7 +100,7 @@ export function ContactForm({
           Nom
         </label>
         <div className="relative flex items-center">
-          <User className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+          <User aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
           <input
             id={`${idPrefix}-name`}
             value={name}
@@ -110,8 +110,10 @@ export function ContactForm({
               setSent(false);
             }}
             required
+            maxLength={100}
+            autoComplete="name"
             placeholder="Jean Dupont"
-            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/50 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
           />
         </div>
       </div>
@@ -124,7 +126,7 @@ export function ContactForm({
           Email
         </label>
         <div className="relative flex items-center">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
+          <Mail aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-cyan-400/60" />
           <input
             id={`${idPrefix}-email`}
             type="email"
@@ -135,8 +137,8 @@ export function ContactForm({
               setSent(false);
             }}
             required
-            placeholder="vous@exemple.com"
-            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            placeholder="toi@exemple.com"
+            className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/50 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
           />
         </div>
       </div>
@@ -149,7 +151,7 @@ export function ContactForm({
           Message
         </label>
         <div className="relative">
-          <MessageSquare className="pointer-events-none absolute left-3 top-3.5 z-10 h-4 w-4 text-cyan-400/60" />
+          <MessageSquare aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 z-10 h-4 w-4 text-cyan-400/60" />
           <textarea
             id={`${idPrefix}-message`}
             value={message}
@@ -159,15 +161,16 @@ export function ContactForm({
               setSent(false);
             }}
             required
+            maxLength={5000}
             rows={4}
-            placeholder="Votre question..."
-            className="w-full resize-none rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/30 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+            placeholder="Ta question..."
+            className="w-full resize-none rounded-lg border border-cyan-400/20 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/50 outline-none transition-all focus:border-cyan-400/60 focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
           />
         </div>
       </div>
 
       {formError && (
-        <p className="rounded-md border border-pink-400/30 bg-pink-400/10 px-3 py-2 text-xs text-pink-200">
+        <p role="alert" className="rounded-md border border-pink-400/30 bg-pink-400/10 px-3 py-2 text-xs text-pink-200">
           {formError}
         </p>
       )}
@@ -184,7 +187,7 @@ export function ContactForm({
           </>
         ) : (
           <>
-            <Mail className="h-4 w-4" />
+            <Mail aria-hidden="true" className="h-4 w-4" />
             Envoyer le message
           </>
         )}
@@ -194,10 +197,11 @@ export function ContactForm({
         <motion.p
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
+          role="status"
           className="flex items-center gap-1.5 rounded-md border border-green-400/30 bg-green-400/10 px-3 py-2 text-xs text-green-300"
         >
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-          Votre message a été envoyé avec succès ! Nous vous répondrons
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+          Ton message a été envoyé avec succès ! Nous te répondrons
           sous 24h.
         </motion.p>
       )}

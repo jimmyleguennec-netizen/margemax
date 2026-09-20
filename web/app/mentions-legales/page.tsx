@@ -19,7 +19,7 @@ export default function MentionsLegalesPage() {
         <p>
           SIREN : 107 057 432 — SIRET : 107 057 432 00018 — RCS Narbonne.
         </p>
-        <p className="text-white/50">
+        <p className="text-white/70">
           Numéro de TVA intracommunautaire et numéro de téléphone : en cours
           de finalisation, et seront publiés sur cette page. Pour toute
           question sur l&apos;identité de l&apos;éditeur d&apos;ici là,

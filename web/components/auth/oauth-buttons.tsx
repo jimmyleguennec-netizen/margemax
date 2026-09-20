@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 
 const OAUTH_ERROR_MESSAGE =
-  "Connexion impossible pour le moment, réessayez ou utilisez votre e-mail.";
+  "Connexion impossible pour le moment, réessaie ou utilise ton e-mail.";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -137,7 +137,7 @@ export function OAuthButtons({ mode }: { mode: "login" | "signup" }) {
     <div className="space-y-2.5">
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-white/10" />
-        <span className="text-[11px] uppercase tracking-wider text-white/30">
+        <span className="text-[11px] uppercase tracking-wider text-white/50">
           ou continuer avec
         </span>
         <span className="h-px flex-1 bg-white/10" />

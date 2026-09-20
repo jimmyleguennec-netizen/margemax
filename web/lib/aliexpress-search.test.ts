@@ -324,3 +324,26 @@ describe("performAliExpressSearch — retry sur panne transitoire du fournisseur
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("performAliExpressSearch — erreurs d'URL distinctes d'une absence de résultat", () => {
+  beforeEach(() => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "test-key");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ["lien d'un autre site", "https://www.amazon.fr/dp/B0ABC"],
+    ["lien AliExpress sans fiche produit", "https://fr.aliexpress.com/category/100003109/women-clothing.html"],
+    ["lien raccourci", "https://a.aliexpress.com/_mABCdef"],
+  ])("%s -> erreur 400, aucun appel fournisseur", async (_label, url) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(performAliExpressSearch(url)).rejects.toMatchObject({ status: 400 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

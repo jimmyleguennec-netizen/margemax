@@ -61,10 +61,10 @@ export function CreditCalculator() {
     <section className="container py-20 sm:py-28">
       <div className="mx-auto mb-12 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Quel pack vous correspond ?
+          Quel pack te correspond ?
         </h2>
-        <p className="mt-3 text-white/50">
-          Une estimation d&apos;usage pour vous orienter vers un pack :
+        <p className="mt-3 text-white/70">
+          Une estimation d&apos;usage pour t'orienter vers un pack :
           les crédits n&apos;expirent pas et ne sont liés à aucun
           abonnement.
         </p>
@@ -73,8 +73,8 @@ export function CreditCalculator() {
       <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm sm:p-10">
         <div className="flex items-center justify-between gap-4">
           <span className="flex items-center gap-2 text-sm font-medium text-white/60">
-            <Gauge className="h-4 w-4 text-cyan-300" />
-            Combien d&apos;analyses prévoyez-vous ?
+            <Gauge aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+            Combien d&apos;analyses prévois-tu ?
           </span>
           <span className="text-2xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
             {volume}
@@ -120,7 +120,7 @@ export function CreditCalculator() {
               >
                 {isMatch && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-[0_0_10px_-1px_rgba(34,211,238,0.9)]">
-                    Pour vous
+                    Pour toi
                   </span>
                 )}
                 <p
@@ -134,12 +134,12 @@ export function CreditCalculator() {
                 <p
                   className={cn(
                     "mt-1 text-xs",
-                    isMatch ? "text-cyan-200" : "text-white/40"
+                    isMatch ? "text-cyan-200" : "text-white/60"
                   )}
                 >
                   {pack.credits} crédits
                 </p>
-                <p className="mt-1 text-xs text-white/30">
+                <p className="mt-1 text-xs text-white/50">
                   {formatEuro(pack.priceEuros)}
                 </p>
               </motion.div>
@@ -149,7 +149,7 @@ export function CreditCalculator() {
 
         {coversVolume ? (
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-white/70">
               Avec <span className="text-white">{formatAnalyses(volume)}</span>, le
               pack{" "}
               <span className="font-semibold text-cyan-300">
@@ -168,10 +168,10 @@ export function CreditCalculator() {
         ) : (
           combination && (
             <div className="mt-8 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-5">
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-white/70">
                 Aucun pack seul ne couvre{" "}
                 <span className="text-white">{formatAnalyses(volume)}</span>.
-                Combinez{" "}
+                Combine{" "}
                 {combination.items
                   .map((item) =>
                     item.quantity > 1
@@ -196,7 +196,7 @@ export function CreditCalculator() {
                       Pack {item.pack.label} ({item.pack.credits} crédits)
                     </span>
                     <div className="flex items-center gap-3">
-                      <span className="text-white/40">
+                      <span className="text-white/60">
                         {formatEuro(item.pack.priceEuros * item.quantity)}
                       </span>
                       <button
@@ -217,7 +217,7 @@ export function CreditCalculator() {
                   {formatEuro(combination.totalPrice)}
                 </span>
               </p>
-              <p className="mt-2 text-xs text-white/30">
+              <p className="mt-2 text-xs text-white/50">
                 Chaque pack s&apos;achète séparément (aucun panier
                 groupé pour l&apos;instant) : clique sur chaque
                 &laquo; Choisir &raquo; pour l&apos;acheter.

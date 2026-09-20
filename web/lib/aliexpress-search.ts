@@ -190,7 +190,7 @@ async function findFirstProductIdFromKeyword(
     // Distinct de "0 resultat" : le fournisseur a bloque/limite la
     // requete, ce n'est pas une absence reelle de resultats.
     throw new AliExpressSearchError(
-      "AliExpress a limité ou bloqué cette recherche pour le moment — réessayez dans quelques instants, ou collez directement le lien de l'annonce.",
+      "AliExpress a limité ou bloqué cette recherche pour le moment — réessaie dans quelques instants, ou colle directement le lien de l'annonce.",
       503
     );
   }
@@ -229,7 +229,7 @@ async function firecrawlAttempt(
 ): Promise<string> {
   if (!FIRECRAWL_API_KEY) {
     throw new AliExpressSearchError(
-      "FIRECRAWL_API_KEY absente — configurez cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
+      "FIRECRAWL_API_KEY absente — configure cette variable (Vercel -> Environment Variables) pour activer la recherche réelle.",
       502
     );
   }
@@ -279,13 +279,13 @@ async function firecrawlAttempt(
     const isTimeout = err instanceof Error && err.name === "TimeoutError";
     if (isTimeout) {
       throw new AliExpressSearchError(
-        "Le fournisseur de données met trop de temps à répondre (délai dépassé). Réessayez dans quelques instants.",
+        "Le fournisseur de données met trop de temps à répondre (délai dépassé). Réessaie dans quelques instants.",
         504,
         true
       );
     }
     throw new AliExpressSearchError(
-      "Impossible de contacter le fournisseur de données pour le moment. Réessayez dans quelques instants.",
+      "Impossible de contacter le fournisseur de données pour le moment. Réessaie dans quelques instants.",
       502,
       true
     );
@@ -294,8 +294,8 @@ async function firecrawlAttempt(
   if (!response.ok) {
     throw new AliExpressSearchError(
       response.status === 429
-        ? "Trop de recherches en cours — le fournisseur limite temporairement les requêtes. Réessayez dans quelques instants."
-        : `Le fournisseur de données a répondu avec une erreur (code ${response.status}). Réessayez dans quelques instants.`,
+        ? "Trop de recherches en cours — le fournisseur limite temporairement les requêtes. Réessaie dans quelques instants."
+        : `Le fournisseur de données a répondu avec une erreur (code ${response.status}). Réessaie dans quelques instants.`,
       502,
       // 5xx = panne transitoire ; 4xx (cle invalide, quota) et 429 ne
       // guerissent pas en retentant immediatement.
@@ -308,7 +308,7 @@ async function firecrawlAttempt(
     payload = await response.json();
   } catch {
     throw new AliExpressSearchError(
-      "Réponse du fournisseur de données illisible. Réessayez dans quelques instants.",
+      "Réponse du fournisseur de données illisible. Réessaie dans quelques instants.",
       502,
       true
     );
@@ -318,7 +318,7 @@ async function firecrawlAttempt(
     throw new AliExpressSearchError(
       payload.error
         ? `Le fournisseur de données n'a pas pu récupérer cette page (${payload.error}).`
-        : "Le fournisseur de données n'a pas pu récupérer cette page. Réessayez dans quelques instants.",
+        : "Le fournisseur de données n'a pas pu récupérer cette page. Réessaie dans quelques instants.",
       502,
       true
     );
@@ -365,7 +365,7 @@ async function fetchHtmlViaFirecrawl(
   throw (
     lastError ??
     new AliExpressSearchError(
-      "L'analyse a pris trop de temps. Réessayez dans quelques instants — aucun crédit n'a été débité.",
+      "L'analyse a pris trop de temps. Réessaie dans quelques instants — aucun crédit n'a été débité.",
       504
     )
   );
@@ -594,17 +594,52 @@ function estimateImportFee(subtotal: number): number {
  * a l'appelant de decider s'il debite un credit ou non selon que cette
  * fonction resout ou rejette.
  */
+/**
+ * Distingue une ERREUR D'URL (lien non AliExpress, lien raccourci, lien sans
+ * fiche produit) d'un simple mot-clé : sans ça, une URL collée de travers
+ * partait en recherche par mot-clé et finissait en « aucune annonce
+ * trouvée », ce qui laissait croire à une absence réelle de résultats.
+ */
+function assertKeywordOrThrowUrlError(query: string): void {
+  const text = query.trim();
+  const looksLikeUrl = /^(https?:\/\/|www\.)/i.test(text) || /^[\w-]+(\.[\w-]+)+\/\S*$/.test(text);
+  if (!looksLikeUrl) return;
+
+  let host = "";
+  try {
+    host = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`).hostname.toLowerCase();
+  } catch {
+    throw new AliExpressSearchError(
+      "Ce lien n'est pas valide. Colle l'adresse complète d'une fiche produit AliExpress, ou tape un mot-clé.",
+      400
+    );
+  }
+
+  if (!/(^|\.)aliexpress\.(com|us)$/.test(host)) {
+    throw new AliExpressSearchError(
+      "Ce lien ne vient pas d'AliExpress. Colle le lien d'une fiche produit AliExpress (…/item/123….html), ou tape un mot-clé.",
+      400
+    );
+  }
+
+  throw new AliExpressSearchError(
+    "Ce lien AliExpress ne mène pas à une fiche produit reconnue (les liens raccourcis a.aliexpress.com ne sont pas pris en charge). Ouvre l'annonce, copie l'adresse complète (…/item/123….html) et colle-la ici.",
+    400
+  );
+}
+
 export async function performAliExpressSearch(
   query: string
 ): Promise<AliExpressSearchResult> {
   const deadline = Date.now() + ANALYSIS_BUDGET_MS;
   const directProductId = extractProductId(query);
+  if (!directProductId) assertKeywordOrThrowUrlError(query);
   const productId =
     directProductId ?? (await findFirstProductIdFromKeyword(query, deadline));
 
   if (!productId) {
     throw new AliExpressSearchError(
-      "Aucune annonce trouvée pour ce mot-clé sur AliExpress. Essayez un terme plus précis ou collez un lien produit direct.",
+      "Aucune annonce trouvée pour ce mot-clé sur AliExpress. Essaie un terme plus précis ou colle un lien produit direct.",
       404
     );
   }
@@ -648,8 +683,8 @@ export async function performAliExpressSearch(
   if (price === undefined || Number.isNaN(price)) {
     throw new AliExpressSearchError(
       blocked
-        ? "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment, et aucune donnée de secours n'a pu être récupérée. Réessayez dans quelques instants."
-        : "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifiez le lien, ou réessayez dans quelques instants.",
+        ? "AliExpress a limité ou bloqué l'accès à cette annonce pour le moment, et aucune donnée de secours n'a pu être récupérée. Réessaie dans quelques instants."
+        : "Cette annonce a peut-être été retirée, ou sa page n'a pas pu être analysée correctement. Vérifie le lien, ou réessaie dans quelques instants.",
       blocked ? 503 : 502
     );
   }

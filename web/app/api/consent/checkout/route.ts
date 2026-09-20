@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connectez-vous pour finaliser cet achat." },
+      { error: "Connecte-toi pour finaliser cet achat." },
       { status: 401 }
     );
   }
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   if (insertError) {
     console.error("[api/consent/checkout] Échec d'enregistrement du consentement :", insertError);
     return NextResponse.json(
-      { error: "Impossible d'enregistrer votre consentement pour le moment." },
+      { error: "Impossible d'enregistrer ton consentement pour le moment." },
       { status: 502 }
     );
   }

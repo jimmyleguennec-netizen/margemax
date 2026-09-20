@@ -18,7 +18,7 @@ const NeonAuthPanel = dynamic(
       <div
         role="status"
         aria-live="polite"
-        className="flex min-h-[320px] w-full max-w-sm items-center justify-center text-sm text-white/50"
+        className="flex min-h-[320px] w-full max-w-sm items-center justify-center text-sm text-white/70"
       >
         Chargement du formulaire…
       </div>

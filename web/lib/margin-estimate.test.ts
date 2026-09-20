@@ -111,3 +111,37 @@ describe("computeMarginEstimate", () => {
     expect(estimate.marginHigh).toBeCloseTo(estimate.highPrice - 0.01, 5);
   });
 });
+
+import { computeSaleMetrics, roundCents } from "./margin-estimate";
+
+describe("computeSaleMetrics", () => {
+  it("distingue marge (€), taux de marge sur vente et ROI sur coût", () => {
+    const m = computeSaleMetrics(18.09, 29.9);
+    expect(m.marginBeforeAds).toBeCloseTo(11.81, 2);
+    expect(m.marginRatePct).toBeCloseTo((11.81 / 29.9) * 100, 5);
+    expect(m.roiPct).toBeCloseTo((11.81 / 18.09) * 100, 5);
+  });
+
+  it("le budget pub suit le prix de vente choisi, pas le prix haut", () => {
+    const low = computeSaleMetrics(20, 30);
+    const high = computeSaleMetrics(20, 46);
+    expect(low.adBudgetMax).toBe(10);
+    expect(high.adBudgetMax).toBe(26);
+  });
+
+  it("budget pub jamais négatif quand la marge est négative", () => {
+    expect(computeSaleMetrics(30, 20).adBudgetMax).toBe(0);
+  });
+
+  it("prix de vente nul -> taux de marge non calculable (null), jamais 0 %", () => {
+    expect(computeSaleMetrics(10, 0).marginRatePct).toBeNull();
+  });
+
+  it("coût nul -> ROI non calculable (null)", () => {
+    expect(computeSaleMetrics(0, 10).roiPct).toBeNull();
+  });
+
+  it("roundCents évite les artefacts flottants", () => {
+    expect(roundCents(0.1 + 0.2)).toBe(0.3);
+  });
+});

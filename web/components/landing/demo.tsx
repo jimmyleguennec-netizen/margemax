@@ -84,7 +84,7 @@ function MacDemoWindow() {
             <span className="h-2.5 w-2.5 rounded-full bg-pink-500/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-400/70" />
-            <span className="ml-3 truncate rounded-md bg-black/40 px-3 py-1 text-xs text-white/40">
+            <span className="ml-3 truncate rounded-md bg-black/40 px-3 py-1 text-xs text-white/60">
               margemax.app/recherche
             </span>
           </div>
@@ -96,7 +96,7 @@ function MacDemoWindow() {
                 <p className="font-medium leading-tight text-white">
                   Station de charge sans fil 3-en-1 pliable
                 </p>
-                <p className="text-sm text-white/40">
+                <p className="text-sm text-white/60">
                   Compatible iPhone / Watch / AirPods
                 </p>
               </div>
@@ -110,7 +110,7 @@ function MacDemoWindow() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.15 + i * 0.1, duration: 0.4 }}
-                  className="flex items-center justify-between text-white/50"
+                  className="flex items-center justify-between text-white/70"
                 >
                   <span>{row.label}</span>
                   <span className="font-medium text-white">{row.value}</span>
@@ -135,7 +135,7 @@ function MacDemoWindow() {
                 transition={{ delay: 0.55, duration: 0.4 }}
                 className="inline-flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]"
               >
-                <CheckCircle2 className="h-3.5 w-3.5" />
+                <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
                 Exemple de résultat
               </motion.div>
             </div>
@@ -145,7 +145,7 @@ function MacDemoWindow() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.6, duration: 0.4 }}
-              className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-white/40"
+              className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-white/60"
             >
               {reliability.map((r) => (
                 <span key={r.label} className="flex items-center gap-1.5">
@@ -167,7 +167,7 @@ function MacDemoWindow() {
               className="rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4"
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-xs text-white/40">
+                <p className="flex items-center gap-1.5 text-xs text-white/60">
                   Prix de vente recommandé estimé
                 </p>
                 <ReliabilityBadge tier={PRICE_ESTIMATE.reliability} />
@@ -178,27 +178,27 @@ function MacDemoWindow() {
 
               <div className="mt-3 grid grid-cols-2 gap-3 border-t border-white/10 pt-3">
                 <div>
-                  <p className="flex items-center gap-1 text-[11px] text-white/40">
-                    <TrendingDown className="h-3 w-3 text-pink-300" />
+                  <p className="flex items-center gap-1 text-[11px] text-white/60">
+                    <TrendingDown aria-hidden="true" className="h-3 w-3 text-pink-300" />
                     Prix bas
                   </p>
                   <p className="text-sm font-semibold text-white">
                     {formatEuro(PRICE_ESTIMATE.lowPrice)}
                   </p>
-                  <p className="text-[11px] text-white/40">
+                  <p className="text-[11px] text-white/60">
                     Marge {formatEuro(PRICE_ESTIMATE.marginLow)} ·{" "}
                     {formatPct(PRICE_ESTIMATE.roiLow)} ROI
                   </p>
                 </div>
                 <div>
-                  <p className="flex items-center gap-1 text-[11px] text-white/40">
-                    <TrendingUp className="h-3 w-3 text-cyan-300" />
+                  <p className="flex items-center gap-1 text-[11px] text-white/60">
+                    <TrendingUp aria-hidden="true" className="h-3 w-3 text-cyan-300" />
                     Prix haut
                   </p>
                   <p className="text-sm font-semibold text-white">
                     {formatEuro(PRICE_ESTIMATE.highPrice)}
                   </p>
-                  <p className="text-[11px] text-white/40">
+                  <p className="text-[11px] text-white/60">
                     Marge {formatEuro(PRICE_ESTIMATE.marginHigh)} ·{" "}
                     {formatPct(PRICE_ESTIMATE.roiHigh)} ROI
                   </p>
@@ -213,7 +213,7 @@ function MacDemoWindow() {
               className="flex origin-center items-center justify-center gap-2 rounded-lg border border-white/15 py-2.5 text-sm font-semibold text-white/80 transition-all hover:scale-x-105 hover:border-cyan-400/40 hover:text-white hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.5)]"
             >
               Voir l&apos;offre sur AliExpress
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
@@ -252,7 +252,7 @@ function CalculatorDemoWindow() {
         <div className="overflow-hidden rounded-xl bg-[#0a0a14]">
           {/* Barre de titre style Windows 11 */}
           <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] pl-4">
-            <span className="truncate text-xs font-medium text-white/50">
+            <span className="truncate text-xs font-medium text-white/70">
               MargeMax — Calculateur de marge
             </span>
             <div className="flex items-center">
@@ -260,32 +260,32 @@ function CalculatorDemoWindow() {
                 type="button"
                 tabIndex={-1}
                 aria-hidden
-                className="flex h-9 w-11 items-center justify-center text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex h-9 w-11 items-center justify-center text-white/70 transition-colors hover:bg-white/10 hover:text-white"
               >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 tabIndex={-1}
                 aria-hidden
-                className="flex h-9 w-11 items-center justify-center text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex h-9 w-11 items-center justify-center text-white/70 transition-colors hover:bg-white/10 hover:text-white"
               >
-                <Square className="h-3 w-3" />
+                <Square aria-hidden="true" className="h-3 w-3" />
               </button>
               <button
                 type="button"
                 tabIndex={-1}
                 aria-hidden
-                className="flex h-9 w-11 items-center justify-center text-white/50 transition-colors hover:bg-red-500 hover:text-white"
+                className="flex h-9 w-11 items-center justify-center text-white/70 transition-colors hover:bg-red-500 hover:text-white"
               >
-                <X className="h-4 w-4" />
+                <X aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
           </div>
 
           <div className="space-y-4 p-6 text-left">
-            <p className="text-sm text-white/50">
-              Simulez vos propres coûts et découvrez votre marge et votre
+            <p className="text-sm text-white/70">
+              Simule tes propres coûts et découvre ta marge et ton
               ROI en temps réel — utilisable à volonté, sans consommer de
               crédit.
             </p>
@@ -297,15 +297,15 @@ function CalculatorDemoWindow() {
               transition={{ delay: 0.2, duration: 0.4 }}
               className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
             >
-              <div className="flex items-center justify-between text-white/50">
+              <div className="flex items-center justify-between text-white/70">
                 <span>Prix produit</span>
                 <span className="font-medium text-white">{formatEuro(SUBTOTAL)}</span>
               </div>
-              <div className="mt-2 flex items-center justify-between text-white/50">
+              <div className="mt-2 flex items-center justify-between text-white/70">
                 <span>Livraison</span>
                 <span className="font-medium text-white">{formatEuro(SHIPPING)}</span>
               </div>
-              <div className="mt-2 flex items-center justify-between text-white/50">
+              <div className="mt-2 flex items-center justify-between text-white/70">
                 <span>Taxes / import</span>
                 <span className="font-medium text-white">{formatEuro(IMPORT_FEE)}</span>
               </div>
@@ -326,20 +326,20 @@ function CalculatorDemoWindow() {
               className="grid grid-cols-3 gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
             >
               <div>
-                <p className="text-xs text-white/40">Marge</p>
+                <p className="text-xs text-white/60">Marge</p>
                 <p className="mt-1 text-lg font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
                   <CountUp value={MARGIN} format={formatEuro} />
                 </p>
               </div>
               <div>
-                <p className="text-xs text-white/40">Marge %</p>
+                <p className="text-xs text-white/60">Marge %</p>
                 <p className="mt-1 text-lg font-bold text-white">
                   {formatPct(MARGIN_PCT)}
                 </p>
               </div>
               <div>
-                <p className="flex items-center gap-1 text-xs text-white/40">
-                  <TrendingUp className="h-3 w-3" /> ROI
+                <p className="flex items-center gap-1 text-xs text-white/60">
+                  <TrendingUp aria-hidden="true" className="h-3 w-3" /> ROI
                 </p>
                 <p className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
                   <CountUp value={ROI_PCT} format={formatPct} />
@@ -347,7 +347,7 @@ function CalculatorDemoWindow() {
               </div>
             </motion.div>
 
-            <p className="text-center text-[11px] text-white/40">
+            <p className="text-center text-[11px] text-white/60">
               Prix de vente testé : {formatEuro(SALE_PRICE)} — librement
               modifiable dans le vrai calculateur, sans limite d&apos;essais.
             </p>
@@ -363,10 +363,10 @@ export function Demo() {
     <section id="demo" className="container scroll-mt-20 pb-20 sm:pb-28">
       <div className="mx-auto mb-12 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Ne calculez plus vos marges au hasard — estimez vos coûts réels
+          Ne calcule plus tes marges au hasard — estime tes coûts réels
           à partir des données disponibles
         </h2>
-        <p className="mt-3 text-white/50">
+        <p className="mt-3 text-white/70">
           Chaque champ indique s&apos;il est confirmé ou estimé. Dès que
           tous les frais d&apos;une annonce sont confirmés, MargeMax
           l&apos;indique avec un badge vérifié.
@@ -378,7 +378,7 @@ export function Demo() {
         <CalculatorDemoWindow />
       </div>
 
-      <p className="mt-4 text-center text-xs text-white/30">
+      <p className="mt-4 text-center text-xs text-white/50">
         Exemple basé sur une véritable annonce AliExpress — chaque recherche
         affiche les données réelles au moment de l&apos;analyse.
       </p>

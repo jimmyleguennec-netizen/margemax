@@ -15,8 +15,8 @@ export function ForgotPasswordForm() {
   return (
     <div className="w-full max-w-sm rounded-2xl border border-cyan-500/30 bg-slate-900/80 p-6 shadow-[0_0_30px_rgba(0,240,255,0.15)] backdrop-blur-xl">
       <h1 className="text-2xl font-bold text-white">Mot de passe oublié ?</h1>
-      <p className="mt-1 text-sm text-white/50">
-        Entrez votre e-mail, nous vous envoyons un lien pour en choisir un
+      <p className="mt-1 text-sm text-white/70">
+        Entre ton e-mail, nous t'envoyons un lien pour en choisir un
         nouveau.
       </p>
 

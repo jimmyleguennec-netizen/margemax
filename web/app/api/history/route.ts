@@ -25,7 +25,7 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json(
-      { error: "Connectez-vous pour accéder à votre historique." },
+      { error: "Connecte-toi pour accéder à ton historique." },
       { status: 401 }
     );
   }
@@ -33,7 +33,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("search_history")
     .select(
-      "id, query, title, product_url, total, partial_total, is_complete, currency, created_at"
+      "id, query, title, product_url, subtotal, shipping, shipping_status, import_fee, import_fee_status, variant_status, total, partial_total, is_complete, currency, created_at"
     )
     .eq("user_id", user.id)
     .eq("status", "succes")
@@ -58,6 +58,16 @@ export async function GET() {
       partialTotal: row.partial_total,
       isComplete: row.is_complete,
       currency: row.currency ?? "EUR",
+      // Detail pour rouvrir le resultat complet (sans nouvelle analyse ni
+      // credit) -- uniquement des colonnes deja persistees par api/analyze.
+      detail: {
+        subtotal: row.subtotal,
+        shipping: row.shipping,
+        shippingStatus: row.shipping_status,
+        importFee: row.import_fee,
+        importFeeStatus: row.import_fee_status,
+        variantStatus: row.variant_status,
+      },
       timestamp: new Date(row.created_at).getTime(),
     })),
     migrationApplied: true,

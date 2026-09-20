@@ -17,7 +17,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export function createClient() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
-      "Configuration Supabase manquante (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY). Vérifiez les variables d'environnement Vercel pour cet environnement, et qu'un nouveau déploiement a eu lieu après leur ajout."
+      "Configuration Supabase manquante (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY). Vérifie les variables d'environnement Vercel pour cet environnement, et qu'un nouveau déploiement a eu lieu après leur ajout."
     );
   }
   return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);

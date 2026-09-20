@@ -49,7 +49,7 @@ const guideSteps: {
     id: "recherche",
     icon: Search,
     label: "1. Recherche",
-    title: "Saisissez un mot-clé ou collez l'URL d'une annonce AliExpress",
+    title: "Saisis un mot-clé ou colle l'URL d'une annonce AliExpress",
     description:
       "Fonctionne avec un simple mot-clé (ex. « chargeur induction ») ou un lien produit direct.",
   },
@@ -75,15 +75,15 @@ const guideSteps: {
     label: "4. Décision",
     title: "Sélection de l'offre la plus rentable",
     description:
-      "Comparez plusieurs annonces AliExpress et gardez la meilleure automatiquement.",
+      "Compare plusieurs annonces AliExpress et garde la meilleure automatiquement.",
   },
 ];
 
 function SearchVisual() {
   return (
     <div className="mt-4 space-y-2">
-      <div className="flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/50">
-        <Link2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+      <div className="flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-white/5 px-3 py-2.5 text-xs text-white/70">
+        <Link2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
         <span className="truncate">chargeur à induction pour iPhone</span>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-cyan-300/80">
@@ -112,7 +112,7 @@ function AnalyzeVisual() {
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.15 + i * 0.15, duration: 0.3 }}
-          className="flex items-center justify-between text-white/50"
+          className="flex items-center justify-between text-white/70"
         >
           <span>{row.label}</span>
           <span className="font-medium text-white">
@@ -129,11 +129,11 @@ function MarginVisual() {
     <div className="mt-4 space-y-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
       <div className="flex items-center gap-4">
         <div>
-          <p className="text-xs text-white/40">Marge avant pub (prix conseillé)</p>
+          <p className="text-xs text-white/60">Marge avant pub (prix conseillé)</p>
           <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
             <CountUp value={MARGIN_EXAMPLE.marginHigh} format={formatEuro} />
           </p>
-          <p className="text-xs text-white/40">
+          <p className="text-xs text-white/60">
             ROI{" "}
             {MARGIN_EXAMPLE.roiHigh !== null ? (
               <CountUp value={MARGIN_EXAMPLE.roiHigh} format={formatPct} />
@@ -144,11 +144,11 @@ function MarginVisual() {
         </div>
       </div>
       <div>
-        <div className="flex items-center justify-between text-[11px] text-white/40">
+        <div className="flex items-center justify-between text-[11px] text-white/60">
           <span>Fiabilité</span>
           <ReliabilityBadge tier={MARGIN_EXAMPLE.reliability} />
         </div>
-        <p className="mt-1.5 text-[10px] text-white/30">
+        <p className="mt-1.5 text-[10px] text-white/50">
           Exemple illustratif — palier qualitatif, pas un pourcentage
           précis ni une donnée de marché garantie.
         </p>
@@ -162,7 +162,7 @@ function DecisionVisual() {
     <div className="mt-4 space-y-1.5">
       <div className="flex items-center justify-between rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] px-3 py-2 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
         <span className="flex items-center gap-1.5 text-white">
-          <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
           Offre n° 1
           <span
             className="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-300"
@@ -172,7 +172,7 @@ function DecisionVisual() {
         </span>
         <span className="font-medium text-cyan-300">120,6 % ROI</span>
       </div>
-      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/50">
+      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70">
         <span>Offre n° 2</span>
         <span>60,2 % ROI</span>
       </div>
@@ -197,9 +197,9 @@ export function QuickGuide() {
       <SectionGlow />
       <div className="mx-auto mb-14 max-w-2xl text-center">
         <h2 className="bg-gradient-to-r from-pink-400 via-fuchsia-500 to-cyan-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent drop-shadow-[0_0_25px_rgba(217,70,239,0.35)] sm:text-4xl">
-          Prenez en main l&apos;outil en 30 secondes
+          Prends en main l&apos;outil en 30 secondes
         </h2>
-        <p className="mt-3 text-white/50">
+        <p className="mt-3 text-white/70">
           Le parcours complet, du compte gratuit à la décision d&apos;achat.
         </p>
       </div>
@@ -215,7 +215,7 @@ export function QuickGuide() {
                 onClick={() => setActive(step.id)}
                 className={cn(
                   "relative flex shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition-colors duration-200",
-                  isActive ? "text-white" : "text-white/40 hover:text-white/70"
+                  isActive ? "text-white" : "text-white/60 hover:text-white/70"
                 )}
               >
                 {isActive && (
@@ -228,7 +228,7 @@ export function QuickGuide() {
                 <step.icon
                   className={cn(
                     "relative z-10 h-4 w-4 shrink-0",
-                    isActive ? "text-cyan-300" : "text-white/40"
+                    isActive ? "text-cyan-300" : "text-white/60"
                   )}
                 />
                 <span className="relative z-10 whitespace-nowrap sm:whitespace-normal">
@@ -254,7 +254,7 @@ export function QuickGuide() {
               <h3 className="text-xl font-semibold text-white">
                 {activeStep.title}
               </h3>
-              <p className="mt-2 max-w-md text-sm text-white/50">
+              <p className="mt-2 max-w-md text-sm text-white/70">
                 {activeStep.description}
               </p>
               <ActiveVisual />

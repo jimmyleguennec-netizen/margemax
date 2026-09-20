@@ -128,7 +128,7 @@ export default function CgvPage() {
           écrite préalable restée infructueuse auprès d&apos;AutOutilShop
           SAS.
         </p>
-        <p className="text-white/50">
+        <p className="text-white/70">
           <strong className="text-amber-300">
             Aucun médiateur de la consommation n&apos;est à ce jour désigné
             pour AutOutilShop SAS.

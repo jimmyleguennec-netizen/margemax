@@ -54,7 +54,7 @@ const DropdownMenuStaticRow = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/40",
+      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/60",
       className
     )}
     {...props}
