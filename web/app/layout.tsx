@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className="dark overflow-x-hidden" suppressHydrationWarning>
+    <html lang="fr" className="dark overflow-x-clip" suppressHydrationWarning>
       <body className={`${inter.variable} overflow-x-clip bg-background font-sans text-foreground antialiased`}>
         {/* Desactive la restauration de scroll native du navigateur
             (rechargement de page, retour arriere) le plus tot possible --

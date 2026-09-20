@@ -136,7 +136,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
           autoComplete="one-time-code"
           maxLength={OTP_LENGTH}
           placeholder="12345678"
-          className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-white/20 outline-none backdrop-blur-sm transition-all duration-200 focus:border-cyan-400/60 focus:bg-white/[0.07] focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
+          className="w-full rounded-lg border border-cyan-400/20 bg-white/5 py-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-white/20 outline-none md:backdrop-blur-sm transition-all duration-200 focus:border-cyan-400/60 focus:bg-white/[0.07] focus:shadow-[0_0_20px_-2px_rgba(34,211,238,0.5)]"
         />
       </div>
 

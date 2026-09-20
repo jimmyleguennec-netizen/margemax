@@ -36,9 +36,14 @@ type LitCell = {
 export function InteractiveGrid({
   children,
   className,
+  hideOnMobile = false,
 }: {
   children?: React.ReactNode;
   className?: string;
+  /** true : aucun calque decoratif fixe sous md (pages d'auth) -- des calques
+   * fixes plein ecran + parallaxe saturent la memoire graphique de Safari iOS
+   * et gelent la page quand le clavier redimensionne le viewport. */
+  hideOnMobile?: boolean;
 }) {
   const [cells, setCells] = useState<LitCell[]>([]);
   const nextId = useRef(0);
@@ -85,7 +90,7 @@ export function InteractiveGrid({
           de vide pendant la translation. */}
       <motion.div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 z-0 w-full overflow-hidden"
+        className={cn("pointer-events-none fixed inset-x-0 z-0 w-full overflow-hidden", hideOnMobile && "hidden md:block")}
         style={{
           top: -150,
           bottom: -150,
@@ -99,7 +104,7 @@ export function InteractiveGrid({
       {/* Calque des cases allumees, aligne sur le viewport (coordonnees
           clientX/clientY) -- jamais transforme, pour rester pile sous le
           curseur independamment du parallaxe du motif ci-dessus. */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 h-full w-full overflow-hidden">
+      <div aria-hidden className={cn("pointer-events-none fixed inset-0 z-0 h-full w-full overflow-hidden", hideOnMobile && "hidden md:block")}>
         {cells.map((cell) => (
           <div
             key={cell.id}

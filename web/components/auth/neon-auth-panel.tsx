@@ -90,7 +90,7 @@ function LoginForm({
         id={`${idPrefix}-login-password`}
         name="password"
         label="Mot de passe"
-        autoComplete="off"
+        autoComplete="current-password"
       />
       <Link
         href="/forgot-password"
@@ -299,7 +299,43 @@ const MODE_TITLES: Record<Mode, string> = {
   signup: "Créer un compte — MargeMax",
 };
 
+/**
+ * Ne monte QUE la disposition utile (desktop OU mobile) : avant, les deux
+ * formulaires desktop (masques en CSS) restaient montes sous le formulaire
+ * mobile, soit 3 formulaires et des champs email/mot de passe dupliques --
+ * ce qui embrouille l'AutoFill de Safari iOS (gel a l'ouverture du clavier).
+ * Sans risque d'hydratation : ce composant est rendu cote client uniquement
+ * (voir neon-auth-panel-client.tsx).
+ */
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isDesktop;
+}
+
 export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
+  const isDesktop = useIsDesktop();
+
+  // Mobile : quand le clavier s'ouvre, ramene le champ actif au centre de la
+  // zone visible (iOS le laissait parfois derriere le clavier, ne montrant
+  // que la barre de fleches).
+  useEffect(() => {
+    function onFocusIn(e: FocusEvent) {
+      const el = e.target as HTMLElement | null;
+      if (!el || !/^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+      if (!window.matchMedia("(max-width: 767px)").matches) return;
+      window.setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 350);
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
   const [mode, setMode] = useState<Mode>(initialMode);
 
   // Le bascule login/signup est un simple etat client (panneau glissant),
@@ -394,7 +430,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
       {/* Halo neon ambiant */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-8 -z-10 rounded-[2rem] bg-gradient-to-r from-cyan-500/30 via-fuchsia-500/20 to-pink-500/30 blur-3xl"
+        className="pointer-events-none absolute -inset-8 -z-10 hidden md:block rounded-[2rem] bg-gradient-to-r from-cyan-500/30 via-fuchsia-500/20 to-pink-500/30 blur-3xl"
       />
 
       {/* Bordure neon degradee */}
@@ -407,6 +443,8 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                 "inert" (non focusable au clavier, ignore des lecteurs
                 d'ecran) pour qu'aucun champ ni icone residuelle du
                 formulaire cache ne reste accessible par Tab. */}
+            {isDesktop && (
+            <>
             <div
               className="hidden items-center justify-center p-8 sm:p-10 md:flex"
               aria-hidden={mode !== "login"}
@@ -455,10 +493,13 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                 </div>
               </div>
             </motion.div>
+            </>
+            )}
 
             {/* Mobile : un seul formulaire visible a la fois + lien de
                 bascule (pas d'overlay coulissant, non adapte au petit
                 ecran). */}
+            {!isDesktop && (
             <div className="flex flex-col items-center gap-6 p-8 md:hidden">
               <AnimatePresence mode="wait">
                 {mode === "login" ? (
@@ -493,6 +534,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                   : "Déjà un compte ? Se connecter"}
               </button>
             </div>
+            )}
 
             <AnimatePresence>
               {isSuccess && (
