@@ -17,9 +17,11 @@ const RESEND_FALLBACK_FROM_EMAIL = "MargeMax <onboarding@resend.dev>";
 // ou si l'envoi echoue specifiquement pour ce motif, repli automatique
 // sur RESEND_FALLBACK_FROM_EMAIL plutot que de faire echouer tout le
 // formulaire de contact a cause d'une configuration DNS incomplete.
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? RESEND_FALLBACK_FROM_EMAIL;
+// `||` (pas `??`) : une variable Vercel presente mais vide ("") retombe aussi
+// sur l'adresse de secours au lieu d'un From vide rejete par Resend.
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || RESEND_FALLBACK_FROM_EMAIL;
 const CONTACT_DESTINATION_EMAIL =
-  process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@autoutilshop.fr";
+  process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "contact@autoutilshop.fr";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -197,7 +199,7 @@ async function sendViaResend(
   // donc detection textuelle deliberement large plutot qu'un match exact
   // fragile.
   const looksLikeUnverifiedDomain =
-    response.status === 403 &&
+    (response.status === 403 || response.status === 422) &&
     /domain/i.test(parsedMessage) &&
     /verif/i.test(parsedMessage);
 

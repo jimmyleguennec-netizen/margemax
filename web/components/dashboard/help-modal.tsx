@@ -43,7 +43,7 @@ export function HelpModal({ open, onClose }: { open: boolean; onClose: () => voi
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="relative flex max-h-[85vh] w-full max-w-xl flex-col rounded-2xl border border-white/10 bg-[#0a0a14] p-6 shadow-[0_0_60px_-10px_rgba(217,70,239,0.4)]"
+            className="relative flex max-h-[85dvh] w-full max-w-xl flex-col rounded-2xl border border-white/10 bg-[#0a0a14] p-6 shadow-[0_0_60px_-10px_rgba(217,70,239,0.4)]"
           >
             <button
               type="button"

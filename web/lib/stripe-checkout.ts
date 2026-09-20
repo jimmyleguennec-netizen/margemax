@@ -20,7 +20,9 @@ export function buildCheckoutSessionParams(
   pack: Pack,
   userId: string,
   siteUrl: string,
-  email?: string | null
+  email?: string | null,
+  /** Price ID Stripe verifie (voir isPriceIdUsable) -- sinon price_data. */
+  priceId?: string | null
 ): Stripe.Checkout.SessionCreateParams {
   return {
     mode: "payment",
@@ -29,18 +31,55 @@ export function buildCheckoutSessionParams(
     ...(email ? { customer_email: email } : {}),
     customer_creation: "always",
     line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "eur",
-          unit_amount: Math.round(pack.priceEuros * 100),
-          product_data: {
-            name: `Pack ${pack.label} — ${pack.credits} crédits MargeMax`,
+      priceId
+        ? { quantity: 1, price: priceId }
+        : {
+            quantity: 1,
+            price_data: {
+              currency: "eur",
+              unit_amount: packAmountCents(pack),
+              product_data: {
+                name: `Pack ${pack.label} — ${pack.credits} crédits MargeMax`,
+              },
+            },
           },
-        },
-      },
     ],
     success_url: `${siteUrl}/dashboard?tab=account&purchase=success`,
     cancel_url: `${siteUrl}/dashboard?tab=account&purchase=cancelled`,
   };
+}
+
+export function packAmountCents(pack: Pack): number {
+  return Math.round(pack.priceEuros * 100);
+}
+
+/** Variable d'environnement optionnelle portant le Price ID Stripe d'un
+ * pack : STRIPE_PRICE_ID_STARTER, _ESSENTIEL, _AVANCE, _PRO, _ULTIMATE
+ * (cle du pack en majuscules, sans accent). */
+export function priceIdEnvName(pack: Pack): string {
+  return `STRIPE_PRICE_ID_${pack.key.toUpperCase()}`;
+}
+
+export function getConfiguredPriceId(pack: Pack): string | null {
+  const raw = process.env[priceIdEnvName(pack)]?.trim();
+  return raw && raw.startsWith("price_") ? raw : null;
+}
+
+/**
+ * Un Price ID n'est utilise que s'il correspond EXACTEMENT au pack : actif,
+ * paiement unique (non recurrent), en euros, au meme montant que PACKS.
+ * Le webhook recoupe amount_total avec PACKS avant de crediter -- un Price
+ * ID perime ou mal associe ferait payer le client sans le crediter, donc
+ * on prefere retomber sur price_data (prix issu de PACKS).
+ */
+export function isPriceIdUsable(
+  price: { active: boolean; currency: string; unit_amount: number | null; type: string },
+  pack: Pack
+): boolean {
+  return (
+    price.active &&
+    price.type === "one_time" &&
+    price.currency === "eur" &&
+    price.unit_amount === packAmountCents(pack)
+  );
 }

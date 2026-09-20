@@ -5,10 +5,55 @@ import { MotionProvider } from "@/components/motion-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
+const SITE_URL = "https://www.margemax.com";
+const SITE_TITLE = "MargeMax — Trouve tes meilleures opportunités de sourcing";
+const SITE_DESCRIPTION =
+  "MargeMax analyse tes produits AliExpress et calcule marge, ROI et coûts d'importation récupérés ou estimés selon les données disponibles.";
+
 export const metadata: Metadata = {
-  title: "MargeMax — Trouve tes meilleures opportunités de sourcing",
-  description:
-    "MargeMax analyse tes produits AliExpress et calcule marge, ROI et coûts d'importation récupérés ou estimés selon les données disponibles.",
+  // Adresse officielle : toutes les URL relatives des metadonnees (canonique,
+  // Open Graph, icones) se resolvent contre ce domaine.
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: "MargeMax",
+  // "./" = URL de la page courante resolue sur metadataBase : "/" pour
+  // l'accueil, "/cgv" pour les CGV, etc. Une canonique fixe sur l'accueil
+  // heritee par TOUTES les pages dirait a Google que /cgv, /mentions-legales
+  // ... sont des doublons de la page d'accueil et les ferait desindexer.
+  alternates: { canonical: "./" },
+  // Fichiers app/favicon.ico, app/icon.png et app/apple-icon.png (servis
+  // par Next sous /favicon.ico, /icon.png, /apple-icon.png).
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "MargeMax",
+    locale: "fr_FR",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/images/logo-margemax.png",
+        width: 1254,
+        height: 1254,
+        alt: "Logo MargeMax",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/images/logo-margemax.png"],
+  },
 };
 
 // viewportFit "cover" + interactiveWidget "resizes-content" : a l'ouverture du

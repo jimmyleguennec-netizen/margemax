@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PACKS } from "@/lib/packs";
 import { buildStripeCheckoutUrl } from "@/lib/stripe-links";
-import { buildCheckoutSessionParams } from "@/lib/stripe-checkout";
+import {
+  buildCheckoutSessionParams,
+  getConfiguredPriceId,
+  isPriceIdUsable,
+  priceIdEnvName,
+} from "@/lib/stripe-checkout";
 import { getStripeClient } from "@/lib/stripe";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -60,8 +65,33 @@ export async function POST(request: Request) {
   //    variable NEXT_PUBLIC_STRIPE_LINK_* requise.
   if (process.env.STRIPE_SECRET_KEY) {
     try {
-      const session = await getStripeClient().checkout.sessions.create(
-        buildCheckoutSessionParams(pack, user.id, getSiteUrl(), user.email)
+      const stripe = getStripeClient();
+
+      // Price ID optionnel (STRIPE_PRICE_ID_<PACK>) : utilise seulement s'il
+      // correspond exactement au pack (voir isPriceIdUsable) ; absent ou
+      // incoherent -> price_data (prix issu de PACKS), le checkout s'ouvre
+      // dans tous les cas.
+      let priceId: string | null = getConfiguredPriceId(pack);
+      if (priceId) {
+        try {
+          const price = await stripe.prices.retrieve(priceId);
+          if (!isPriceIdUsable(price, pack)) {
+            console.warn(
+              `[api/checkout] ${priceIdEnvName(pack)} (${priceId}) ne correspond pas au pack "${pack.key}" (montant/devise/statut) -- repli sur price_data.`
+            );
+            priceId = null;
+          }
+        } catch (err) {
+          console.warn(
+            `[api/checkout] ${priceIdEnvName(pack)} (${priceId}) introuvable avec cette cle Stripe (mode test/live different ?) -- repli sur price_data :`,
+            err instanceof Error ? err.message : err
+          );
+          priceId = null;
+        }
+      }
+
+      const session = await stripe.checkout.sessions.create(
+        buildCheckoutSessionParams(pack, user.id, getSiteUrl(), user.email, priceId)
       );
       if (session.url) {
         return NextResponse.json({ url: session.url });

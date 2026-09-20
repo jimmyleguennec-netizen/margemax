@@ -14,7 +14,7 @@ export function LegalPage({
 }) {
   return (
     <InteractiveGrid>
-      <div className="min-h-screen bg-[#05050a]">
+      <div className="min-h-[100dvh] bg-[#05050a]">
         <header className="border-b border-white/10 bg-black/40 backdrop-blur-xl">
           <div className="container flex h-16 items-center">
             <Link href="/">

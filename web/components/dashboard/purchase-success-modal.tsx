@@ -41,7 +41,7 @@ export function PurchaseSuccessModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-[#05050a]/80 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[95] flex justify-center overflow-y-auto overscroll-contain bg-[#05050a]/80 p-4 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-labelledby="purchase-success-title"
@@ -52,7 +52,7 @@ export function PurchaseSuccessModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
             transition={{ type: "spring", damping: 20, stiffness: 220 }}
-            className="relative w-full max-w-sm overflow-visible rounded-3xl border border-cyan-300/30 bg-[#0a0a14] p-8 text-center shadow-[0_0_80px_-10px_rgba(34,211,238,0.55),0_0_120px_-30px_rgba(217,70,239,0.6)]"
+            className="relative m-auto w-full max-w-sm overflow-visible rounded-3xl border border-cyan-300/30 bg-[#0a0a14] p-8 text-center shadow-[0_0_80px_-10px_rgba(34,211,238,0.55),0_0_120px_-30px_rgba(217,70,239,0.6)]"
           >
             <button
               type="button"
