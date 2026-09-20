@@ -54,10 +54,21 @@ function TopBar({ loggedIn }: { loggedIn: boolean }) {
 }
 
 const drawerAnchors = [
+  { href: "#demo", label: "DÉMO" },
   { href: "#features", label: "Fonctionnalités" },
   { href: "#pricing", label: "Tarifs" },
   { href: "#faq", label: "FAQ" },
 ];
+
+const drawerList = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08, delayChildren: 0.12 } },
+};
+
+const drawerItem = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", damping: 25, stiffness: 200 } },
+};
 
 function MobileMenu({
   open,
@@ -86,9 +97,9 @@ function MobileMenu({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.25 }}
             onClick={onClose}
-            className="absolute inset-0 bg-[#05050a]/70"
+            className="absolute inset-0 bg-[#05050a]/70 backdrop-blur-md"
           />
           <motion.aside
             role="dialog"
@@ -97,8 +108,8 @@ function MobileMenu({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-            className="absolute inset-y-0 right-0 flex w-[85%] max-w-sm flex-col border-l border-white/10 bg-[#0a0a14] px-6 pb-8 pt-4"
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="absolute inset-y-0 right-0 flex w-[85%] max-w-sm flex-col border-l border-white/10 bg-[#0a0a14]/95 px-6 pb-8 pt-4 shadow-[-20px_0_60px_-20px_rgba(34,211,238,0.35)]"
           >
             <div className="flex h-12 items-center justify-between">
               <Link href="/" onClick={onClose}>
@@ -114,47 +125,59 @@ function MobileMenu({
               </button>
             </div>
 
-            <nav className="mt-6 flex flex-col gap-1">
+            <motion.nav
+              variants={drawerList}
+              initial="hidden"
+              animate="show"
+              className="mt-6 flex flex-col gap-1"
+            >
               {loggedIn ? (
-                <Link
-                  href="/dashboard"
-                  onClick={onClose}
-                  className="rounded-lg bg-cyan-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
-                >
-                  Mon espace
-                </Link>
+                <motion.div variants={drawerItem}>
+                  <Link
+                    href="/dashboard"
+                    onClick={onClose}
+                    className="block rounded-lg bg-cyan-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
+                  >
+                    Mon espace
+                  </Link>
+                </motion.div>
               ) : (
                 <>
-                  <Link
-                    href="/login"
-                    onClick={onClose}
-                    className="rounded-lg border border-white/15 px-4 py-3 text-center text-sm font-semibold text-white/80 transition-colors hover:bg-white/5"
-                  >
-                    Se connecter
-                  </Link>
-                  <Link
-                    href="/signup"
-                    onClick={onClose}
-                    className="mt-2 rounded-lg bg-cyan-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
-                  >
-                    Créer un compte
-                  </Link>
+                  <motion.div variants={drawerItem}>
+                    <Link
+                      href="/login"
+                      onClick={onClose}
+                      className="block rounded-lg border border-white/15 px-4 py-3 text-center text-sm font-semibold text-white/80 transition-colors hover:bg-white/5"
+                    >
+                      Se connecter
+                    </Link>
+                  </motion.div>
+                  <motion.div variants={drawerItem}>
+                    <Link
+                      href="/signup"
+                      onClick={onClose}
+                      className="mt-2 block rounded-lg bg-gradient-to-r from-cyan-500 to-fuchsia-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
+                    >
+                      Créer un compte
+                    </Link>
+                  </motion.div>
                 </>
               )}
 
-              <div className="my-4 h-px bg-white/10" />
+              <motion.div variants={drawerItem} className="my-4 h-px bg-white/10" />
 
               {drawerAnchors.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={onClose}
-                  className="rounded-lg px-4 py-3 text-base font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
-                >
-                  {link.label}
-                </Link>
+                <motion.div key={link.href} variants={drawerItem}>
+                  <Link
+                    href={link.href}
+                    onClick={onClose}
+                    className="block rounded-lg px-4 py-3 text-base font-medium tracking-wide text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    {link.label}
+                  </Link>
+                </motion.div>
               ))}
-            </nav>
+            </motion.nav>
           </motion.aside>
         </div>
       )}
@@ -213,22 +236,19 @@ export function Navbar() {
 
       <div
         className={cn(
-          // backdrop-blur retire sur mobile : un filtre backdrop-filter
-          // recalcule a chaque frame sur un header position:sticky pendant
-          // le scroll declenche des glitches de rendu (flash noir) sur
-          // Safari/Chrome mobile. Le fond passe a une opacite plus elevee
-          // sur mobile pour compenser visuellement l'absence de flou ; le
-          // flou reste actif a partir de sm (desktop, moins expose au bug).
-          "w-full border-b transition-colors duration-300 sm:backdrop-blur-xl",
+          // Flou (backdrop-blur) : desktop en permanence ; sur mobile uniquement
+          // une fois la page defilee (fond deja opaque a 90 %, ce qui limite le
+          // cout du filtre pendant le scroll).
+          "w-full border-b transition-all duration-300 sm:backdrop-blur-xl",
           scrolled
-            ? "border-cyan-500/20 bg-slate-950/95 shadow-[0_4px_20px_rgba(0,0,0,0.5)] sm:bg-slate-950/80"
+            ? "border-cyan-500/20 bg-slate-950/90 shadow-[0_8px_30px_-10px_rgba(34,211,238,0.25)] backdrop-blur-md sm:bg-slate-950/70"
             : "border-white/10 bg-black/80 sm:bg-black/40"
         )}
       >
         <div
           className={cn(
-            "container flex items-center justify-between transition-[height] duration-300",
-            scrolled ? "h-12" : "h-16"
+            "container flex origin-top items-center justify-between transition-all duration-300",
+            scrolled ? "h-12 scale-[0.985]" : "h-16"
           )}
         >
           <Link href="/">

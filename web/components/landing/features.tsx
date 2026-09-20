@@ -5,6 +5,7 @@ import { Calculator, ShieldCheck, History } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SectionGlow } from "@/components/ui/section-glow";
+import { GlowCard } from "@/components/ui/glow-card";
 
 const features = [
   {
@@ -78,6 +79,7 @@ export function Features() {
               variants={item}
               className={cn(feature.span)}
             >
+              <GlowCard className="h-full rounded-2xl">
               <div className="h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md">
                 <div
                   className={cn(
@@ -94,6 +96,7 @@ export function Features() {
                   {feature.description}
                 </p>
               </div>
+              </GlowCard>
             </motion.div>
           );
         })}

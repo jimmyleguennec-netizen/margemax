@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -21,6 +21,14 @@ import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tab
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 import { Logo } from "@/components/ui/logo";
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { PurchaseSuccessModal } from "@/components/dashboard/purchase-success-modal";
+import {
+  clearPendingPurchase,
+  markCelebrated,
+  readPendingPurchase,
+  wasCelebrated,
+} from "@/lib/pending-purchase";
 import {
   SearchPanel,
   historyEntryToResult,
@@ -183,7 +191,7 @@ function ParametresPanel({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-sm glow-hover-sm">
         <div>
           <p className="text-sm text-white/60">
             {isDemo ? "Aperçu de démonstration" : "Connecté en tant que"}
@@ -210,14 +218,14 @@ function ParametresPanel({
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm glow-hover-sm">
         <div className="flex flex-col items-center gap-4 text-center">
           <h3 className="text-sm font-medium uppercase tracking-wider text-cyan-200/70">
             Crédits
           </h3>
           <p className="flex items-center gap-1.5 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">
             <Zap aria-hidden="true" className="h-5 w-5" />
-            {credits ?? "--"}
+            {credits === null ? "--" : <AnimatedCounter value={credits} />}
             {creditsMax !== null ? ` / ${creditsMax}` : ""}
           </p>
           <button
@@ -237,11 +245,11 @@ function ParametresPanel({
         {purchases.length > 0 && (
           <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-6 text-center">
             <div>
-              <p className="text-lg font-bold text-white">{creditsPurchasedTotal}</p>
+              <p className="text-lg font-bold text-white"><AnimatedCounter value={creditsPurchasedTotal} /></p>
               <p className="text-[11px] text-white/60">Crédits achetés</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-white">{purchases.length}</p>
+              <p className="text-lg font-bold text-white"><AnimatedCounter value={purchases.length} /></p>
               <p className="text-[11px] text-white/60">
                 Achat{purchases.length > 1 ? "s" : ""}
               </p>
@@ -326,6 +334,7 @@ export function DashboardShell({
   pendingPackKey?: string | null;
 }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   // Onglet actif reflete dans l'URL (?tab=account, etc.) : un lien direct
   // vers /dashboard?tab=account (menu du compte, retour du portail de
   // facturation Stripe...) doit ouvrir le bon onglet des le chargement,
@@ -370,10 +379,63 @@ export function DashboardShell({
   // de la page, puis mis a jour en direct par SearchPanel apres chaque
   // debit reussi (voir app/api/analyze), sans recharger toute la page.
   const [liveCredits, setLiveCredits] = useState(credits);
+
+  // --- Retour de paiement : le solde suit le serveur apres router.refresh(),
+  // et la celebration ne se declenche QUE si une vraie ligne credit_purchases
+  // (creee par le webhook Stripe) correspond a l'achat demarre depuis ce
+  // navigateur (ou au retour ?purchase=success) -- jamais sur une supposition.
+  useEffect(() => {
+    setLiveCredits(credits);
+  }, [credits]);
+
+  const purchasesRef = useRef(purchases);
+  purchasesRef.current = purchases;
+  const fromCheckoutParam = searchParams.get("purchase") === "success";
+  const [celebration, setCelebration] = useState<{ credits: number; packLabel?: string } | null>(
+    null
+  );
+
+  useEffect(() => {
+    const latest = purchases[0];
+    if (!latest || wasCelebrated(latest.id)) return;
+    const pending = readPendingPurchase();
+    const createdAt = new Date(latest.created_at).getTime();
+    const matchesPending = pending !== null && createdAt >= pending.ts - 120_000;
+    const matchesParam = fromCheckoutParam && Date.now() - createdAt < 60 * 60 * 1000;
+    if (!matchesPending && !matchesParam) return;
+
+    markCelebrated(latest.id);
+    clearPendingPurchase();
+    setCelebration({
+      credits: latest.credits,
+      packLabel: PACKS.find((p) => p.key === latest.pack_key)?.label,
+    });
+    if (fromCheckoutParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("purchase");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    }
+  }, [purchases, fromCheckoutParam]);
+
+  // Le webhook peut arriver quelques secondes apres le retour de Stripe :
+  // tant qu'un achat est attendu, on relit le serveur (8 x 4 s max).
+  useEffect(() => {
+    if (!readPendingPurchase() && !fromCheckoutParam) return;
+    let tries = 0;
+    const id = window.setInterval(() => {
+      tries += 1;
+      const latest = purchasesRef.current[0];
+      if ((latest && wasCelebrated(latest.id)) || tries > 8) {
+        window.clearInterval(id);
+        return;
+      }
+      router.refresh();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [fromCheckoutParam, router]);
   const [helpOpen, setHelpOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
 
-  const router = useRouter();
 
   function setActive(tab: TabValue) {
     setActiveState(tab);
@@ -422,7 +484,7 @@ export function DashboardShell({
 
   return (
     <InteractiveGrid>
-      <div className="relative min-h-screen overflow-hidden bg-[#05050a]">
+      <div className="relative min-h-screen overflow-x-clip bg-[#05050a]">
         <div
           aria-hidden
           className="pointer-events-none fixed -left-40 top-0 -z-10 h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-[140px]"
@@ -453,7 +515,7 @@ export function DashboardShell({
                 <>
                   <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-200 shadow-[0_0_14px_-4px_rgba(34,211,238,0.6)] sm:gap-1.5 sm:px-3 sm:py-1.5">
                     <Zap aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-                    {liveCredits}
+                    <AnimatedCounter value={liveCredits} fromZero={false} />
                     {creditsMax !== null ? ` / ${creditsMax}` : ""}
                     <span className="hidden sm:inline">&nbsp;crédits</span>
                   </span>
@@ -538,6 +600,12 @@ export function DashboardShell({
           </AnimatePresence>
         </main>
       </div>
+
+      <PurchaseSuccessModal
+        credits={celebration?.credits ?? null}
+        packLabel={celebration?.packLabel}
+        onClose={() => setCelebration(null)}
+      />
 
       <BuyCreditsModal
         open={buyModalOpen}

@@ -21,6 +21,8 @@ import { RgbLoader } from "@/components/ui/rgb-loader";
 import { ProductThumbnail } from "@/components/ui/product-thumbnail";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
+import { StaggerList } from "@/components/ui/stagger";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
 import type { HistoryEntry } from "@/components/dashboard/history-panel";
 
@@ -289,7 +291,7 @@ function EstimateBlock({
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((tile) => (
-          <div key={tile.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div key={tile.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-3 glow-hover">
             <p className="text-[11px] text-white/60">{tile.label}</p>
             <p className="mt-1 text-base font-bold text-white">{tile.value}</p>
           </div>
@@ -458,7 +460,7 @@ export function SearchPanel({
           {typeof credits === "number" && (
             <p className="flex items-center gap-1.5 text-sm text-cyan-300">
               <Zap aria-hidden="true" className="h-4 w-4" />
-              {credits} crédit{credits > 1 ? "s" : ""} disponible
+              <AnimatedCounter value={credits} /> crédit{credits > 1 ? "s" : ""} disponible
               {credits > 1 ? "s" : ""}
             </p>
           )}
@@ -622,7 +624,8 @@ export function SearchPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ type: "spring", stiffness: 280, damping: 24 }}
-            className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] backdrop-blur-sm"
+            whileHover={{ y: -4, scale: 1.01 }}
+            className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_0_36px_-8px_rgba(34,211,238,0.45),0_0_56px_-18px_rgba(139,92,246,0.5)]"
           >
             {result.isFromHistory && (
               <div className="flex items-center gap-1.5 border-b border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-xs font-medium text-cyan-200">
@@ -679,7 +682,7 @@ export function SearchPanel({
             {/* Liste de lignes label/valeur plutot qu'un tableau : reste
                 lisible sans jamais avoir besoin de defiler horizontalement,
                 du telephone (375px) au desktop. */}
-            <div className="divide-y divide-white/10 text-sm">
+            <StaggerList className="divide-y divide-white/10 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
                 <span className="text-xs uppercase tracking-wider text-white/60">
                   Sous-total
@@ -761,7 +764,7 @@ export function SearchPanel({
                   <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </Link>
               </div>
-            </div>
+            </StaggerList>
 
             {typeof result.creditsDebited === "boolean" && (
               <p className="border-t border-white/10 px-5 py-3 text-xs text-white/60">

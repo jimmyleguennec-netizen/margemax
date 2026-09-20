@@ -120,3 +120,41 @@
     background-position: 0% 50%;
   }
 }
+
+/* --- Survol "premium" des cartes du dashboard (voir aussi GlowCard pour la
+   landing, en Framer Motion) : leger soulevement + aura neon cyan/violette.
+   Uniquement sur appareils a vrai survol (jamais "colle" au toucher) ;
+   prefers-reduced-motion ramene deja les transitions a ~0 ci-dessus. --- */
+.glow-hover,
+.glow-hover-sm {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+@media (hover: hover) {
+  .glow-hover:hover {
+    transform: translateY(-5px) scale(1.02);
+    border-color: rgba(103, 232, 249, 0.45);
+    box-shadow: 0 0 28px -6px rgba(34, 211, 238, 0.45), 0 0 44px -14px rgba(139, 92, 246, 0.5);
+  }
+  .glow-hover-sm:hover {
+    transform: translateY(-3px) scale(1.01);
+    border-color: rgba(103, 232, 249, 0.4);
+    box-shadow: 0 0 32px -8px rgba(34, 211, 238, 0.4), 0 0 50px -16px rgba(139, 92, 246, 0.45);
+  }
+}
+
+/* --- Focus neon des champs de saisie : halo cyan net + lueur violette
+   diffuse, transition douce. !important pour unifier tous les champs
+   (certains portaient leur propre ombre de focus). --- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea {
+  caret-color: #22d3ee;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: rgba(34, 211, 238, 0.8) !important;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.55), 0 0 22px -4px rgba(34, 211, 238, 0.5),
+    0 0 44px -14px rgba(139, 92, 246, 0.5) !important;
+}

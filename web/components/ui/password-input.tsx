@@ -85,10 +85,10 @@ export function PasswordInput({
             {visible ? (
               <motion.span
                 key="open"
-                initial={{ opacity: 0, rotate: -20, scale: 0.7 }}
+                initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
                 animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: 20, scale: 0.7 }}
-                transition={{ duration: 0.2 }}
+                exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
+                transition={{ type: "spring", damping: 16, stiffness: 260 }}
                 className="block"
               >
                 <Eye aria-hidden="true" className="h-4 w-4" />
@@ -96,10 +96,10 @@ export function PasswordInput({
             ) : (
               <motion.span
                 key="closed"
-                initial={{ opacity: 0, rotate: 20, scale: 0.7 }}
+                initial={{ opacity: 0, rotate: 90, scale: 0.5 }}
                 animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: -20, scale: 0.7 }}
-                transition={{ duration: 0.2 }}
+                exit={{ opacity: 0, rotate: -90, scale: 0.5 }}
+                transition={{ type: "spring", damping: 16, stiffness: 260 }}
                 className="block"
               >
                 <EyeOff aria-hidden="true" className="h-4 w-4" />

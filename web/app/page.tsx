@@ -10,10 +10,11 @@ import { Faq } from "@/components/landing/faq";
 import { Contact } from "@/components/landing/contact";
 import { Footer } from "@/components/landing/footer";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
+import { Reveal } from "@/components/ui/reveal";
 
 export default function HomePage() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#05050a]">
+    <div className="relative min-h-screen overflow-x-clip bg-[#05050a]">
       <div
         aria-hidden
         className="pointer-events-none fixed -left-40 top-0 -z-10 h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-[140px]"
@@ -27,14 +28,14 @@ export default function HomePage() {
         <Navbar />
         <main>
           <Hero />
-          <Demo />
-          <InteractiveDemo />
+          <Reveal><Demo /></Reveal>
+          <Reveal><InteractiveDemo /></Reveal>
           <Features />
-          <QuickGuide />
-          <CreditCalculator />
+          <Reveal><QuickGuide /></Reveal>
+          <Reveal><CreditCalculator /></Reveal>
           <Pricing />
-          <Faq />
-          <Contact />
+          <Reveal><Faq /></Reveal>
+          <Reveal><Contact /></Reveal>
           <Footer />
         </main>
       </InteractiveGrid>

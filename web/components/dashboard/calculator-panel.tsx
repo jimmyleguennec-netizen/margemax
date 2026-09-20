@@ -233,7 +233,7 @@ export function CalculatorPanel() {
               <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-cyan-200/70">
                 Tes coûts
               </h3>
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm glow-hover-sm">
                 <div className="flex items-center justify-between text-white/70">
                   <span>Prix produit</span>
                   <span className="font-medium text-white">
@@ -362,7 +362,7 @@ export function CalculatorPanel() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 glow-hover">
                     <p className="flex items-center gap-1.5 text-xs text-white/60">
                       <TrendingDown aria-hidden="true" className="h-3.5 w-3.5 text-pink-300" />
                       Prix de vente bas (fourchette prudente)
@@ -376,7 +376,7 @@ export function CalculatorPanel() {
                       {formatPct(estimate.roiLow)} ROI
                     </p>
                   </div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 glow-hover">
                     <p className="flex items-center gap-1.5 text-xs text-white/60">
                       <TrendingUp aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
                       Prix de vente haut (fourchette premium)

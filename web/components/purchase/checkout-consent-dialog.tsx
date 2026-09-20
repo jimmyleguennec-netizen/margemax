@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { IMMEDIATE_EXECUTION_WAIVER_LABEL } from "@/lib/legal-consent";
 import { formatEuro } from "@/lib/packs";
+import { markPurchaseStarted } from "@/lib/pending-purchase";
 
 export type ConsentPack = {
   key: string;
@@ -89,6 +90,9 @@ export function CheckoutConsentDialog({
         return;
       }
 
+      // Memorise l'achat demarre : au retour, le dashboard le verifie contre
+      // la vraie ligne credit_purchases avant de celebrer.
+      markPurchaseStarted(pack.key, pack.credits);
       // Redirection externe reelle (domaine Stripe) -- pas router.push, qui
       // est concu pour la navigation interne Next.js.
       window.location.href = checkoutData.url;

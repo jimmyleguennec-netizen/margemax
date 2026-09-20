@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark overflow-x-hidden" suppressHydrationWarning>
-      <body className={`${inter.variable} overflow-x-hidden bg-background font-sans text-foreground antialiased`}>
+      <body className={`${inter.variable} overflow-x-clip bg-background font-sans text-foreground antialiased`}>
         {/* Desactive la restauration de scroll native du navigateur
             (rechargement de page, retour arriere) le plus tot possible --
             sans ca, un rechargement sur une page longue (dashboard,

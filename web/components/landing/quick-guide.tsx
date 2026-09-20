@@ -204,7 +204,7 @@ export function QuickGuide() {
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-[220px_1fr]">
+      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-[220px_1fr] lg:hidden">
         <div className="relative flex flex-row gap-2 overflow-x-auto sm:flex-col sm:gap-1 sm:overflow-visible">
           {guideSteps.map((step) => {
             const isActive = step.id === active;
@@ -260,6 +260,61 @@ export function QuickGuide() {
               <ActiveVisual />
             </motion.div>
           </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Ecran large : "scrollytelling" -- la demo visuelle reste epinglee
+          (sticky) a gauche pendant que les etapes defilent a droite ; l'etape
+          qui traverse le milieu de l'ecran pilote la demo affichee. En
+          dessous de lg, les onglets ci-dessus restent utilises. */}
+      <div className="mx-auto hidden max-w-5xl grid-cols-2 gap-14 lg:grid">
+        <div>
+          <div className="sticky top-28">
+            <div className="relative min-h-[360px] rounded-2xl border border-white/10 bg-white/[0.03] p-8 shadow-[0_0_60px_-20px_rgba(34,211,238,0.35)] backdrop-blur-sm">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeStep.id}
+                  initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                  transition={{ duration: 0.35 }}
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-fuchsia-500/20 text-cyan-300 shadow-[0_0_20px_-6px_rgba(34,211,238,0.6)]">
+                    <activeStep.icon aria-hidden="true" className="h-6 w-6" />
+                  </div>
+                  <ActiveVisual />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+            <div aria-hidden="true" className="mt-4 flex justify-center gap-2">
+              {guideSteps.map((step) => (
+                <motion.span
+                  key={step.id}
+                  animate={{ width: step.id === active ? 28 : 8, opacity: step.id === active ? 1 : 0.4 }}
+                  className="h-2 rounded-full bg-cyan-300"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {guideSteps.map((step) => (
+            <motion.div
+              key={step.id}
+              onViewportEnter={() => setActive(step.id)}
+              viewport={{ margin: "-45% 0px -45% 0px" }}
+              animate={{ opacity: step.id === active ? 1 : 0.35, x: step.id === active ? 0 : 12 }}
+              transition={{ duration: 0.4 }}
+              className="flex min-h-[65vh] flex-col justify-center"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
+                {step.label}
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold text-white">{step.title}</h3>
+              <p className="mt-3 max-w-md text-white/70">{step.description}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>

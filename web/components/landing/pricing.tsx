@@ -9,6 +9,7 @@ import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
 import { SectionGlow } from "@/components/ui/section-glow";
 import { PACKS, formatEuro, formatPricePerCredit } from "@/lib/packs";
+import { GlowCard } from "@/components/ui/glow-card";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
 import {
   CheckoutConsentDialog,
@@ -71,6 +72,7 @@ export function Pricing() {
             variants={item}
             className="relative h-full"
           >
+            <GlowCard className="h-full rounded-2xl">
             <div className="h-full rounded-2xl border border-white/10 bg-white/10 p-[1.5px]">
               <div className="relative z-0 flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6">
                 <p className="text-sm font-medium text-white/70">
@@ -104,6 +106,7 @@ export function Pricing() {
                 />
               </div>
             </div>
+            </GlowCard>
           </motion.div>
         ))}
       </motion.div>

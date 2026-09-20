@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { StaggerList } from "@/components/ui/stagger";
 import { AlertTriangle, ExternalLink, History as HistoryIcon } from "lucide-react";
 
 // Doit correspondre a HISTORY_LIMIT dans app/api/history/route.ts (nombre
@@ -128,11 +129,11 @@ export function HistoryPanel({
   }
 
   return (
-    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm glow-hover-sm">
       <PersistenceNotice persisted={persisted} />
       {/* Cartes empilees plutot qu'un tableau : lisibles sans defilement
           horizontal, du telephone (375px) au desktop. */}
-      <div className="divide-y divide-white/5">
+      <StaggerList className="divide-y divide-white/5">
         {entries.map((entry) => (
           <div
             key={entry.id}
@@ -169,7 +170,7 @@ export function HistoryPanel({
             </div>
           </div>
         ))}
-      </div>
+      </StaggerList>
       {persisted && (
         <p className="border-t border-white/10 px-5 py-3 text-xs text-white/50">
           Historique lié à ton compte — conservé après reconnexion (les{" "}
