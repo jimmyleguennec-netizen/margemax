@@ -158,3 +158,14 @@ textarea:focus-visible {
   box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.55), 0 0 22px -4px rgba(34, 211, 238, 0.5),
     0 0 44px -14px rgba(139, 92, 246, 0.5) !important;
 }
+
+/* iOS Safari zoome automatiquement sur tout champ dont la police est < 16 px
+   au focus, ce qui decale/agrandit la page quand le clavier s'ouvre. 16 px
+   sur mobile evite ce zoom sans bloquer le zoom utilisateur (accessibilite). */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

@@ -10,7 +10,7 @@ export default function AuthLayout({
 }) {
   return (
     <InteractiveGrid>
-      <div className="relative flex min-h-screen min-h-[100svh] flex-col items-center justify-center gap-8 overflow-hidden bg-[#05050a] px-4 py-12">
+      <div className="relative flex min-h-[100dvh] flex-col items-center justify-center gap-8 overflow-x-clip bg-[#05050a] px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div
           aria-hidden
           className="pointer-events-none absolute -left-32 top-1/4 -z-10 h-[420px] w-[420px] rounded-full bg-cyan-500/20 blur-[120px]"
