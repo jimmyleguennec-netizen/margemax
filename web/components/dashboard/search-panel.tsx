@@ -11,7 +11,6 @@ import {
   Link2,
   Search,
   Send,
-  Sparkles,
   Star,
   TrendingDown,
   TrendingUp,
@@ -200,7 +199,6 @@ function EstimateBlock({
       <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
         <div>
           <p className="flex items-center gap-1.5 text-xs text-white/40">
-            <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
             Prix de vente recommandé estimé
             {!isComplete && (
               <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
@@ -563,7 +561,6 @@ export function SearchPanel({
           >
             {result.isExample && (
               <div className="flex items-center gap-1.5 border-b border-amber-400/20 bg-amber-400/10 px-5 py-2 text-xs font-medium text-amber-200">
-                <Sparkles className="h-3.5 w-3.5" />
                 Exemple illustratif — aucun crédit utilisé, aucune donnée
                 récupérée en direct.
               </div>

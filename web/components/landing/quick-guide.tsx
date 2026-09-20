@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Link2,
   Search,
-  Sparkles,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -64,7 +63,7 @@ const guideSteps: {
   },
   {
     id: "marge",
-    icon: Sparkles,
+    icon: CheckCircle2,
     label: "3. Marge",
     title: "Découverte de la marge avant publicité et autres frais, et de l'indice de fiabilité",
     description:
@@ -88,11 +87,7 @@ function SearchVisual() {
         <span className="truncate">chargeur à induction pour iPhone</span>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-cyan-300/80">
-        <motion.span
-          animate={{ opacity: [1, 0.3, 1], scale: [1, 1.3, 1] }}
-          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-          className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_2px_rgba(34,211,238,0.8)]"
-        />
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
         Exemple de recherche
       </div>
     </div>
@@ -109,11 +104,7 @@ function AnalyzeVisual() {
   return (
     <div className="mt-4 space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs">
       <div className="relative h-1 overflow-hidden rounded-full bg-white/5">
-        <motion.div
-          animate={{ x: ["-100%", "220%"] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
-        />
+        <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-cyan-400/60" />
       </div>
       {ANALYZE_ROWS.map((row, i) => (
         <motion.div
@@ -173,13 +164,11 @@ function DecisionVisual() {
         <span className="flex items-center gap-1.5 text-white">
           <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />
           Offre n° 1
-          <motion.span
-            animate={{ opacity: [1, 0.5, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          <span
             className="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-cyan-300"
           >
             Meilleur choix
-          </motion.span>
+          </span>
         </span>
         <span className="font-medium text-cyan-300">120,6 % ROI</span>
       </div>

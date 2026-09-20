@@ -7,7 +7,6 @@ import { Check } from "lucide-react";
 
 import { AnimatedBuyButton } from "@/components/ui/animated-buy-button";
 import { buildPackCheckoutHref } from "@/lib/stripe-links";
-import { TiltCard } from "@/components/ui/tilt-card";
 import { SectionGlow } from "@/components/ui/section-glow";
 import { PACKS, formatEuro, formatPricePerCredit } from "@/lib/packs";
 import { useSupabaseUser } from "@/lib/hooks/use-supabase-user";
@@ -70,14 +69,9 @@ export function Pricing() {
           <motion.div
             key={pack.key}
             variants={item}
-            whileHover={{ scale: 1.05, zIndex: 30 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="group relative h-full"
+            className="relative h-full"
           >
-            <TiltCard
-              glowColor="rgba(34,211,238,0.35)"
-              className="h-full rounded-2xl border border-white/10 bg-white/10 p-[1.5px] transition-all duration-300 group-hover:bg-gradient-to-b group-hover:from-cyan-400/80 group-hover:via-fuchsia-500/70 group-hover:to-purple-500/80 group-hover:shadow-[0_0_70px_-10px_rgba(34,211,238,0.8)]"
-            >
+            <div className="h-full rounded-2xl border border-white/10 bg-white/10 p-[1.5px]">
               <div className="relative z-0 flex h-full flex-col rounded-2xl bg-[#0a0a14] p-6">
                 <p className="text-sm font-medium text-white/50">
                   Pack {pack.label}
@@ -106,10 +100,10 @@ export function Pricing() {
                           })
                       : undefined
                   }
-                  className="mt-6 transition-shadow duration-300 group-hover:!shadow-[0_0_10px_2px_rgba(74,222,128,0.6),0_0_32px_-4px_rgba(34,211,238,0.85)]"
+                  className="mt-6"
                 />
               </div>
-            </TiltCard>
+            </div>
           </motion.div>
         ))}
       </motion.div>

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ShieldAlert, X } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { RgbLoader } from "@/components/ui/rgb-loader";
 import { IMMEDIATE_EXECUTION_WAIVER_LABEL } from "@/lib/legal-consent";
 import { formatEuro } from "@/lib/packs";
 
@@ -184,9 +185,10 @@ export function CheckoutConsentDialog({
                 type="button"
                 onClick={handleConfirm}
                 disabled={!checked || submitting}
-                className="flex-1 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex-1 rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgba(217,70,239,0.8)] transition-opacity flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {submitting ? "Enregistrement..." : "Confirmer et payer"}
+                {submitting && <RgbLoader size={16} />}
+                {submitting ? "Redirection vers le paiement..." : "Confirmer et payer"}
               </button>
             </div>
           </motion.div>

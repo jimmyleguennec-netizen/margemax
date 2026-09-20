@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useAnimation } from "framer-motion";
-import { AlertTriangle, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 
 import { computeMarginEstimate, parseDecimalInput } from "@/lib/margin-estimate";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
@@ -265,7 +265,7 @@ export function CalculatorPanel() {
                 className={`grid grid-cols-3 gap-2 rounded-xl border p-3 text-sm transition-colors duration-300 sm:gap-4 sm:p-4 ${
                   isProfitable
                     ? "border-white/10 bg-white/[0.02]"
-                    : "animate-pulse border-pink-500/40 bg-pink-500/[0.04] shadow-[0_0_24px_-6px_rgba(244,63,94,0.5)]"
+                    : "border-pink-500/40 bg-pink-500/[0.04] shadow-[0_0_24px_-6px_rgba(244,63,94,0.5)]"
                 }`}
               >
                 <div>
@@ -343,7 +343,6 @@ export function CalculatorPanel() {
                 <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
                   <div>
                     <p className="flex items-center gap-1.5 text-xs text-white/40">
-                      <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
                       Prix de vente recommandé estimé
                     </p>
                     <p className="mt-1 text-2xl font-bold text-cyan-300 drop-shadow-[0_0_14px_rgba(34,211,238,0.7)]">

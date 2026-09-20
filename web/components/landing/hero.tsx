@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 import { MIconBadge } from "@/components/ui/m-icon-badge";
 
@@ -38,11 +38,7 @@ export function Hero() {
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-40 -z-10 flex justify-center blur-2xl sm:blur-3xl"
       >
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="h-[420px] w-[720px] rounded-full bg-gradient-to-tr from-cyan-500/40 via-fuchsia-500/20 to-transparent"
-        />
+        <div className="h-[420px] w-[720px] rounded-full bg-gradient-to-tr from-cyan-500/30 via-fuchsia-500/15 to-transparent" />
       </div>
 
       <motion.div
@@ -55,10 +51,7 @@ export function Hero() {
           variants={item}
           className="inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-slate-900/90 px-4 py-1.5 text-xs font-semibold text-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.2)]"
         >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-          </span>
+          <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           ⚡ SOURCING AUTOMATISÉ ALIEXPRESS — CALCUL DE MARGE RÉELLE
         </motion.div>
 
@@ -101,13 +94,12 @@ export function Hero() {
           className="flex flex-wrap items-center justify-center gap-4"
         >
           <span className="relative inline-flex overflow-hidden rounded-full p-[1.5px]">
-            <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#22d3ee_0%,#d946ef_50%,#22d3ee_100%)]" />
+            <span className="absolute inset-[-1000%] bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-cyan-400" />
             <Link
               href="/signup"
               className="relative z-10 inline-flex items-center gap-2 rounded-full bg-[#05050a] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0a0a14]"
             >
               Essayer gratuitement
-              <ArrowRight className="h-4 w-4" />
             </Link>
           </span>
 
@@ -153,7 +145,6 @@ export function Hero() {
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-cyan-300 shadow-[0_0_20px_-4px_rgba(34,211,238,0.7)] transition-all duration-300 hover:scale-x-105 hover:bg-cyan-400/20 hover:shadow-[0_0_30px_-2px_rgba(34,211,238,0.9)]"
           >
             Tester MargeMax maintenant
-            <ArrowRight className="h-4 w-4" />
           </Link>
         </motion.div>
       </motion.div>

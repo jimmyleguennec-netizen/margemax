@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { Calculator, ShieldCheck, History } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { TiltCard } from "@/components/ui/tilt-card";
 import { SectionGlow } from "@/components/ui/section-glow";
 
 const features = [
@@ -34,28 +33,10 @@ const features = [
   },
 ];
 
-const accentStyles: Record<
-  string,
-  { icon: string; border: string; glow: string; tilt: string }
-> = {
-  cyan: {
-    icon: "bg-cyan-400/10 text-cyan-300",
-    border: "hover:border-cyan-400/50",
-    glow: "group-hover:shadow-[0_0_40px_-12px_rgba(34,211,238,0.6)]",
-    tilt: "rgba(34,211,238,0.35)",
-  },
-  fuchsia: {
-    icon: "bg-fuchsia-400/10 text-fuchsia-300",
-    border: "hover:border-fuchsia-400/50",
-    glow: "group-hover:shadow-[0_0_40px_-12px_rgba(232,121,249,0.6)]",
-    tilt: "rgba(232,121,249,0.35)",
-  },
-  pink: {
-    icon: "bg-pink-400/10 text-pink-300",
-    border: "hover:border-pink-400/50",
-    glow: "group-hover:shadow-[0_0_40px_-12px_rgba(244,114,182,0.6)]",
-    tilt: "rgba(244,114,182,0.35)",
-  },
+const accentStyles: Record<string, { icon: string }> = {
+  cyan: { icon: "bg-cyan-400/10 text-cyan-300" },
+  fuchsia: { icon: "bg-fuchsia-400/10 text-fuchsia-300" },
+  pink: { icon: "bg-pink-400/10 text-pink-300" },
 };
 
 const container = {
@@ -95,21 +76,12 @@ export function Features() {
             <motion.div
               key={feature.title}
               variants={item}
-              whileHover={{ scale: 1.02, y: -4 }}
-              transition={{ type: "spring", stiffness: 300, damping: 22 }}
               className={cn(feature.span)}
             >
-              <TiltCard
-                glowColor={accent.tilt}
-                className={cn(
-                  "group h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300",
-                  accent.border,
-                  accent.glow
-                )}
-              >
+              <div className="h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md">
                 <div
                   className={cn(
-                    "relative z-0 mb-4 flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110",
+                    "mb-4 flex h-11 w-11 items-center justify-center rounded-xl",
                     accent.icon
                   )}
                 >
@@ -121,7 +93,7 @@ export function Features() {
                 <p className="relative z-0 mt-2 text-sm text-white/50">
                   {feature.description}
                 </p>
-              </TiltCard>
+              </div>
             </motion.div>
           );
         })}

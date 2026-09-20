@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Minus,
-  Sparkles,
   Square,
   Star,
   TrendingDown,
@@ -64,34 +63,19 @@ function MacDemoWindow() {
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      whileHover={{ y: -6 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="group relative w-full"
+      className="relative w-full"
     >
       {/* Halo neon ambiant */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-r from-cyan-500/20 via-fuchsia-500/10 to-pink-500/20 opacity-60 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-r from-cyan-500/20 via-fuchsia-500/10 to-pink-500/20 opacity-60 blur-2xl"
       />
 
       {/* Bordure neon degradee, style carte de login */}
-      <div className="rounded-2xl bg-gradient-to-r from-cyan-400/60 via-fuchsia-500/60 to-pink-500/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(217,70,239,0.5)] transition-shadow duration-500 group-hover:shadow-[0_0_60px_-10px_rgba(34,211,238,0.6)]">
+      <div className="rounded-2xl bg-gradient-to-r from-cyan-400/60 via-fuchsia-500/60 to-pink-500/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(217,70,239,0.5)]">
         <div className="relative overflow-hidden rounded-2xl bg-[#0a0a14]">
-          {/* Scanner laser -- balayage vertical simulant l'analyse IA */}
-          <motion.div
-            aria-hidden
-            animate={{ top: ["0%", "100%", "0%"] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-            className="pointer-events-none absolute inset-x-0 z-20 h-12 bg-gradient-to-b from-transparent via-cyan-400/25 to-transparent"
-          />
-          <motion.div
-            aria-hidden
-            animate={{ top: ["0%", "100%", "0%"] }}
-            transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-            className="pointer-events-none absolute inset-x-0 z-20 h-px bg-cyan-300 shadow-[0_0_12px_3px_rgba(34,211,238,0.9)]"
-          />
-
           {/* Barre de titre style macOS -- purement decorative */}
           <div
             aria-hidden="true"
@@ -184,7 +168,6 @@ function MacDemoWindow() {
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="flex items-center gap-1.5 text-xs text-white/40">
-                  <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
                   Prix de vente recommandé estimé
                 </p>
                 <ReliabilityBadge tier={PRICE_ESTIMATE.reliability} />
@@ -254,19 +237,18 @@ function CalculatorDemoWindow() {
     <motion.div
       initial={{ opacity: 0, y: 30, scale: 0.98 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      whileHover={{ y: -6 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
-      className="group relative w-full"
+      className="relative w-full"
     >
       {/* Halo neon ambiant */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-r from-blue-500/20 via-cyan-400/10 to-purple-500/20 opacity-60 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-r from-blue-500/20 via-cyan-400/10 to-purple-500/20 opacity-60 blur-2xl"
       />
 
       {/* Bordure neon degradee, deux tons bleu/cyan (identite Windows) */}
-      <div className="rounded-xl bg-gradient-to-r from-blue-400/60 via-cyan-400/60 to-purple-400/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(56,189,248,0.5)] transition-shadow duration-500 group-hover:shadow-[0_0_60px_-10px_rgba(56,189,248,0.6)]">
+      <div className="rounded-xl bg-gradient-to-r from-blue-400/60 via-cyan-400/60 to-purple-400/60 p-[1.5px] shadow-[0_0_50px_-15px_rgba(56,189,248,0.5)]">
         <div className="overflow-hidden rounded-xl bg-[#0a0a14]">
           {/* Barre de titre style Windows 11 */}
           <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] pl-4">

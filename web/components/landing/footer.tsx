@@ -126,7 +126,7 @@ export function Footer() {
               à l&apos;inscription.
             </p>
             <span className="relative inline-flex overflow-hidden rounded-full p-[1.5px]">
-              <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#22d3ee_0%,#d946ef_50%,#22d3ee_100%)]" />
+              <span className="absolute inset-[-1000%] bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-cyan-400" />
               <Link
                 href="/signup"
                 className="relative z-10 inline-flex items-center rounded-full bg-[#05050a] px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0a0a14]"
@@ -172,7 +172,7 @@ export function Footer() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
             {PAYMENT_METHODS.map(({ label, Icon }) => (
-              <Icon key={label} className="opacity-90 transition-opacity hover:opacity-100" />
+              <Icon key={label} className="opacity-90" />
             ))}
           </div>
         </div>

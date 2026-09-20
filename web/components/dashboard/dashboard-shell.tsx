@@ -20,6 +20,7 @@ import { logout } from "@/lib/actions/auth";
 import { AnimatedTabs, type AnimatedTabItem } from "@/components/ui/animated-tabs";
 import { InteractiveGrid } from "@/components/ui/interactive-grid";
 import { Logo } from "@/components/ui/logo";
+import { RgbLoader } from "@/components/ui/rgb-loader";
 import { SearchPanel } from "@/components/dashboard/search-panel";
 import { CalculatorPanel } from "@/components/dashboard/calculator-panel";
 import { HistoryPanel, type HistoryEntry } from "@/components/dashboard/history-panel";
@@ -150,7 +151,7 @@ function BillingPortalButton() {
         disabled={loading}
         className="flex items-center gap-2 rounded-full border border-cyan-400/30 px-5 py-2.5 text-sm font-medium text-cyan-200 transition-all hover:border-cyan-400/60 hover:shadow-[0_0_18px_-4px_rgba(34,211,238,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <Receipt className="h-4 w-4" />
+        {loading ? <RgbLoader size={16} /> : <Receipt className="h-4 w-4" />}
         {loading ? "Ouverture..." : "Gérer mes factures"}
       </button>
       {error && <p className="mt-2 text-xs text-pink-300">{error}</p>}

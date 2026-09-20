@@ -30,31 +30,18 @@ const links = [
 // du produit (solde de credits affiche au dashboard, 1 credit = 1 analyse).
 const BANNER_TEXT = "🎁 3 crédits offerts à l'inscription";
 
-function ScrollingBanner() {
+function Banner() {
   return (
-    <div
-      role="marquee"
-      aria-label={BANNER_TEXT}
-      className="relative mx-6 h-4 flex-1 overflow-hidden"
-    >
-      <motion.div
-        aria-hidden="true"
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-y-0 flex w-max items-center gap-16 whitespace-nowrap text-[11px] font-medium text-cyan-200/70"
-      >
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span key={i}>{BANNER_TEXT}</span>
-        ))}
-      </motion.div>
-    </div>
+    <p className="mx-6 flex-1 truncate text-center text-[11px] font-medium text-cyan-200/70">
+      {BANNER_TEXT}
+    </p>
   );
 }
 
 function TopBar({ loggedIn }: { loggedIn: boolean }) {
   return (
     <div className="hidden w-full items-center justify-end border-b border-white/5 bg-black/60 px-4 py-1.5 sm:flex">
-      <ScrollingBanner />
+      <Banner />
 
       <Link
         href={loggedIn ? "/dashboard" : "/signup"}
@@ -66,6 +53,12 @@ function TopBar({ loggedIn }: { loggedIn: boolean }) {
   );
 }
 
+const drawerAnchors = [
+  { href: "#features", label: "Fonctionnalités" },
+  { href: "#pricing", label: "Tarifs" },
+  { href: "#faq", label: "FAQ" },
+];
+
 function MobileMenu({
   open,
   onClose,
@@ -75,87 +68,95 @@ function MobileMenu({
   onClose: () => void;
   loggedIn: boolean;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          // Pas de backdrop-blur ici : le fond est deja quasi-opaque
-          // (bg-black/95), et animer un filtre backdrop-filter en opacite
-          // sur un calque plein ecran est une cause frequente de flash
-          // noir a l'ouverture/fermeture sur mobile.
-          className="fixed inset-0 z-[60] flex flex-col bg-black/95 sm:hidden"
-        >
-          <div className="container flex h-16 items-center justify-between">
-            <Link href="/" onClick={onClose}>
-              <Logo className="h-12" />
-            </Link>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fermer le menu"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 text-cyan-300 transition-colors hover:bg-cyan-400/10"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <nav className="container flex flex-1 flex-col items-center justify-center gap-2">
-            {links.map((link, i) => (
-              <motion.div
-                key={link.href}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 + i * 0.05, duration: 0.3 }}
+        <div className="fixed inset-0 z-[60] sm:hidden">
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-[#05050a]/70"
+          />
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu principal"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+            className="absolute inset-y-0 right-0 flex w-[85%] max-w-sm flex-col border-l border-white/10 bg-[#0a0a14] px-6 pb-8 pt-4"
+          >
+            <div className="flex h-12 items-center justify-between">
+              <Link href="/" onClick={onClose}>
+                <Logo className="h-10" />
+              </Link>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Fermer le menu"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:bg-white/5"
               >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="mt-6 flex flex-col gap-1">
+              {loggedIn ? (
                 <Link
+                  href="/dashboard"
+                  onClick={onClose}
+                  className="rounded-lg bg-cyan-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
+                >
+                  Mon espace
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={onClose}
+                    className="rounded-lg border border-white/15 px-4 py-3 text-center text-sm font-semibold text-white/80 transition-colors hover:bg-white/5"
+                  >
+                    Se connecter
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={onClose}
+                    className="mt-2 rounded-lg bg-cyan-500 px-4 py-3 text-center text-sm font-semibold text-[#05050a]"
+                  >
+                    Créer un compte
+                  </Link>
+                </>
+              )}
+
+              <div className="my-4 h-px bg-white/10" />
+
+              {drawerAnchors.map((link) => (
+                <Link
+                  key={link.href}
                   href={link.href}
                   onClick={onClose}
-                  className="block px-4 py-3 text-2xl font-semibold text-white/80 transition-colors hover:text-cyan-300"
+                  className="rounded-lg px-4 py-3 text-base font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
                 >
                   {link.label}
                 </Link>
-              </motion.div>
-            ))}
-          </nav>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.3 }}
-            className="container mb-10 flex flex-col gap-3"
-          >
-            {loggedIn ? (
-              <Link
-                href="/dashboard"
-                onClick={onClose}
-                className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
-              >
-                Mon espace
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  onClick={onClose}
-                  className="rounded-full border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white/80"
-                >
-                  Connexion
-                </Link>
-                <Link
-                  href="/signup"
-                  onClick={onClose}
-                  className="rounded-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_18px_-4px_rgba(217,70,239,0.8)]"
-                >
-                  Essayer gratuitement
-                </Link>
-              </>
-            )}
-          </motion.div>
-        </motion.div>
+              ))}
+            </nav>
+          </motion.aside>
+        </div>
       )}
     </AnimatePresence>
   );

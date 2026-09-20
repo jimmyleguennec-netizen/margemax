@@ -165,7 +165,7 @@ export function OtpVerifyForm({ email }: { email: string }) {
         disabled={resendState === "sending" || cooldown > 0}
         className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-cyan-300 underline-offset-4 transition-opacity hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
       >
-        <RotateCw className="h-3 w-3" />
+        {resendState === "sending" ? <RgbLoader size={12} /> : <RotateCw className="h-3 w-3" />}
         {cooldown > 0
           ? `Renvoyer le code (${cooldown}s)`
           : resendState === "sent"

@@ -17,6 +17,12 @@ const config: Config = {
     },
     extend: {
       colors: {
+        // Pas de noir (#000) ni de blanc (#FFF) purs : teintes legerement
+        // bleutees, alignees sur les fonds #05050a/#0a0a14 du site. Surcharge
+        // globale de `white`/`black` -- couvre text-white, bg-white/5,
+        // bg-black/60, etc. sans toucher chaque composant.
+        white: "#EEF1F6",
+        black: "#0A0A12",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
