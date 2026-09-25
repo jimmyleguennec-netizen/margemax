@@ -14,8 +14,9 @@ export function renderOgImage() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background:
-            "radial-gradient(circle at 20% 15%, rgba(34,211,238,0.28), transparent 45%), radial-gradient(circle at 85% 85%, rgba(217,70,239,0.30), transparent 45%), #05060f",
+          backgroundColor: "#05060f",
+          backgroundImage:
+            "radial-gradient(circle at 20% 15%, rgba(34,211,238,0.28), transparent 45%), radial-gradient(circle at 85% 85%, rgba(217,70,239,0.30), transparent 45%)",
           color: "white",
           fontFamily: "sans-serif",
         }}
@@ -30,7 +31,7 @@ export function renderOgImage() {
             borderRadius: 28,
             fontSize: 76,
             fontWeight: 800,
-            background: "linear-gradient(135deg, #22d3ee, #d946ef 60%, #ec4899)",
+            backgroundImage: "linear-gradient(135deg, #22d3ee, #d946ef 60%, #ec4899)",
             marginBottom: 36,
           }}
         >
