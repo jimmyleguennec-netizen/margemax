@@ -17,11 +17,12 @@ export default function MentionsLegalesPage() {
           social est situé au 4 rue Gustave Delory, 11100 Narbonne, France.
         </p>
         <p>
-          SIREN : 107 057 432 — SIRET : 107 057 432 00018 — RCS Narbonne.
+          SIREN : 107 057 432 — SIRET : 107 057 432 00018 — RCS Narbonne —
+          TVA intracommunautaire : FR70107057432.
         </p>
         <p className="text-white/70">
-          Numéro de TVA intracommunautaire et numéro de téléphone : en cours
-          de finalisation, et seront publiés sur cette page. Pour toute
+          Numéro de téléphone : en cours
+          de finalisation, il sera publié sur cette page. Pour toute
           question sur l&apos;identité de l&apos;éditeur d&apos;ici là,
           contactez{" "}
           <a
