@@ -743,8 +743,14 @@ function extractShippingAndImportFee(html: string): {
 // jamais presentee comme une valeur "confirmee".
 const ESTIMATED_VAT_RATE = 0.2;
 
-function estimateImportFee(subtotal: number): number {
-  return Math.round(subtotal * ESTIMATED_VAT_RATE * 100) / 100;
+/** Frais de livraison estimes (livraison standard France, ex. Cainiao/Choice)
+ * appliques UNIQUEMENT quand la fiche publique n'en affiche aucun : mieux
+ * vaut un cout realiste marque "estimated" qu'une livraison a 0 EUR qui
+ * gonflerait la marge. */
+export const ESTIMATED_SHIPPING_FEE = 1.99;
+
+function estimateImportFee(taxableBase: number): number {
+  return Math.round(taxableBase * ESTIMATED_VAT_RATE * 100) / 100;
 }
 
 /**
@@ -851,7 +857,7 @@ export async function performAliExpressSearch(
   // Meme logique que fromJsonLd ci-dessus : sans danger a tenter meme sur
   // une page partiellement bloquee, se degrade simplement en null si rien
   // n'est trouve plutot que d'echouer.
-  const { shipping, importFee: extractedImportFee } = extractShippingAndImportFee(html);
+  const { shipping: extractedShipping, importFee: extractedImportFee } = extractShippingAndImportFee(html);
 
   const subtotal = price;
 
@@ -862,8 +868,12 @@ export async function performAliExpressSearch(
   // Repli explicite sur une estimation TVA France 20% du sous-total,
   // TOUJOURS marque importFeeStatus: "estimated" -- jamais "confirmed".
   const importFeeStatus: FieldStatus = extractedImportFee === null ? "estimated" : "confirmed";
-  const importFee = extractedImportFee ?? estimateImportFee(subtotal);
-  const shippingStatus: FieldStatus = shipping === null ? "missing" : "confirmed";
+  // Livraison introuvable : estimation par defaut (ESTIMATED_SHIPPING_FEE),
+  // marquee "estimated" -- jamais "confirmed", donc isComplete reste false.
+  const shippingStatus: FieldStatus = extractedShipping === null ? "estimated" : "confirmed";
+  const shipping = extractedShipping ?? ESTIMATED_SHIPPING_FEE;
+  // Taxes manquantes : TVA 20 % sur (sous-total + livraison).
+  const importFee = extractedImportFee ?? estimateImportFee(subtotal + shipping);
   const variantStatus: FieldStatus = variant ? "confirmed" : "missing";
 
   // `total` = cout REEL, uniquement si tout est confirme (jamais un champ
@@ -875,7 +885,7 @@ export async function performAliExpressSearch(
     shippingStatus === "confirmed" &&
     importFeeStatus === "confirmed" &&
     variantStatus === "confirmed";
-  const partialTotal = subtotal + (shipping ?? 0) + importFee;
+  const partialTotal = subtotal + shipping + importFee;
   const total = isComplete ? partialTotal : null;
 
   return {

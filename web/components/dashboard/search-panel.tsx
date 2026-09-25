@@ -181,10 +181,10 @@ const STATUS_CLASS: Record<FieldStatus, string> = {
   missing: "text-amber-300/70",
 };
 
-function StatusTag({ status }: { status: FieldStatus }) {
+function StatusTag({ status, label }: { status: FieldStatus; label?: string }) {
   return (
     <span className={`text-[10px] uppercase tracking-wide ${STATUS_CLASS[status]}`}>
-      {STATUS_LABEL[status]}
+      {label ?? STATUS_LABEL[status]}
     </span>
   );
 }
@@ -213,12 +213,14 @@ function EstimateBlock({
   partialTotal,
   isComplete,
   shippingMissing,
+  shippingEstimated,
   importFee,
 }: {
   total: number | null;
   partialTotal: number;
   isComplete: boolean;
   shippingMissing: boolean;
+  shippingEstimated: boolean;
   importFee: number | null;
 }) {
   // Prix de vente RETENU par l'utilisateur (conseille par defaut) : marge,
@@ -259,7 +261,9 @@ function EstimateBlock({
             <strong>{partialLabel}</strong>.{" "}
             {shippingMissing
               ? "La livraison viendra s'ajouter : marge, ROI et budget pub réels seront plus bas que ceux affichés (≤)."
-              : "Certains frais sont estimés ou manquants : les chiffres ci-dessous peuvent s'écarter du coût réel."}
+              : shippingEstimated
+                ? "Frais de livraison estimés à 1,99 € par défaut (non détectés sur la fiche publique). Les taxes sont recalculées en conséquence si elles ne sont pas lues sur la fiche."
+                : "Certains frais sont estimés ou manquants : les chiffres ci-dessous peuvent s'écarter du coût réel."}
           </span>
         </div>
       )}
@@ -758,7 +762,11 @@ export function SearchPanel({
                   Frais de port
                 </span>
                 <span className="text-white/70">
-                  {formatEuro(result.shipping)} <StatusTag status={result.shippingStatus} />
+                  {formatEuro(result.shipping)}{" "}
+                  <StatusTag
+                    status={result.shippingStatus}
+                    label={result.shippingStatus === "estimated" ? "estimé (défaut)" : undefined}
+                  />
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3">
@@ -789,6 +797,8 @@ export function SearchPanel({
                   <p className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-200">
                     Total hors frais inconnus —{" "}
                     {[
+                      result.shippingStatus === "estimated" &&
+                        "les frais de livraison sont estimés à 1,99 € par défaut (non détectés sur la fiche publique)",
                       result.shippingStatus === "missing" &&
                         "la livraison n'est pas incluse (introuvable sur la fiche)",
                       result.importFeeStatus === "estimated" &&
@@ -846,6 +856,7 @@ export function SearchPanel({
               partialTotal={result.partialTotal}
               isComplete={result.isComplete}
               shippingMissing={result.shippingStatus === "missing"}
+              shippingEstimated={result.shippingStatus === "estimated"}
               importFee={result.importFee}
             />
           </motion.div>

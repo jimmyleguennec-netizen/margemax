@@ -81,7 +81,7 @@ describe("performAliExpressSearch — complétude du résultat", () => {
     expect(result.partialTotal).toBeCloseTo(result.total as number, 5);
   });
 
-  it("résultat incomplet : livraison introuvable -> shippingStatus=missing, shipping jamais remplacé par 0, total null", async () => {
+  it("résultat incomplet : livraison introuvable -> estimée à 1,99 € (shippingStatus=estimated), jamais 0, total null", async () => {
     mockFirecrawlSuccess(
       fakeProductHtml({
         price: "11.19",
@@ -93,12 +93,12 @@ describe("performAliExpressSearch — complétude du résultat", () => {
 
     const result = await performAliExpressSearch(PRODUCT_URL);
 
-    expect(result.shippingStatus).toBe("missing");
-    expect(result.shipping).toBeNull(); // jamais 0 à la place de null
+    expect(result.shippingStatus).toBe("estimated");
+    expect(result.shipping).toBeCloseTo(1.99, 5); // estimation par défaut, jamais 0
     expect(result.isComplete).toBe(false);
     expect(result.total).toBeNull(); // jamais affiché comme "Coût total" complet
-    // Le cout partiel reste calculable (livraison comptée pour 0 dans CE calcul là uniquement).
-    expect(result.partialTotal).toBeCloseTo(11.19 + 0 + 3.61, 5);
+    // Le coût partiel inclut la livraison estimée.
+    expect(result.partialTotal).toBeCloseTo(11.19 + 1.99 + 3.61, 5);
   });
 
   it("taxe non trouvée -> estimation TVA 20% appliquée et marquée estimated, jamais confirmed", async () => {
@@ -115,8 +115,8 @@ describe("performAliExpressSearch — complétude du résultat", () => {
 
     expect(result.importFeeStatus).toBe("estimated");
     expect(result.importFeeEstimated).toBe(true);
-    // 11.19 * 0.20 = 2.238 -> arrondi à 2,24 €.
-    expect(result.importFee).toBeCloseTo(2.24, 5);
+    // (11.19 + 5.41) * 0.20 = 3.32 €.
+    expect(result.importFee).toBeCloseTo(3.32, 5);
     expect(result.isComplete).toBe(false);
     expect(result.total).toBeNull();
   });
@@ -130,8 +130,8 @@ describe("performAliExpressSearch — complétude du résultat", () => {
     );
 
     const result = await performAliExpressSearch(PRODUCT_URL);
-    // 14.995 * 0.20 = 2.999 -> arrondi à 3,00 €.
-    expect(result.importFee).toBeCloseTo(3.0, 5);
+    // (14.995 + 1.00) * 0.20 = 3.199 -> arrondi à 3,20 €.
+    expect(result.importFee).toBeCloseTo(3.2, 5);
   });
 
   it("variante non identifiée -> variantStatus=missing, empêche isComplete même si livraison/taxe confirmées", async () => {
