@@ -2,6 +2,8 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
+import { SESSION_MAX_AGE_SECONDS } from "@/lib/supabase/session";
+
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /**
@@ -30,7 +32,10 @@ export function createClient(options?: { rememberMe?: boolean }) {
           try {
             cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
               const finalOptions = rememberMe
-                ? cookieOptions
+                ? {
+                    ...cookieOptions,
+                    maxAge: Math.min(cookieOptions.maxAge ?? SESSION_MAX_AGE_SECONDS, SESSION_MAX_AGE_SECONDS),
+                  }
                 : { ...cookieOptions, maxAge: undefined, expires: undefined };
               cookieStore.set(name, value, finalOptions);
             });

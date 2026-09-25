@@ -22,6 +22,7 @@ import { InteractiveGrid } from "@/components/ui/interactive-grid";
 import { Logo } from "@/components/ui/logo";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { SessionWatcher } from "@/components/dashboard/session-watcher";
 import { PurchaseSuccessModal } from "@/components/dashboard/purchase-success-modal";
 import {
   clearPendingPurchase,
@@ -485,6 +486,7 @@ export function DashboardShell({
   return (
     <InteractiveGrid>
       <div className="relative min-h-[100dvh] overflow-x-clip bg-[#05050a]">
+        <SessionWatcher />
         <div
           aria-hidden
           className="pointer-events-none fixed -left-40 top-0 -z-10 h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-[140px]"
