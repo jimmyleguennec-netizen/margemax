@@ -1114,10 +1114,17 @@ async function selectCheapestSupplier(
   deadline: number
 ): Promise<AliExpressSearchResult> {
   try {
-    if (deadline - Date.now() < MIN_COMPARISON_BUDGET_MS) return primary;
+    const budgetLeft = deadline - Date.now();
+    if (budgetLeft < MIN_COMPARISON_BUDGET_MS) {
+      console.info(`[supplier-comparison] ignorée : budget restant insuffisant (${budgetLeft} ms)`);
+      return primary;
+    }
 
     const candidates = await searchSimilarListings(primary.title, primaryProductId, deadline);
-    if (candidates.length === 0) return primary;
+    if (candidates.length === 0) {
+      console.info("[supplier-comparison] ignorée : aucune annonce similaire trouvée par la recherche");
+      return primary;
+    }
 
     const settled = await Promise.allSettled(
       candidates.map((candidate) =>
@@ -1133,7 +1140,12 @@ async function selectCheapestSupplier(
           (listing.subtotal ?? 0) > 0 &&
           titleSimilarity(primary.title, listing.title) >= MIN_TITLE_SIMILARITY
       );
-    if (comparable.length === 0) return primary;
+    if (comparable.length === 0) {
+      console.info(
+        `[supplier-comparison] ignorée : ${candidates.length} candidat(s) trouvé(s), aucun exploitable (échec du scrape, titre trop différent ou devise différente)`
+      );
+      return primary;
+    }
 
     const all = [primary, ...comparable];
     const best = all.reduce((cheapest, listing) =>
