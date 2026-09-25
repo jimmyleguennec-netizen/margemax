@@ -5,6 +5,7 @@
 // comportement, juste extraite pour eviter de dupliquer ~150 lignes.
 
 import { createHmac } from "crypto";
+import { VARIANT_WARNING } from "@/lib/variant-warning";
 
 // Lu a l'appel (pas a l'import) : evite de figer la valeur au chargement du
 // module (tests, rechargement a chaud) -- meme comportement en production.
@@ -18,6 +19,7 @@ const ALIEXPRESS_APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
  * ("missing" -- reste null, JAMAIS remplacee par 0). */
 export type FieldStatus = "confirmed" | "estimated" | "missing";
 
+
 export type AliExpressSearchResult = {
   title: string;
   /** Variante (couleur/taille/modele) du prix affiche, quand AliExpress la
@@ -29,6 +31,11 @@ export type AliExpressSearchResult = {
    * fiable qu'un prix rattache a une variante precise, donc compte dans le
    * calcul de completude du total (voir isComplete). */
   variantStatus: FieldStatus;
+  /** Avertissement affiche quand la variante n'est pas rattachee au
+   * checkout reel (variantStatus !== "confirmed") -- null sinon. */
+  variantWarning: string | null;
+  /** Fourchette de prix des variantes quand la fiche en expose plusieurs. */
+  variantPriceRange: { low: number; high: number } | null;
   url: string;
   product_image_url: string | null;
   subtotal: number | null;
@@ -546,6 +553,11 @@ function extractFromJsonLd(html: string): {
   currency?: string;
   imageUrl?: string;
   variant?: string;
+  /** true quand la fiche expose plusieurs offres/variantes de prix
+   * differents : le sous-total ne peut alors pas etre rattache a l'option
+   * exacte du checkout. */
+  multipleVariants?: boolean;
+  priceRange?: { low: number; high: number };
   rating?: number;
   reviewCount?: number;
 } {
@@ -586,7 +598,29 @@ function extractFromJsonLd(html: string): {
             ? Number.parseInt(String(aggregateRating.ratingCount), 10)
             : undefined;
 
+      // Plusieurs offres/variantes : liste d'offres, ou AggregateOffer
+      // (lowPrice/highPrice). Si leurs prix different, l'offre retenue
+      // ci-dessous n'est que l'"offre d'appel".
+      const offerList: Record<string, unknown>[] = Array.isArray(product.offers)
+        ? product.offers
+        : product.offers
+          ? [product.offers]
+          : [];
+      const offerPrices = offerList
+        .flatMap((o) => [o?.price, o?.lowPrice, o?.highPrice])
+        .map((raw) => (raw === undefined || raw === null ? NaN : Number.parseFloat(String(raw))))
+        .filter((n) => Number.isFinite(n));
+      const lowPrice = offerPrices.length ? Math.min(...offerPrices) : undefined;
+      const highPrice = offerPrices.length ? Math.max(...offerPrices) : undefined;
+      const multipleVariants =
+        lowPrice !== undefined && highPrice !== undefined && highPrice - lowPrice > 0.005;
+
       return {
+        multipleVariants,
+        priceRange:
+          multipleVariants && lowPrice !== undefined && highPrice !== undefined
+            ? { low: lowPrice, high: highPrice }
+            : undefined,
         title: productName,
         price:
           offer?.price !== undefined ? Number.parseFloat(String(offer.price)) : undefined,
@@ -895,7 +929,13 @@ async function analyzeProductPage(
   const shipping = extractedShipping ?? ESTIMATED_SHIPPING_FEE;
   // Taxes manquantes : max(3,60 EUR, 20 % de (sous-total + livraison)).
   const importFee = extractedImportFee ?? estimateImportFee(subtotal + shipping);
-  const variantStatus: FieldStatus = variant ? "confirmed" : "missing";
+  // Variante "confirmee" seulement si elle est identifiee ET qu'aucune autre
+  // variante de prix different n'existe : sinon le sous-total est celui de
+  // l'offre d'appel et le checkout reel peut differer ("partiellement
+  // verifie", jamais "verifie").
+  const multipleVariants = fromJsonLd.multipleVariants === true;
+  const variantStatus: FieldStatus = variant && !multipleVariants ? "confirmed" : "missing";
+  const variantWarning = variantStatus === "confirmed" ? null : VARIANT_WARNING;
 
   // `total` = cout REEL, uniquement si tout est confirme (jamais un champ
   // manquant remplace par 0 dans CE calcul). `partialTotal` reste toujours
@@ -913,6 +953,8 @@ async function analyzeProductPage(
     title: title ?? "Titre indisponible",
     variant: variant ?? null,
     variantStatus,
+    variantWarning,
+    variantPriceRange: fromJsonLd.priceRange ?? null,
     url: targetUrl,
     product_image_url: imageUrl ?? null,
     subtotal,

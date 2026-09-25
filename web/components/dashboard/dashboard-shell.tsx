@@ -346,6 +346,8 @@ export function DashboardShell({
   });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [reopened, setReopened] = useState<ApiResult | null>(null);
+  // URL d'une entree d'historique a re-analyser (bouton "Actualiser le prix").
+  const [refreshUrl, setRefreshUrl] = useState<string | null>(null);
   // false tant qu'on n'a pas confirmé que l'historique lu vient vraiment
   // de Supabase (migration_search_history_details.sql exécutée) -- pilote
   // l'avertissement "non sauvegardé" dans HistoryPanel. Chargé une seule
@@ -569,6 +571,8 @@ export function DashboardShell({
                   onCreditsChange={setLiveCredits}
                   reopen={reopened}
                   onReopenConsumed={() => setReopened(null)}
+                  autoRun={refreshUrl}
+                  onAutoRunConsumed={() => setRefreshUrl(null)}
                   onResult={(entry) =>
                     setHistory((prev) => [entry, ...prev])
                   }
@@ -580,6 +584,11 @@ export function DashboardShell({
                   entries={history}
                   onGoToSearch={() => setActive("recherche")}
                   persisted={historyPersisted}
+                  onRefresh={(entry) => {
+                    if (!entry.url) return;
+                    setRefreshUrl(entry.url);
+                    setActive("recherche");
+                  }}
                   onReopen={(entry) => {
                     const result = historyEntryToResult(entry);
                     if (!result) return;

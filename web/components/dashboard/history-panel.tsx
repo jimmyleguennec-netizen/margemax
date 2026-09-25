@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { StaggerList } from "@/components/ui/stagger";
-import { AlertTriangle, ExternalLink, History as HistoryIcon } from "lucide-react";
+import { AlertTriangle, ExternalLink, History as HistoryIcon, RefreshCw } from "lucide-react";
 
 // Doit correspondre a HISTORY_LIMIT dans app/api/history/route.ts (nombre
 // d'entrees reellement renvoyees par l'API) -- ici uniquement pour le
@@ -91,11 +91,14 @@ export function HistoryPanel({
   onGoToSearch,
   persisted = false,
   onReopen,
+  onRefresh,
 }: {
   entries: HistoryEntry[];
   onGoToSearch?: () => void;
   /** Rouvre le resultat complet dans l'onglet Recherche (aucun credit). */
   onReopen?: (entry: HistoryEntry) => void;
+  /** Re-analyse l'URL enregistree (nouveau scrape en direct, 1 credit). */
+  onRefresh?: (entry: HistoryEntry) => void;
   /** true quand l'historique est réellement lu depuis le compte (Supabase)
    * -- false tant que la migration n'a pas été exécutée ou que la lecture
    * a échoué, auquel cas seules les entrées de cette session s'affichent. */
@@ -154,6 +157,17 @@ export function HistoryPanel({
                   className="rounded-full border border-cyan-400/30 px-3 py-1 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-400/10"
                 >
                   Rouvrir
+                </button>
+              )}
+              {entry.url && onRefresh && (
+                <button
+                  type="button"
+                  onClick={() => onRefresh(entry)}
+                  title="Nouveau scrape en direct de cette annonce (1 crédit)"
+                  className="inline-flex items-center gap-1 rounded-full border border-fuchsia-400/30 px-3 py-1 text-xs font-semibold text-fuchsia-200 transition-colors hover:bg-fuchsia-400/10"
+                >
+                  <RefreshCw aria-hidden="true" className="h-3 w-3" />
+                  Actualiser le prix (1 crédit)
                 </button>
               )}
               {entry.url && (

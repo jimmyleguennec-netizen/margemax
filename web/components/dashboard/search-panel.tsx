@@ -25,6 +25,7 @@ import { StaggerList } from "@/components/ui/stagger";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
 import type { HistoryEntry } from "@/components/dashboard/history-panel";
+import { VARIANT_WARNING } from "@/lib/variant-warning";
 
 type Status = "idle" | "loading" | "result" | "error";
 
@@ -34,6 +35,9 @@ export type ApiResult = {
   title: string;
   variant: string | null;
   variantStatus: FieldStatus;
+  /** Absents des anciens resultats (historique) : voir isFullyVerified. */
+  variantWarning?: string | null;
+  variantPriceRange?: { low: number; high: number } | null;
   url: string;
   product_image_url: string | null;
   subtotal: number | null;
@@ -154,6 +158,25 @@ function buildExampleResult(): ApiResult {
     analyzedAt: new Date().toISOString(),
     isExample: true,
   };
+}
+
+/** "Vérifié" UNIQUEMENT si tous les frais sont confirmes ET que le prix est
+ * rattache a une variante precise, sans incertitude sur le sous-total. */
+function isFullyVerified(r: ApiResult): boolean {
+  return (
+    r.isComplete &&
+    r.variantStatus === "confirmed" &&
+    r.subtotal !== null &&
+    !r.variantWarning &&
+    !r.variantPriceRange
+  );
+}
+
+/** Avertissement variante : celui du serveur, sinon reconstruit pour les
+ * resultats rouverts depuis l'historique (qui n'en portent pas). */
+function variantWarningOf(r: ApiResult): string | null {
+  if (r.variantWarning) return r.variantWarning;
+  return r.variantStatus !== "confirmed" || r.variantPriceRange ? VARIANT_WARNING : null;
 }
 
 function formatAnalyzedAt(iso: string): string {
@@ -346,6 +369,8 @@ export function SearchPanel({
   onResult,
   reopen,
   onReopenConsumed,
+  autoRun,
+  onAutoRunConsumed,
 }: {
   credits?: number | null;
   onCreditsChange?: (credits: number) => void;
@@ -353,6 +378,10 @@ export function SearchPanel({
   reopen?: ApiResult | null;
   /** Appele une fois le resultat affiche, pour que le parent l'oublie. */
   onReopenConsumed?: () => void;
+  /** URL d'un produit de l'historique a re-analyser (actualisation du prix,
+   * 1 credit) -- lance une analyse directe SANS comparaison de fournisseurs. */
+  autoRun?: string | null;
+  onAutoRunConsumed?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -373,6 +402,17 @@ export function SearchPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reopen]);
 
+  // Actualisation d'un prix depuis l'historique : re-analyse l'URL enregistree
+  // (nouveau scrape Firecrawl, 1 credit, nouvelle entree d'historique), sans
+  // comparaison de fournisseurs pour rester sur le MEME produit.
+  useEffect(() => {
+    if (!autoRun) return;
+    setQuery(autoRun);
+    onAutoRunConsumed?.();
+    void runAnalysis(autoRun, { compare: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun]);
+
   useEffect(() => {
     if (status === "error") {
       shakeControls.start({
@@ -382,7 +422,7 @@ export function SearchPanel({
     }
   }, [status, shakeControls]);
 
-  async function runAnalysis(trimmed: string) {
+  async function runAnalysis(trimmed: string, opts: { compare?: boolean } = {}) {
     if (!trimmed || status === "loading") return;
 
     setStatus("loading");
@@ -394,7 +434,9 @@ export function SearchPanel({
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: trimmed }),
+        body: JSON.stringify(
+          opts.compare === false ? { query: trimmed, compare: false } : { query: trimmed }
+        ),
       });
 
       const data = await response.json();
@@ -756,7 +798,7 @@ export function SearchPanel({
                   {" · "}Analysé le {formatAnalyzedAt(result.analyzedAt)}
                 </p>
               </div>
-              {result.isComplete ? (
+              {isFullyVerified(result) ? (
                 <span className="flex shrink-0 items-center gap-1.5 self-start rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-[11px] font-medium text-green-300">
                   <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
                   Vérifié
@@ -768,6 +810,23 @@ export function SearchPanel({
                 </span>
               )}
             </div>
+
+            {variantWarningOf(result) && (
+              <div className="mx-5 mb-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs text-amber-200">
+                <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {variantWarningOf(result)}
+                  {result.variantPriceRange && (
+                    <>
+                      {" "}
+                      Les variantes de cette fiche vont de{" "}
+                      {formatEuro(result.variantPriceRange.low)} à{" "}
+                      {formatEuro(result.variantPriceRange.high)}.
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* Liste de lignes label/valeur plutot qu'un tableau : reste
                 lisible sans jamais avoir besoin de defiler horizontalement,

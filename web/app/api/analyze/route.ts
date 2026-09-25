@@ -32,7 +32,7 @@ export const maxDuration = 60;
  *      zero.
  */
 export async function POST(request: Request) {
-  let body: { query?: string };
+  let body: { query?: string; compare?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -89,7 +89,11 @@ export async function POST(request: Request) {
 
   let result;
   try {
-    result = await performAliExpressSearch(query, { compareSuppliers: true });
+    result = await performAliExpressSearch(query, {
+      // false pour une actualisation de prix depuis l'historique : on veut le
+      // prix du MEME produit, pas un fournisseur alternatif.
+      compareSuppliers: body.compare !== false,
+    });
   } catch (error) {
     console.error("[api/analyze] Échec de l'analyse (aucun crédit débité) :", error);
     const status = error instanceof AliExpressSearchError ? error.status : 502;

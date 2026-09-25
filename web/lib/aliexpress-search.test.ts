@@ -153,6 +153,34 @@ describe("performAliExpressSearch — complétude du résultat", () => {
     expect(result.partialTotal).toBeCloseTo(11.19 + 5.41 + 3.61, 5);
   });
 
+  it("plusieurs variantes de prix différents -> variantStatus=missing, avertissement, fourchette, jamais complet", async () => {
+    const product = {
+      "@type": "Product",
+      name: "Chargeur induction 15W",
+      offers: [
+        { price: "9.90", priceCurrency: "EUR", name: "Blanc" },
+        { price: "14.50", priceCurrency: "EUR", name: "Noir" },
+      ],
+    };
+    const html = `<html><body>${"x".repeat(2500)}
+      <script type="application/ld+json">${JSON.stringify(product)}</script>
+      Livraison : 5,41 €
+      Droits de douane : 3,61 €
+      Avis des acheteurs
+    </body></html>`;
+    mockFirecrawlSuccess(html);
+
+    const result = await performAliExpressSearch(PRODUCT_URL);
+
+    expect(result.variantStatus).toBe("missing");
+    expect(result.variantWarning).toBe(
+      "Prix basé sur l'offre d'appel. Le checkout réel peut varier selon la variante sélectionnée."
+    );
+    expect(result.variantPriceRange).toEqual({ low: 9.9, high: 14.5 });
+    expect(result.isComplete).toBe(false);
+    expect(result.total).toBeNull();
+  });
+
   it("livraison gratuite sans condition -> shipping=0 confirmé (jamais null)", async () => {
     mockFirecrawlSuccess(
       fakeProductHtml({
