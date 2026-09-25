@@ -12,17 +12,13 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // verifie (voir sendViaResend plus bas). Domaine "resend.dev" toujours
 // disponible, jamais a configurer.
 const RESEND_FALLBACK_FROM_EMAIL = "MargeMax <onboarding@resend.dev>";
-// Doit etre une adresse d'un domaine verifie dans le compte Resend
-// (Resend refuse d'envoyer "From" un domaine non verifie) -- si absente
-// ou si l'envoi echoue specifiquement pour ce motif, repli automatique
-// sur RESEND_FALLBACK_FROM_EMAIL plutot que de faire echouer tout le
-// formulaire de contact a cause d'une configuration DNS incomplete.
-// `||` (pas `??`) : une variable Vercel presente mais vide ("") retombe aussi
-// sur l'adresse par defaut (domaine autoutilshop.fr) au lieu d'un From vide rejete par Resend.
-const RESEND_DEFAULT_FROM_EMAIL = "MargeMax <contact@autoutilshop.fr>";
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || RESEND_DEFAULT_FROM_EMAIL;
-const CONTACT_DESTINATION_EMAIL =
-  process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "contact@autoutilshop.fr";
+// Expediteur et destinataire FIXES (domaine autoutilshop.fr verifie chez
+// Resend) : plus de dependance a RESEND_FROM_EMAIL / NEXT_PUBLIC_CONTACT_EMAIL,
+// dont une mauvaise valeur sur Vercel faisait echouer tout envoi.
+// Repli automatique sur RESEND_FALLBACK_FROM_EMAIL uniquement si Resend
+// signale ce domaine comme non verifie (voir sendViaResend).
+const RESEND_FROM_EMAIL = "MargeMax <contact@autoutilshop.fr>";
+const CONTACT_DESTINATION_EMAIL = "contact@autoutilshop.fr";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -189,7 +185,9 @@ async function sendViaResend(
     return { ok: true };
   }
 
+  // Corps exact de la reponse Resend, tel quel, pour les logs Vercel.
   const rawBody = await response.text().catch(() => "");
+  console.error("Resend delivery failed:", response.status, rawBody);
   let parsedMessage = rawBody;
   try {
     const parsed = JSON.parse(rawBody) as { message?: string; name?: string };
