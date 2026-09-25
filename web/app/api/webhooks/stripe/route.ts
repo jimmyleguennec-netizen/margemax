@@ -231,7 +231,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true, duplicate: true });
     }
     console.error("[webhook stripe] Échec enregistrement de l'événement :", eventInsertError);
-    return NextResponse.json({ error: "erreur serveur" }, { status: 500 });
+    // Detail renvoye dans la reponse : ce endpoint n'est appele que par Stripe
+    // (signature verifiee ci-dessus) et la reponse est visible dans Stripe ->
+    // Webhooks -> evenement, ce qui permet de diagnostiquer sans les logs Vercel.
+    return NextResponse.json(
+      {
+        error: "erreur serveur",
+        etape: "enregistrement de l'événement (table stripe_webhook_events)",
+        code: eventInsertError.code ?? null,
+        detail: eventInsertError.message ?? null,
+      },
+      { status: 500 }
+    );
   }
 
   try {
@@ -265,7 +276,13 @@ export async function POST(request: Request) {
     if (releaseError) {
       console.error("[webhook stripe] Libération de l'événement impossible :", releaseError);
     }
-    return NextResponse.json({ error: "erreur de traitement" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "erreur de traitement",
+        etape: err instanceof Error ? err.message : "inconnue",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });
