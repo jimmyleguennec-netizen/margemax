@@ -60,8 +60,22 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user && isProtectedPath(request.nextUrl.pathname)) {
+      // Cookies d'auth presents mais session invalide/expiree : on les
+      // purge et on signale l'expiration. Sans cookie (visiteur jamais
+      // connecte), simple redirection vers /login, sans faux message.
+      const authCookies = request.cookies
+        .getAll()
+        .filter(({ name }) => name.startsWith("sb-"));
       const loginUrl = new URL("/login", request.url);
-      return NextResponse.redirect(loginUrl);
+      if (authCookies.length > 0) loginUrl.searchParams.set("expired", "true");
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      supabaseResponse.cookies
+        .getAll()
+        .forEach((cookie) => redirectResponse.cookies.set(cookie));
+      authCookies.forEach(({ name }) =>
+        redirectResponse.cookies.set(name, "", { path: "/", maxAge: 0 })
+      );
+      return redirectResponse;
     }
 
     return supabaseResponse;

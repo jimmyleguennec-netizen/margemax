@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { pack?: string };
+  searchParams: { pack?: string; expired?: string };
 }) {
   // Un utilisateur deja connecte ne doit jamais revoir le formulaire de
   // connexion -- renvoie vers l'outil en conservant un pack en attente.
@@ -38,5 +38,17 @@ export default async function LoginPage({
     );
   }
 
-  return <NeonAuthPanelClient initialMode="login" />;
+  return (
+    <>
+      {searchParams.expired === "true" && (
+        <p
+          role="status"
+          className="mb-4 w-full max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-center text-sm text-white/80"
+        >
+          Ta session a expiré. Connecte-toi à nouveau.
+        </p>
+      )}
+      <NeonAuthPanelClient initialMode="login" />
+    </>
+  );
 }

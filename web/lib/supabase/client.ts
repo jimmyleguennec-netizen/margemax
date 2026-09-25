@@ -20,5 +20,7 @@ export function createClient() {
       "Configuration Supabase manquante (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY). Vérifie les variables d'environnement Vercel pour cet environnement, et qu'un nouveau déploiement a eu lieu après leur ajout."
     );
   }
-  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true },
+  });
 }
