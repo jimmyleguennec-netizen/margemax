@@ -7,7 +7,7 @@ import { useFormState } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Building2, Mail, ShieldCheck } from "lucide-react";
 
-import { login, signup, type AuthActionState } from "@/lib/actions/auth";
+import { login, type AuthActionState } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/client";
 import { PACKS } from "@/lib/packs";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -112,21 +112,28 @@ function LoginForm({
 }
 
 function SignupForm({
-  action,
+  onSubmit,
+  pending,
   state,
   idPrefix,
   onSwitchToLogin,
 }: {
-  action: FormDispatch;
+  /** Envoi du formulaire (fetch vers /api/auth/signup, sans Server Action). */
+  onSubmit: (formData: FormData) => void;
+  pending: boolean;
   state: AuthActionState;
   idPrefix: string;
   /** Bascule vers l'onglet de connexion (compte deja existant). */
   onSwitchToLogin?: () => void;
 }) {
-  // Hook appele avant tout retour anticipe (regle des Hooks) -- meme si
-  // OtpVerifyForm est affiche juste apres, le rendu suivant reinitialise
-  // proprement ce composant.
-  const guardSubmit = useSubmitOnceGuard(state);
+  // Soumission unique : `pending` (etat du parent) bloque tout second envoi
+  // tant que la reponse n'est pas arrivee ; preventDefault evite la
+  // soumission native du <form>.
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (pending) return;
+    onSubmit(new FormData(e.currentTarget));
+  }
 
   // Confirmation par email requise cote Supabase (signUp() sans session
   // immediate) : bascule vers la saisie du code OTP plutot que d'afficher
@@ -145,7 +152,7 @@ function SignupForm({
   }
 
   return (
-    <form action={action} onSubmit={guardSubmit} className="w-full max-w-sm space-y-4">
+    <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
       <div>
         <h2 className="text-2xl font-bold text-white">Créer un compte</h2>
         <p className="mt-1 text-sm text-white/70">
@@ -200,7 +207,9 @@ function SignupForm({
           Se connecter
         </button>
       )}
-      <NeonSubmitButton loadingLabel="Envoi en cours...">Créer mon compte</NeonSubmitButton>
+      <NeonSubmitButton loadingLabel="Envoi en cours..." pending={pending}>
+        Créer mon compte
+      </NeonSubmitButton>
       <OAuthButtons mode="signup" />
       <p className="text-center text-[11px] leading-relaxed text-white/60">
         En créant un compte, tu acceptes nos{" "}
@@ -409,26 +418,48 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
         ? { error: CALLBACK_ERROR_MESSAGE }
         : initialState;
   const [loginState, loginActionFn] = useFormState(login, initialLoginState);
-  // Filet de securite : si la Server Action d'inscription ne repond pas
-  // (delai depasse, coupure reseau), React reinitialise le formulaire SANS
-  // aucun message -- exactement le symptome "je remplis, tout s'efface, rien
-  // ne se passe". On intercepte donc l'echec : le code a tres probablement
-  // ete envoye, on affiche donc directement la saisie du code.
-  const safeSignup = async (
-    prevState: AuthActionState,
-    formData: FormData
-  ): Promise<AuthActionState> => {
+  // Inscription par fetch vers /api/auth/signup (et non par Server Action +
+  // useFormState) : le resultat arrive dans un etat React local. Avec la
+  // Server Action, le formulaire etait reinitialise sans message et il fallait
+  // le remplir 2-3 fois avant de voir l'ecran du code de verification.
+  const [signupState, setSignupState] = useState<AuthActionState>(initialState);
+  const [signupPending, setSignupPending] = useState(false);
+  const submitSignup = async (formData: FormData) => {
+    const email = String(formData.get("email") ?? "").trim();
+    setSignupPending(true);
+    setSignupState(initialState);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 40000);
     try {
-      return await signup(prevState, formData);
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password: String(formData.get("password") ?? ""),
+          confirmPassword: String(formData.get("confirmPassword") ?? ""),
+          company: String(formData.get("company") ?? ""),
+          remember: formData.get("remember") === "on",
+        }),
+        signal: controller.signal,
+      });
+      const data: unknown = await res.json().catch(() => null);
+      if (!data || typeof data !== "object") throw new Error(`Réponse invalide (${res.status})`);
+      setSignupState(data as AuthActionState);
     } catch (err) {
+      // Pas de reponse (delai, coupure) : le code a tres probablement ete
+      // envoye, on affiche donc directement la saisie du code.
       console.error("[auth] L'inscription n'a pas répondu :", err);
-      const email = String(formData.get("email") ?? "").trim();
-      return email
-        ? { message: SIGNUP_SLOW_NOTICE, pendingEmail: email }
-        : { error: "Une erreur est survenue. Réessaie dans un instant." };
+      setSignupState(
+        email
+          ? { message: SIGNUP_SLOW_NOTICE, pendingEmail: email }
+          : { error: "Une erreur est survenue. Réessaie dans un instant." }
+      );
+    } finally {
+      window.clearTimeout(timer);
+      setSignupPending(false);
     }
   };
-  const [signupState, signupActionFn] = useFormState(safeSignup, initialState);
   const router = useRouter();
 
   const isSuccess = Boolean(loginState.success || signupState.success);
@@ -523,7 +554,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
               aria-hidden={mode !== "signup"}
               inert={mode !== "signup" ? true : undefined}
             >
-              <SignupForm action={signupActionFn} state={signupState} idPrefix="desktop" onSwitchToLogin={() => setMode("login")} />
+              <SignupForm onSubmit={submitSignup} pending={signupPending} state={signupState} idPrefix="desktop" onSwitchToLogin={() => setMode("login")} />
             </div>
 
             <motion.div
@@ -586,7 +617,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                     exit={{ opacity: 0, x: -16 }}
                     className="w-full"
                   >
-                    <SignupForm action={signupActionFn} state={signupState} idPrefix="mobile" onSwitchToLogin={() => setMode("login")} />
+                    <SignupForm onSubmit={submitSignup} pending={signupPending} state={signupState} idPrefix="mobile" onSwitchToLogin={() => setMode("login")} />
                   </motion.div>
                 )}
               </AnimatePresence>

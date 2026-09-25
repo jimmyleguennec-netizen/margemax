@@ -60,14 +60,20 @@ export function NeonField({
 export function NeonSubmitButton({
   children,
   loadingLabel,
+  pending: pendingProp,
 }: {
   children: React.ReactNode;
   /** Texte affiché a la place de `children` pendant l'envoi (ex. "Envoi
    * en cours...") -- en plus du spinner deja affiche, pour que
    * l'utilisateur voie un changement de texte, pas seulement une icone. */
   loadingLabel?: string;
+  /** Force l'etat "en cours" (formulaire envoye par fetch, sans action). */
+  pending?: boolean;
 }) {
-  const { pending } = useFormStatus();
+  const status = useFormStatus();
+  // pending fourni par le parent (formulaires geres en fetch, sans action) ;
+  // sinon l'etat de l'action de formulaire.
+  const pending = pendingProp ?? status.pending;
 
   return (
     <button
