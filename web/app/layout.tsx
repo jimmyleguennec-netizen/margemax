@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { MotionProvider } from "@/components/motion-provider";
 
@@ -81,13 +80,11 @@ export default function RootLayout({
   return (
     <html lang="fr" className="dark overflow-x-clip" suppressHydrationWarning>
       <head>
-        {/* Script AdSense : verification du site (landing page) et annonces. */}
-        <Script
-          id="adsense-script"
+        {/* Script AdSense en balise HTML brute (pas next/script) : present dans le HTML statique initial, donc detecte par le robot de verification d'AdSense. */}
+        <script
           async
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
       </head>
       <body className={`${inter.variable} overflow-x-clip bg-background font-sans text-foreground antialiased`}>
