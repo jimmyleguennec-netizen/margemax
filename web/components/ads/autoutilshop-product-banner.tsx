@@ -3,6 +3,9 @@
  * Toute la banniere est un lien : clic sur l'image, le titre ou le bouton =
  * fiche produit ouverte dans un nouvel onglet (MargeMax reste ouvert).
  *
+ * Couleurs de la marque AutOutilShop (rouge #BD0303, secondaire #D32F2F, fond
+ * #0B0B0B, bouton en pilule) : l'encart se distingue ainsi du reste de MargeMax.
+ *
  * Produit, prix et image sont centralises dans FEATURED_PRODUCT ci-dessous
  * (donnees copiees de la page d'accueil d'autoutilshop.fr, section "Nos
  * essentiels") : a mettre a jour ici si le produit phare change.
@@ -22,9 +25,9 @@ export function AutoutilshopProductBanner({ className = "" }: { className?: stri
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`${FEATURED_PRODUCT.name} sur AutOutilShop.fr — Acheter maintenant (s'ouvre dans un nouvel onglet)`}
-      className={`group block overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] text-left shadow-[0_0_30px_-12px_rgba(34,211,238,0.5)] transition-all duration-300 hover:border-cyan-400/40 hover:shadow-[0_0_36px_-8px_rgba(217,70,239,0.55)] ${className}`}
+      className={`group block overflow-hidden rounded-xl border-2 border-[#BD0303] bg-[#0B0B0B] text-left shadow-[0_0_24px_-10px_rgba(189,3,3,0.7)] transition-all duration-300 hover:border-[#D32F2F] hover:shadow-[0_0_30px_-6px_rgba(211,47,47,0.75)] ${className}`}
     >
-      <p className="border-b border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/50">
+      <p className="border-b border-[#BD0303]/40 bg-[#BD0303]/10 px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/60">
         Publicité · AutOutilShop.fr
       </p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -40,8 +43,8 @@ export function AutoutilshopProductBanner({ className = "" }: { className?: stri
           Découvre l&apos;outil indispensable auto
         </p>
         <p className="text-xs leading-snug text-white/70">{FEATURED_PRODUCT.name}</p>
-        <p className="text-base font-bold text-cyan-300">{FEATURED_PRODUCT.price}</p>
-        <span className="block rounded-lg bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-white transition-transform duration-300 group-hover:scale-[1.03]">
+        <p className="text-base font-bold text-[#FF5A5A]">{FEATURED_PRODUCT.price}</p>
+        <span className="block rounded-full bg-[#BD0303] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-white transition-all duration-300 group-hover:scale-[1.03] group-hover:bg-[#D32F2F]">
           Acheter maintenant
         </span>
       </div>
