@@ -20,21 +20,8 @@ export default function MentionsLegalesPage() {
           SIREN : 107 057 432 — SIRET : 107 057 432 00018 — RCS Narbonne —
           TVA intracommunautaire : FR70107057432.
         </p>
-        <p className="text-white/70">
-          Numéro de téléphone : en cours
-          de finalisation, il sera publié sur cette page. Pour toute
-          question sur l&apos;identité de l&apos;éditeur d&apos;ici là,
-          contactez{" "}
-          <a
-            href="mailto:contact@autoutilshop.fr"
-            className="text-cyan-300 hover:underline"
-          >
-            contact@autoutilshop.fr
-          </a>
-          .
-        </p>
         <p>
-          Contact :{" "}
+          Contact (adresse e-mail officielle) :{" "}
           <a
             href="mailto:contact@autoutilshop.fr"
             className="text-cyan-300 hover:underline"
