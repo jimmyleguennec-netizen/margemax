@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, setRememberMeCookie } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site-url";
 import {
   RATE_LIMITS,
@@ -80,6 +80,7 @@ export async function login(
     // mal saisi une premiere fois, par ex.) ne doit pas continuer a
     // compter contre ce compte.
     await resetRateLimit(emailKey);
+    setRememberMeCookie(rememberMe);
 
     // Pas de redirect() ici : le client affiche une animation de succès
     // puis navigue lui-même vers /dashboard une fois celle-ci jouee.

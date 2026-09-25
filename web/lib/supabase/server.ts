@@ -2,7 +2,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-import { SESSION_MAX_AGE_SECONDS } from "@/lib/supabase/session";
+import {
+  REMEMBER_ME_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  applySessionLifetime,
+  parseRememberMe,
+} from "@/lib/supabase/session";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -18,7 +23,10 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
  */
 export function createClient(options?: { rememberMe?: boolean }) {
   const cookieStore = cookies();
-  const rememberMe = options?.rememberMe ?? true;
+  // Sans choix explicite (Server Components, routes...), respecte la
+  // preference memorisee a la connexion (cookie auxiliaire remember_me).
+  const rememberMe =
+    options?.rememberMe ?? parseRememberMe(cookieStore.get(REMEMBER_ME_COOKIE)?.value);
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,12 +39,7 @@ export function createClient(options?: { rememberMe?: boolean }) {
         setAll(cookiesToSet: CookieToSet[]) {
           try {
             cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
-              const finalOptions = rememberMe
-                ? {
-                    ...cookieOptions,
-                    maxAge: Math.min(cookieOptions.maxAge ?? SESSION_MAX_AGE_SECONDS, SESSION_MAX_AGE_SECONDS),
-                  }
-                : { ...cookieOptions, maxAge: undefined, expires: undefined };
+              const finalOptions = applySessionLifetime(cookieOptions, rememberMe);
               cookieStore.set(name, value, finalOptions);
             });
           } catch {
@@ -61,4 +64,19 @@ export function createAdminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+}
+
+/**
+ * Memorise le choix "Se souvenir de moi" dans le cookie auxiliaire
+ * `remember_me`, lu par le middleware et le client navigateur pour conserver
+ * la meme politique de duree de vie lors des rafraichissements de jeton.
+ * Cookie de session navigateur quand le choix est "non", 1 jour sinon.
+ */
+export function setRememberMeCookie(rememberMe: boolean) {
+  cookies().set(REMEMBER_ME_COOKIE, String(rememberMe), {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    ...(rememberMe ? { maxAge: SESSION_MAX_AGE_SECONDS } : {}),
+  });
 }

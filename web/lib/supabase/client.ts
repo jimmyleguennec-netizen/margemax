@@ -1,6 +1,10 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-import { SESSION_MAX_AGE_SECONDS } from "@/lib/supabase/session";
+import {
+  REMEMBER_ME_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  parseRememberMe,
+} from "@/lib/supabase/session";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -24,6 +28,16 @@ export function createClient() {
   }
   return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },
-    cookieOptions: { maxAge: SESSION_MAX_AGE_SECONDS },
+    // Rafraichissements de jeton faits dans le navigateur : meme politique
+    // que le serveur (1 jour, ou cookie de session si "se souvenir" decoche).
+    cookieOptions: { maxAge: readRememberMe() ? SESSION_MAX_AGE_SECONDS : undefined },
   });
+}
+
+function readRememberMe(): boolean {
+  if (typeof document === "undefined") return true;
+  const match = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(`${REMEMBER_ME_COOKIE}=`));
+  return parseRememberMe(match?.split("=")[1]);
 }

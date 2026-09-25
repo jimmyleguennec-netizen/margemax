@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, setRememberMeCookie } from "@/lib/supabase/server";
 
 /**
  * N'autorise qu'un chemin relatif interne au site (commence par un seul
@@ -52,6 +52,8 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=account_not_found`);
       }
 
+      // OAuth / lien e-mail : pas de case a cocher -> session "souvenue" (1 jour).
+      setRememberMeCookie(true);
       return NextResponse.redirect(`${origin}${next}`);
     }
     console.error("[auth/callback] Echec de l'echange du code OAuth :", error);

@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SESSION_MAX_AGE_SECONDS } from "@/lib/supabase/session";
+import {
+  REMEMBER_ME_COOKIE,
+  applySessionLifetime,
+  parseRememberMe,
+} from "@/lib/supabase/session";
 
 /**
  * Prefixes de route exigeant une session active. Verifie ici (middleware,
@@ -35,6 +39,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   try {
+    // Preference "Se souvenir de moi" posee a la connexion : preservee lors
+    // des rafraichissements de jeton (cookies de session vs 1 jour).
+    const rememberMe = parseRememberMe(request.cookies.get(REMEMBER_ME_COOKIE)?.value);
     let supabaseResponse = NextResponse.next({ request });
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -50,10 +57,7 @@ export async function updateSession(request: NextRequest) {
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, {
-              ...options,
-              maxAge: Math.min(options?.maxAge ?? SESSION_MAX_AGE_SECONDS, SESSION_MAX_AGE_SECONDS),
-            })
+            supabaseResponse.cookies.set(name, value, applySessionLifetime(options, rememberMe))
           );
         },
       },
