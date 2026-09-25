@@ -1,13 +1,17 @@
 import { ImageResponse } from "next/og";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 
+// Le fichier est resolu au BUILD par le bundler (new URL + import.meta.url)
+// et embarque avec la fonction : pas de fs.readFile / process.cwd(), dont le
+// chemin est invalide dans une fonction serverless Vercel. En cas d'echec,
+// on retombe sur un badge "M" en CSS/JSX (voir plus bas).
 async function loadLogo(): Promise<string | null> {
   try {
-    const file = await readFile(path.join(process.cwd(), "public", "images", "logo-icon.png"));
-    return `data:image/png;base64,${file.toString("base64")}`;
+    const res = await fetch(new URL("../public/images/logo-icon.png", import.meta.url));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return `data:image/png;base64,${buffer.toString("base64")}`;
   } catch (err) {
-    console.error("[og-image] logo-icon.png illisible :", err);
+    console.error("[og-image] logo-icon.png illisible, badge de secours :", err);
     return null;
   }
 }
@@ -52,7 +56,24 @@ export async function renderOgImage() {
               style={{ position: "absolute", left: -67, top: 0 }}
             />
           </div>
-        ) : null}
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 120,
+              height: 120,
+              borderRadius: 28,
+              fontSize: 76,
+              fontWeight: 800,
+              background: "linear-gradient(135deg, #22d3ee, #d946ef 60%, #ec4899)",
+              marginBottom: 28,
+            }}
+          >
+            M
+          </div>
+        )}
         <div
           style={{
             display: "flex",
