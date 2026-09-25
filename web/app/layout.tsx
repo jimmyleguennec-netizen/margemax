@@ -44,20 +44,11 @@ export const metadata: Metadata = {
     locale: "fr_FR",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [
-      {
-        url: "/images/logo-margemax.png",
-        width: 1254,
-        height: 1254,
-        alt: "Logo MargeMax",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: ["/images/logo-margemax.png"],
   },
 };
 
