@@ -13,12 +13,17 @@ import {
   resetRateLimit,
 } from "@/lib/rate-limit";
 
+const ACCOUNT_EXISTS_MESSAGE = "Un compte existe déjà avec cet e-mail. Veuillez vous connecter.";
+
 export type AuthActionState = {
   error?: string;
   message?: string;
   success?: boolean;
   /** Email en attente de confirmation par code OTP (voir signup ci-dessous). */
   pendingEmail?: string;
+  /** Inscription refusee car un compte existe deja pour cet e-mail : l'UI
+   * propose alors un bouton vers la connexion. */
+  accountExists?: boolean;
 };
 
 function isNextRedirectError(error: unknown): boolean {
@@ -166,10 +171,24 @@ export async function signup(
       if (isSupabaseRateLimitError(error)) {
         return { error: OTP_RATE_LIMIT_MESSAGE };
       }
+      // Compte deja existant : message explicite + bouton vers la connexion
+      // (choix produit : clarte pour l'utilisateur, au prix d'une possible
+      // enumeration de comptes -- la limite de debit par IP/e-mail reste
+      // appliquee plus haut).
+      if (error.code === "user_already_exists" || /already (registered|exists)/i.test(error.message ?? "")) {
+        return { error: ACCOUNT_EXISTS_MESSAGE, accountExists: true };
+      }
       return {
         message: "Compte créé ! Un code de confirmation t'a été envoyé par e-mail.",
         pendingEmail: email,
       };
+    }
+
+    // Avec la confirmation par e-mail activee, Supabase ne renvoie PAS d'erreur
+    // pour une adresse deja confirmee : il renvoie un utilisateur factice dont
+    // la liste `identities` est vide. C'est le signe d'un compte existant.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return { error: ACCOUNT_EXISTS_MESSAGE, accountExists: true };
     }
 
     // Si la confirmation par email est activée côté Supabase, aucune session

@@ -114,10 +114,13 @@ function SignupForm({
   action,
   state,
   idPrefix,
+  onSwitchToLogin,
 }: {
   action: FormDispatch;
   state: AuthActionState;
   idPrefix: string;
+  /** Bascule vers l'onglet de connexion (compte deja existant). */
+  onSwitchToLogin?: () => void;
 }) {
   // Hook appele avant tout retour anticipe (regle des Hooks) -- meme si
   // OtpVerifyForm est affiche juste apres, le rendu suivant reinitialise
@@ -178,6 +181,15 @@ function SignupForm({
         label="Se souvenir de moi"
       />
       <NeonMessage state={state} />
+      {state.accountExists && onSwitchToLogin && (
+        <button
+          type="button"
+          onClick={onSwitchToLogin}
+          className="w-full rounded-lg border border-cyan-400/40 px-4 py-2.5 text-sm font-semibold text-cyan-200 transition-colors hover:bg-cyan-400/10"
+        >
+          Se connecter
+        </button>
+      )}
       <NeonSubmitButton loadingLabel="Envoi en cours...">Créer mon compte</NeonSubmitButton>
       <OAuthButtons mode="signup" />
     </form>
@@ -457,7 +469,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
               aria-hidden={mode !== "signup"}
               inert={mode !== "signup" ? true : undefined}
             >
-              <SignupForm action={signupActionFn} state={signupState} idPrefix="desktop" />
+              <SignupForm action={signupActionFn} state={signupState} idPrefix="desktop" onSwitchToLogin={() => setMode("login")} />
             </div>
 
             <motion.div
@@ -520,7 +532,7 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
                     exit={{ opacity: 0, x: -16 }}
                     className="w-full"
                   >
-                    <SignupForm action={signupActionFn} state={signupState} idPrefix="mobile" />
+                    <SignupForm action={signupActionFn} state={signupState} idPrefix="mobile" onSwitchToLogin={() => setMode("login")} />
                   </motion.div>
                 )}
               </AnimatePresence>
