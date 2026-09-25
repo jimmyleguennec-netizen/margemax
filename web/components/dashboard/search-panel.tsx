@@ -592,6 +592,59 @@ export function SearchPanel({
       </form>
 
       <AnimatePresence mode="wait">
+        {status === "idle" && (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-cyan-400/25 bg-white/[0.02] px-5 py-8 text-center sm:px-8"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400/10">
+              <Link2 aria-hidden="true" className="h-5 w-5 text-cyan-300" />
+            </span>
+            <p className="max-w-sm text-sm text-white/75">
+              Tape une URL de produit AliExpress pour calculer tes vraies marges.
+            </p>
+            <p className="max-w-sm text-xs text-white/50">
+              Coûts réels, port, TVA/douane et prix conseillé : ton résultat
+              apparaîtra ici.
+            </p>
+          </motion.div>
+        )}
+
+        {status === "loading" && (
+          <motion.div
+            key="skeleton"
+            role="status"
+            aria-live="polite"
+            aria-label="Analyse en cours"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden rounded-2xl border border-cyan-400/20 bg-white/[0.03] p-5 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-4">
+              <div className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-white/10" />
+              <div className="min-w-0 flex-1 space-y-2.5">
+                <div className="h-4 w-4/5 animate-pulse rounded bg-white/10" />
+                <div className="h-4 w-3/5 animate-pulse rounded bg-white/10" />
+                <div className="h-3 w-2/5 animate-pulse rounded bg-white/[0.06]" />
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.06]" />
+              ))}
+            </div>
+            <p className="mt-4 text-center text-xs text-white/60">
+              Récupération des coûts réels sur AliExpress… ça peut prendre quelques secondes.
+            </p>
+          </motion.div>
+        )}
+
         {status === "error" && errorMessage && (
           <motion.div
             key="error"
