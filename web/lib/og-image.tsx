@@ -1,6 +1,19 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
-export function renderOgImage() {
+async function loadLogo(): Promise<string | null> {
+  try {
+    const file = await readFile(path.join(process.cwd(), "public", "images", "logo-icon.png"));
+    return `data:image/png;base64,${file.toString("base64")}`;
+  } catch (err) {
+    console.error("[og-image] logo-icon.png illisible :", err);
+    return null;
+  }
+}
+
+export async function renderOgImage() {
+  const logo = await loadLogo();
   return new ImageResponse(
     (
       <div
@@ -17,22 +30,29 @@ export function renderOgImage() {
           fontFamily: "sans-serif",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 120,
-            height: 120,
-            borderRadius: 28,
-            fontSize: 76,
-            fontWeight: 800,
-            background: "linear-gradient(135deg, #22d3ee, #d946ef 60%, #ec4899)",
-            marginBottom: 36,
-          }}
-        >
-          M
-        </div>
+        {logo ? (
+          // Le PNG (1221x589) a de larges marges transparentes : on le
+          // recadre sur le motif (x 265->925) a 170x150 px.
+          <div
+            style={{
+              display: "flex",
+              position: "relative",
+              width: 170,
+              height: 150,
+              overflow: "hidden",
+              marginBottom: 28,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logo}
+              alt=""
+              width={311}
+              height={150}
+              style={{ position: "absolute", left: -67, top: 0 }}
+            />
+          </div>
+        ) : null}
         <div
           style={{
             display: "flex",
