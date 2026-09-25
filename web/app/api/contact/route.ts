@@ -6,18 +6,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// Adresse de secours Resend : fonctionne sans verification DNS, reservee
-// aux tests mais toujours acceptee par l'API -- utilisee par defaut ET en
-// repli automatique si RESEND_FROM_EMAIL pointe vers un domaine non
-// verifie (voir sendViaResend plus bas). Domaine "resend.dev" toujours
-// disponible, jamais a configurer.
-const RESEND_FALLBACK_FROM_EMAIL = "MargeMax <onboarding@resend.dev>";
-// Expediteur et destinataire FIXES (domaine autoutilshop.fr verifie chez
-// Resend) : plus de dependance a RESEND_FROM_EMAIL / NEXT_PUBLIC_CONTACT_EMAIL,
-// dont une mauvaise valeur sur Vercel faisait echouer tout envoi.
-// Repli automatique sur RESEND_FALLBACK_FROM_EMAIL uniquement si Resend
-// signale ce domaine comme non verifie (voir sendViaResend).
-const RESEND_FROM_EMAIL = "MargeMax <contact@autoutilshop.fr>";
+// Doit etre une adresse d'un domaine verifie dans le compte Resend
+// (autoutilshop.fr). `||` (pas `??`) : une variable Vercel presente mais
+// vide ("") retombe aussi sur l'adresse par defaut.
+const RESEND_FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL?.trim() || "MargeMax <contact@autoutilshop.fr>";
+// Destinataire fixe, volontairement non configurable.
 const CONTACT_DESTINATION_EMAIL = "contact@autoutilshop.fr";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,73 +93,20 @@ export async function POST(request: Request) {
     );
   }
 
-  let result = await sendViaResend(RESEND_FROM_EMAIL, { name, email, message });
-
-  // Repli automatique : si l'echec vient specifiquement d'un domaine
-  // d'expediteur non verifie cote Resend (RESEND_FROM_EMAIL mal configure
-  // en variable d'environnement, ex. un domaine autoutilshop.fr jamais
-  // verifie dans le compte Resend), on retente une seule fois avec le
-  // domaine de test toujours accepte -- plutot que de faire echouer tout
-  // le formulaire de contact a cause d'une verification DNS incomplete.
-  if (!result.ok && result.reason === "domain_not_verified" && RESEND_FROM_EMAIL !== RESEND_FALLBACK_FROM_EMAIL) {
-    console.warn(
-      `[api/contact] "${RESEND_FROM_EMAIL}" rejeté par Resend (domaine non vérifié) — nouvelle tentative avec l'adresse de secours ${RESEND_FALLBACK_FROM_EMAIL}.`
-    );
-    result = await sendViaResend(RESEND_FALLBACK_FROM_EMAIL, { name, email, message });
-  }
-
-  if (!result.ok) {
-    // Message public generique : la cause reelle (Resend) n'est jamais
-    // exposee aux visiteurs, seulement loguee cote serveur (Vercel).
-    console.error(
-      `[api/contact] Échec d'envoi (${result.reason}) — Détail : ${result.detail}`
-    );
-    return NextResponse.json(
-      {
-        error:
-          "Impossible d'envoyer le message pour le moment. Réessaye plus tard, ou écris-nous directement à contact@autoutilshop.fr.",
-      },
-      { status: result.reason === "network_error" ? 502 : 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true });
-}
-
-type SendResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: "domain_not_verified" | "resend_error" | "network_error";
-      /** Message d'erreur renvoye par Resend (ou description de la panne). */
-      detail: string;
-    };
-
-/**
- * Un seul appel a l'API Resend, avec des logs assez precis pour diagnostiquer
- * une panne depuis les logs Vercel sans avoir a reproduire le probleme :
- * distingue une erreur reseau (impossible de joindre Resend), une erreur
- * Resend generique (cle invalide, limite atteinte...) et le cas specifique
- * "domaine d'expediteur non verifie" (detecte dans le corps de reponse),
- * seul motif qui declenche le repli automatique ci-dessus.
- */
-async function sendViaResend(
-  fromEmail: string,
-  { name, email, message }: { name: string; email: string; message: string }
-): Promise<SendResult> {
-  let response: Response;
+  // Un seul essai, sans repli : en cas d'echec, la reponse d'erreur exacte
+  // de Resend est loguee (logs Vercel) et le visiteur recoit un message
+  // generique.
   try {
-    response = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: fromEmail,
+        from: RESEND_FROM_EMAIL,
         to: [CONTACT_DESTINATION_EMAIL],
-        // reply_to l'adresse du visiteur : une reponse directe depuis la
-        // boite mail atterrit chez lui, pas chez Resend.
+        // reply_to : l'adresse du visiteur, pour repondre directement.
         reply_to: email,
         subject: `Contact MargeMax : ${name}`,
         html: `<p><strong>Nom :</strong> ${escapeHtml(name)}</p><p><strong>Email :</strong> ${escapeHtml(email)}</p><p><strong>Message :</strong></p><p>${escapeHtml(message).replace(/\n/g, "<br />")}</p>`,
@@ -173,48 +114,26 @@ async function sendViaResend(
       }),
       signal: AbortSignal.timeout(15000),
     });
-  } catch (err) {
-    console.error(
-      `[api/contact] Impossible de joindre l'API Resend (from="${fromEmail}") :`,
-      err
-    );
-    return { ok: false, reason: "network_error", detail: "API Resend injoignable" };
+
+    if (!res.ok) {
+      const resendError = await res.text().catch(() => "");
+      console.error("Resend delivery failed:", res.status, resendError);
+      return failure();
+    }
+  } catch (resendError) {
+    console.error("Resend delivery failed:", resendError);
+    return failure();
   }
 
-  if (response.ok) {
-    return { ok: true };
-  }
+  return NextResponse.json({ ok: true });
+}
 
-  // Corps exact de la reponse Resend, tel quel, pour les logs Vercel.
-  const rawBody = await response.text().catch(() => "");
-  console.error("Resend delivery failed:", response.status, rawBody);
-  let parsedMessage = rawBody;
-  try {
-    const parsed = JSON.parse(rawBody) as { message?: string; name?: string };
-    parsedMessage = parsed.message ?? rawBody;
-  } catch {
-    // Corps non-JSON (rare, ex. panne infra Resend) -- garde le texte brut.
-  }
-
-  console.error(
-    `[api/contact] Resend a répondu avec une erreur (code ${response.status}, from="${fromEmail}") :`,
-    parsedMessage
+function failure() {
+  return NextResponse.json(
+    {
+      error:
+        "Impossible d'envoyer le message pour le moment. Réessaye plus tard, ou écris-nous directement à contact@autoutilshop.fr.",
+    },
+    { status: 500 }
   );
-
-  // Resend signale un domaine "From" non verifie via un message contenant
-  // "domain" + "verif" (ex. "The autoutilshop.fr domain is not verified.
-  // Please, add and verify your domain on resend.com/domains") -- pas de
-  // code d'erreur machine-friendly stable documente pour ce cas precis,
-  // donc detection textuelle deliberement large plutot qu'un match exact
-  // fragile.
-  const looksLikeUnverifiedDomain =
-    (response.status === 403 || response.status === 422) &&
-    /domain/i.test(parsedMessage) &&
-    /verif/i.test(parsedMessage);
-
-  return {
-    ok: false,
-    reason: looksLikeUnverifiedDomain ? "domain_not_verified" : "resend_error",
-    detail: parsedMessage || `Resend HTTP ${response.status}`,
-  };
 }

@@ -26,7 +26,7 @@ function jsonError(message: string, status: number) {
 }
 
 /**
- * route.ts lit RESEND_API_KEY/RESEND_FROM_EMAIL/CONTACT_DESTINATION_EMAIL
+ * route.ts lit RESEND_API_KEY/RESEND_FROM_EMAIL
  * en constantes de module (une seule fois, au premier import) -- vi.resetModules()
  * + réimport dynamique APRÈS avoir positionné process.env est donc
  * nécessaire pour que chaque test parte d'une configuration propre,
@@ -88,87 +88,64 @@ describe("POST /api/contact", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("domaine d'expéditeur non vérifié -> retente automatiquement avec onboarding@resend.dev et réussit", async () => {
-    const fetchMock = vi
-      .fn()
-      // 1er appel : domaine personnalisé rejeté par Resend (403, domaine non vérifié).
-      .mockResolvedValueOnce(
-        jsonError(
-          "The autoutilshop.fr domain is not verified. Please, add and verify your domain on https://resend.com/domains",
-          403
-        )
-      )
-      // 2e appel (repli automatique) : succès avec le domaine de test.
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "email_2" }), { status: 200 }));
+  it("envoie en un seul appel : from par défaut, to fixe, reply_to = e-mail du visiteur", async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ id: "email_1" }), { status: 200 })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { POST } = await loadRouteWithEnv({
       RESEND_API_KEY: "re_test_key",
-      RESEND_FROM_EMAIL: "MargeMax <contact@autoutilshop.fr>",
+      RESEND_FROM_EMAIL: undefined,
     });
-    const response = await postContact(VALID_BODY, POST);
-    const body = await response.json();
+    await postContact(VALID_BODY, POST);
 
-    expect(response.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    const firstCallBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-    const secondCallBody = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(firstCallBody.from).toBe("MargeMax <contact@autoutilshop.fr>");
-    expect(secondCallBody.from).toBe("MargeMax <onboarding@resend.dev>");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.from).toBe("MargeMax <contact@autoutilshop.fr>");
+    expect(sent.to).toEqual(["contact@autoutilshop.fr"]);
+    expect(sent.reply_to).toBe(VALID_BODY.email);
   });
 
-  it("erreur Resend générique (pas un domaine non vérifié) -> pas de nouvelle tentative, message d'erreur clair", async () => {
-    const fetchMock = vi.fn(async () => jsonError("Invalid API key", 401));
+  it("erreur Resend -> 500 propre, aucune nouvelle tentative, détail loggé mais pas exposé", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonError("The autoutilshop.fr domain is not verified.", 403)
+    );
     vi.stubGlobal("fetch", fetchMock);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { POST } = await loadRouteWithEnv({
-      RESEND_API_KEY: "re_test_key",
-      RESEND_FROM_EMAIL: "MargeMax <contact@autoutilshop.fr>",
-    });
+    const { POST } = await loadRouteWithEnv({ RESEND_API_KEY: "re_test_key" });
     const response = await postContact(VALID_BODY, POST);
     const body = await response.json();
 
     expect(response.status).toBe(500);
     expect(body.ok).toBeUndefined();
     expect(body.error).toMatch(/impossible d'envoyer/i);
-    expect(body.error).not.toContain("Invalid API key");
-    // Une seule tentative : une cle API invalide ne se resout pas en
-    // changeant l'adresse d'expediteur, retenter n'aurait aucun sens.
+    expect(body.error).not.toContain("domain");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("aucune tentative de repli quand l'adresse d'expéditeur est déjà celle de secours", async () => {
-    const fetchMock = vi.fn(async () =>
-      jsonError("The resend.dev domain is not verified.", 403)
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Resend delivery failed:",
+      403,
+      expect.stringContaining("not verified")
     );
-    vi.stubGlobal("fetch", fetchMock);
-
-    // RESEND_FROM_EMAIL déjà réglé sur l'adresse de secours resend.dev.
-    const { POST } = await loadRouteWithEnv({
-      RESEND_API_KEY: "re_test_key",
-      RESEND_FROM_EMAIL: "MargeMax <onboarding@resend.dev>",
-    });
-    const response = await postContact(VALID_BODY, POST);
-    expect(response.status).toBe(500);
-    // Pas de deuxieme tentative : on utilisait deja l'adresse de secours,
-    // reessayer avec la meme adresse ne changerait rien.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 
-  it("panne réseau vers Resend -> erreur 502 propre, pas d'exception non gérée", async () => {
+  it("panne réseau vers Resend -> 500 propre, pas d'exception non gérée", async () => {
     const fetchMock = vi.fn(async () => {
       throw new TypeError("fetch failed");
     });
     vi.stubGlobal("fetch", fetchMock);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { POST } = await loadRouteWithEnv({ RESEND_API_KEY: "re_test_key" });
     const response = await postContact(VALID_BODY, POST);
     const body = await response.json();
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     expect(body.error).toMatch(/impossible d'envoyer/i);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 
   it("RESEND_API_KEY absente -> message explicite, aucun appel réseau tenté", async () => {
