@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { MIconBadge } from "@/components/ui/m-icon-badge";
+import { ProductThumbnail } from "@/components/ui/product-thumbnail";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
 import { RgbLoader } from "@/components/ui/rgb-loader";
@@ -217,7 +217,7 @@ function MacDemoBody({ demo }: { demo: LiveDemo }) {
   return (
       <div className="space-y-5 p-6 text-left">
         <div className="flex items-center gap-4">
-          <MIconBadge />
+          <ProductThumbnail src={demo.product_image_url} alt={demo.title} className="h-16 w-16" />
           <div>
             <p className="font-medium leading-tight text-white">
               {demo.title}

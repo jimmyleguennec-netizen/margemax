@@ -9,6 +9,7 @@ import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate
 export type LiveDemo = {
   title: string;
   url: string;
+  product_image_url: string | null;
   subtotal: number | null;
   shipping: number | null;
   shippingStatus: "confirmed" | "estimated" | "missing";

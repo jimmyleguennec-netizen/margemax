@@ -89,7 +89,7 @@ const TAB_HELP: Record<string, { title: string; body: string }> = {
   },
   historique: {
     title: "Historique des analyses",
-    body: "Retrouve et réexamine les produits analysés lors de cette session.",
+    body: "Retrouve et réexamine les produits que tu as analysés (conservés sur ton compte).",
   },
   account: {
     title: "Mon compte",
