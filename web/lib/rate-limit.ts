@@ -27,6 +27,9 @@ export const RATE_LIMITS = {
   // uniquement (pas d'e-mail authentifie a ce stade), evite qu'un envoi
   // automatise n'epuise le quota Resend ou n'inonde contact@autoutilshop.fr.
   contactByIp: { maxAttempts: 5, windowSeconds: 3600, lockSeconds: 3600 },
+  // Recherche publique (demo de la landing, /api/search) : chaque appel declenche
+  // des scrapes Firecrawl payants, donc limite par IP.
+  searchByIp: { maxAttempts: 10, windowSeconds: 3600, lockSeconds: 3600 },
 } as const satisfies Record<string, RateLimitConfig>;
 
 export const RATE_LIMIT_MESSAGE =

@@ -47,7 +47,7 @@ const steps = [
     icon: BadgeCheck,
     title: "Obtiens ta marge avant publicité et autres frais",
     description:
-      "Marge, ROI et badge de vérification croisée avec le total réellement payé au checkout.",
+      "Marge, ROI et badge de vérification : « vérifié » seulement si tous les frais sont confirmés, sinon « partiellement vérifié ».",
   },
 ] as const;
 

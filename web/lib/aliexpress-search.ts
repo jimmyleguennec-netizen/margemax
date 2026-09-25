@@ -886,7 +886,10 @@ export async function performAliExpressSearch(
 
   const primary = await analyzeProductPage(productId, deadline);
   if (!options.compareSuppliers) return primary;
-  return selectCheapestSupplier(primary, productId, deadline);
+  // Lien direct colle par l'utilisateur : son annonce reste le resultat
+  // principal, l'alternative moins chere n'est qu'une suggestion. Recherche par
+  // mot-cle : c'est l'annonce la moins chere qui est retenue.
+  return selectCheapestSupplier(primary, productId, deadline, Boolean(directProductId));
 }
 
 /** Analyse d'UNE fiche produit (extraction + couts atterris). Partagee par
@@ -1047,8 +1050,11 @@ export type SupplierComparison = {
   originalUrl: string;
   originalTitle: string;
   originalLandedCost: number;
-  /** Economie vs l'annonce d'origine (>= 0). */
+  /** Economie vs l'annonce d'origine (>= 0) quand l'alternative est retenue. */
   savings: number;
+  /** Recherche par lien direct : annonce similaire MOINS CHERE proposee en
+   * suggestion (l'annonce collee reste le resultat principal). null = aucune. */
+  cheaperAlternative?: { url: string; title: string; landedCost: number; savings: number } | null;
 };
 
 const MAX_SUPPLIER_CANDIDATES = 5;
@@ -1155,7 +1161,8 @@ async function searchSimilarListings(
 async function selectCheapestSupplier(
   primary: AliExpressSearchResult,
   primaryProductId: string,
-  deadline: number
+  deadline: number,
+  keepOriginal: boolean
 ): Promise<AliExpressSearchResult> {
   try {
     const budgetLeft = deadline - Date.now();
@@ -1195,7 +1202,36 @@ async function selectCheapestSupplier(
     const best = all.reduce((cheapest, listing) =>
       listing.partialTotal < cheapest.partialTotal ? listing : cheapest
     );
-    const selectedIsAlternative = best !== primary;
+    const cheaperExists = best !== primary;
+
+    // Lien direct : on garde l'annonce collee ; l'alternative moins chere est
+    // seulement proposee (badge cote UI).
+    if (keepOriginal) {
+      return {
+        ...primary,
+        supplierComparison: {
+          candidatesCompared: all.length,
+          selectedIsAlternative: false,
+          originalUrl: primary.url,
+          originalTitle: primary.title,
+          originalLandedCost: primary.partialTotal,
+          savings: 0,
+          cheaperAlternative: cheaperExists
+            ? {
+                url: best.url,
+                title: best.title,
+                landedCost: best.partialTotal,
+                savings: Math.max(
+                  0,
+                  Math.round((primary.partialTotal - best.partialTotal) * 100) / 100
+                ),
+              }
+            : null,
+        },
+      };
+    }
+
+    const selectedIsAlternative = cheaperExists;
 
     return {
       ...best,

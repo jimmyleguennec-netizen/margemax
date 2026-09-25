@@ -75,6 +75,7 @@ export type ApiResult = {
     originalUrl: string;
     originalTitle: string;
     originalLandedCost: number;
+    cheaperAlternative?: { url: string; title: string; landedCost: number; savings: number } | null;
     savings: number;
   };
 };
@@ -730,7 +731,29 @@ export function SearchPanel({
                 Résultat rouvert depuis ton historique — aucun crédit utilisé (image et variante détaillée non conservées).
               </div>
             )}
-            {result.supplierComparison && (
+            {result.supplierComparison?.cheaperAlternative && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-xs font-medium text-cyan-200">
+                <TrendingDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Annonce similaire moins chère disponible à{" "}
+                  {formatEuro(result.supplierComparison.cheaperAlternative.landedCost)}
+                </span>
+                <span className="font-normal text-cyan-200/80">
+                  — {formatEuro(result.supplierComparison.cheaperAlternative.savings)} de moins,
+                  coût total estimé, à vérifier : produit similaire, pas forcément identique (
+                  <Link
+                    href={result.supplierComparison.cheaperAlternative.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    voir l&apos;annonce
+                  </Link>
+                  )
+                </span>
+              </div>
+            )}
+            {result.supplierComparison && !result.supplierComparison.cheaperAlternative && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-emerald-400/20 bg-emerald-400/10 px-5 py-2 text-xs font-medium text-emerald-200">
                 <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                 <span>

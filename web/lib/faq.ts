@@ -6,7 +6,7 @@ export const faqs = [
   {
     question: "Comment fonctionne le calcul des marges réelles ?",
     answer:
-      "MargeMax combine le prix produit, la livraison et les frais d'importation réellement appliqués — chaque donnée est marquée confirmée, estimée ou indisponible, jamais devinée. Dès que le total réellement payé au checkout est retrouvé, un badge de vérification croisée confirme que le calcul de marge et de ROI correspond bien à la réalité.",
+      "MargeMax fait une analyse et une estimation des coûts réels : prix produit, livraison et frais d'importation (TVA/douane), lus sur la fiche publique de l'annonce AliExpress. Chaque donnée est marquée confirmée, estimée ou indisponible. Quand un montant n'est pas affiché sur la fiche (les taxes, par exemple, ne sont connues qu'au paiement), il est estimé par une règle indiquée à l'écran, et le résultat s'affiche « partiellement vérifié ». MargeMax n'a pas accès à ton panier AliExpress : vérifie toujours le total final au moment de commander.",
   },
   {
     question: "Pourquoi acheter des crédits au lieu d'un abonnement ?",
@@ -22,11 +22,11 @@ export const faqs = [
     question:
       "Que se passe-t-il si un produit AliExpress ne peut pas être analysé ?",
     answer:
-      "Tu es prévenu immédiatement et aucun crédit n'est débité. MargeMax n'invente jamais une donnée manquante : si une information ne peut pas être récupérée (page indisponible, produit retiré...), elle reste clairement signalée comme absente plutôt que devinée.",
+      "Si l'annonce ne peut pas du tout être analysée (page indisponible, produit retiré, accès bloqué), tu es prévenu immédiatement et aucun crédit n'est débité. Si l'analyse aboutit mais que certaines données manquent, le résultat est affiché avec ce qui a été trouvé : les valeurs estimées sont clairement signalées comme telles, et l'analyse compte alors pour 1 crédit.",
   },
   {
     question: "1 crédit correspond-il toujours à 1 analyse ?",
     answer:
-      "Oui : 1 crédit = 1 analyse complète d'une annonce AliExpress. Les 3 crédits offerts à l'inscription (= 3 analyses) suivent la même règle.",
+      "Oui : 1 crédit = 1 analyse aboutie d'une annonce AliExpress (analyse et estimation des coûts), qu'elle soit complète ou partiellement vérifiée. Les 3 crédits offerts à l'inscription (= 3 analyses) suivent la même règle.",
   },
 ];

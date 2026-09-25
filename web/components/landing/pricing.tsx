@@ -18,7 +18,7 @@ import {
 
 const benefits = [
   "Accès direct au lien produit AliExpress",
-  "Variantes disponibles : couleurs, tailles et modèles",
+  "Analyse de prix et estimations de marges",
   "Analyse de sourcing avec calcul de marge automatique",
 ];
 

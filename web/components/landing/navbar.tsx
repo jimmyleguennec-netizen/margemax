@@ -54,10 +54,11 @@ function TopBar({ loggedIn }: { loggedIn: boolean }) {
 }
 
 const drawerAnchors = [
-  { href: "#demo", label: "DÉMO" },
+  { href: "#demo", label: "Démo" },
   { href: "#features", label: "Fonctionnalités" },
   { href: "#pricing", label: "Tarifs" },
   { href: "#faq", label: "FAQ" },
+  { href: "#contact", label: "Contact" },
 ];
 
 const drawerList = {

@@ -202,6 +202,27 @@ function SignupForm({
       )}
       <NeonSubmitButton loadingLabel="Envoi en cours...">Créer mon compte</NeonSubmitButton>
       <OAuthButtons mode="signup" />
+      <p className="text-center text-[11px] leading-relaxed text-white/60">
+        En créant un compte, tu acceptes nos{" "}
+        <Link
+          href="/cgv"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-300 underline-offset-4 hover:underline"
+        >
+          CGU / CGV
+        </Link>{" "}
+        et notre{" "}
+        <Link
+          href="/confidentialite"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-300 underline-offset-4 hover:underline"
+        >
+          Politique de confidentialité
+        </Link>
+        .
+      </p>
     </form>
   );
 }

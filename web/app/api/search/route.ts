@@ -4,6 +4,7 @@ import {
   AliExpressSearchError,
   performAliExpressSearch,
 } from "@/lib/aliexpress-search";
+import { RATE_LIMITS, checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Route Node.js (pas Edge) : le module partage utilise fetch + parsing
 // HTML, sans dependance Edge-incompatible, mais alignee sur le runtime
@@ -41,6 +42,15 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Le champ 'query' (mot-clé ou lien AliExpress) est requis." },
       { status: 400 }
+    );
+  }
+
+  // Limite par IP (route publique, chaque appel coute des scrapes Firecrawl).
+  const allowed = await checkRateLimit(`search:ip:${getClientIp()}`, RATE_LIMITS.searchByIp);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Trop de recherches depuis ton adresse. Réessaie dans quelques minutes, ou crée un compte gratuit." },
+      { status: 429 }
     );
   }
 

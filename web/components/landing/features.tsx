@@ -18,17 +18,17 @@ const features = [
   },
   {
     icon: ShieldCheck,
-    title: "Données vérifiées",
+    title: "Données transparentes",
     description:
-      "Chaque champ affiche sa source et un badge de vérification croisée avec le total réel payé au checkout.",
+      "Chaque champ est marqué confirmé, estimé ou indisponible. Un badge « vérifié » n'apparaît que lorsque tous les frais sont confirmés.",
     accent: "fuchsia",
     span: "lg:col-span-1",
   },
   {
     icon: History,
-    title: "Historique de session",
+    title: "Historique sur ton compte",
     description:
-      "Retrouve tes dernières analyses dans l'onglet Historique, sans les perdre en changeant d'onglet.",
+      "Retrouve tes dernières analyses dans l'onglet Historique, conservées sur ton compte, et actualise un prix quand tu veux.",
     accent: "pink",
     span: "lg:col-span-1",
   },

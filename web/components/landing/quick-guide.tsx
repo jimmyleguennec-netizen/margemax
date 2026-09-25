@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import { CountUp } from "@/components/ui/count-up";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { SectionGlow } from "@/components/ui/section-glow";
-import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
+import { RgbLoader } from "@/components/ui/rgb-loader";
+import { demoMetrics, useLiveDemo, type LiveDemo } from "@/lib/hooks/use-live-demo";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -25,18 +26,9 @@ function formatPct(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
 
-// Memes chiffres d'exemple que components/landing/demo.tsx (voir son
-// commentaire) : jamais une marge/ROI/fiabilite recalculee ou inventee a
-// la main ici, toujours computeMarginEstimate(), la fonction partagee
-// reellement utilisee par le Calculateur et la Recherche du dashboard.
-// L'ancien "Indice de fiabilité : 94 %" etait un pourcentage fixe sans
-// methode reelle derriere (la vraie fiabilite est qualitative -- eleve/
-// moyen/faible -- voir lib/margin-estimate.ts, reliabilityTierFromImportRatio) :
-// remplace par le meme badge ReliabilityBadge que l'app reelle.
-const SUBTOTAL = 14.49;
-const IMPORT_FEE = 3.6;
-const TOTAL_COST = SUBTOTAL + IMPORT_FEE;
-const MARGIN_EXAMPLE = computeMarginEstimate(TOTAL_COST, IMPORT_FEE);
+// Les visuels des etapes 2 a 4 utilisent l'exemple EN DIRECT (/api/demo) :
+// memes chiffres et memes fonctions de calcul que la demo et le dashboard.
+
 
 const guideSteps: {
   id: string;
@@ -59,7 +51,7 @@ const guideSteps: {
     label: "2. Analyse",
     title: "Analyse instantanée des prix, livraison et taxes d'importation",
     description:
-      "Chaque coût est extrait réellement au checkout, avec un statut confirmé, estimé ou indisponible.",
+      "Analyse et estimation des coûts réels (TVA/douane et livraison) : chaque coût est lu sur la fiche AliExpress, avec un statut confirmé, estimé ou indisponible.",
   },
   {
     id: "marge",
@@ -67,7 +59,7 @@ const guideSteps: {
     label: "3. Marge",
     title: "Découverte de la marge avant publicité et autres frais, et de l'indice de fiabilité",
     description:
-      "Marge, ROI et un score de fiabilité qui diminue quand la part de frais estimés (non confirmés au checkout) augmente.",
+      "Marge, ROI et un score de fiabilité qui diminue quand la part de frais estimés (non confirmés sur la fiche) augmente.",
   },
   {
     id: "decision",
@@ -78,6 +70,16 @@ const guideSteps: {
       "Valide ton produit avec ton prix conseillé et lance ta vente en toute confiance.",
   },
 ];
+
+type VisualProps = { demo: LiveDemo | null };
+
+function VisualPending() {
+  return (
+    <p role="status" className="mt-4 flex items-center gap-2 text-xs text-white/50">
+      <RgbLoader size={14} /> Chargement de l&apos;exemple en direct…
+    </p>
+  );
+}
 
 function SearchVisual() {
   return (
@@ -94,19 +96,20 @@ function SearchVisual() {
   );
 }
 
-const ANALYZE_ROWS = [
-  { label: "Sous-total", value: 14.49 },
-  { label: "Livraison", value: 0 },
-  { label: "Taxes", value: 3.6 },
-];
-
-function AnalyzeVisual() {
+function AnalyzeVisual({ demo }: VisualProps) {
+  if (!demo) return <VisualPending />;
+  const m = demoMetrics(demo);
+  const rows = [
+    { label: "Sous-total", value: m.subtotal },
+    { label: demo.shippingStatus === "estimated" ? "Livraison (estimée)" : "Livraison", value: m.shipping },
+    { label: demo.importFeeStatus === "confirmed" ? "Taxes" : "Taxes (estimées)", value: m.importFee },
+  ];
   return (
     <div className="mt-4 space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs">
       <div className="relative h-1 overflow-hidden rounded-full bg-white/5">
         <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-cyan-400/60" />
       </div>
-      {ANALYZE_ROWS.map((row, i) => (
+      {rows.map((row, i) => (
         <motion.div
           key={row.label}
           initial={{ opacity: 0, x: -8 }}
@@ -124,19 +127,21 @@ function AnalyzeVisual() {
   );
 }
 
-function MarginVisual() {
+function MarginVisual({ demo }: VisualProps) {
+  if (!demo) return <VisualPending />;
+  const m = demoMetrics(demo);
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-3">
       <div className="flex items-center gap-4">
         <div>
           <p className="text-xs text-white/60">Marge avant pub (prix conseillé)</p>
           <p className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
-            <CountUp value={MARGIN_EXAMPLE.marginHigh} format={formatEuro} />
+            <CountUp value={m.sale.marginBeforeAds} format={formatEuro} />
           </p>
           <p className="text-xs text-white/60">
             ROI{" "}
-            {MARGIN_EXAMPLE.roiHigh !== null ? (
-              <CountUp value={MARGIN_EXAMPLE.roiHigh} format={formatPct} />
+            {m.sale.roiPct !== null ? (
+              <CountUp value={m.sale.roiPct} format={formatPct} />
             ) : (
               "non calculable"
             )}
@@ -146,53 +151,47 @@ function MarginVisual() {
       <div>
         <div className="flex items-center justify-between text-[11px] text-white/60">
           <span>Fiabilité</span>
-          <ReliabilityBadge tier={MARGIN_EXAMPLE.reliability} />
+          <ReliabilityBadge tier={m.estimate.reliability} />
         </div>
         <p className="mt-1.5 text-[10px] text-white/50">
-          Exemple illustratif — palier qualitatif, pas un pourcentage
-          précis ni une donnée de marché garantie.
+          Exemple en direct — palier qualitatif, pas un pourcentage précis ni
+          une donnée de marché garantie.
         </p>
       </div>
     </div>
   );
 }
 
-// Meme exemple que les cartes 2 et 3 : prix conseille et marge issus des
-// fonctions partagees (computeMarginEstimate / computeSaleMetrics), pas de
-// chiffres ecrits a la main. "Marge avant pub" (et non "nette") : le calcul
-// ne deduit ni publicite ni frais de transaction ni impots.
-const DECISION_METRICS = computeSaleMetrics(TOTAL_COST, MARGIN_EXAMPLE.recommendedPrice);
-const DECISION_IS_PROFITABLE = DECISION_METRICS.marginBeforeAds > 0;
-
-function DecisionVisual() {
+// "Marge avant pub" (et non "nette") : le calcul ne deduit ni publicite ni
+// frais de transaction ni impots.
+function DecisionVisual({ demo }: VisualProps) {
+  if (!demo) return <VisualPending />;
+  const m = demoMetrics(demo);
+  const profitable = m.sale.marginBeforeAds > 0;
   return (
     <div className="mt-4 rounded-lg border border-cyan-400/30 bg-cyan-400/[0.06] p-3 text-xs shadow-[0_0_14px_-4px_rgba(34,211,238,0.5)]">
       <p className="flex items-center gap-1.5 font-semibold text-white">
         <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-cyan-300" />
-        {DECISION_IS_PROFITABLE ? "Produit rentable" : "Produit non rentable"}
+        {profitable ? "Produit rentable" : "Produit non rentable"}
       </p>
       <dl className="mt-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-3">
           <dt className="text-white/60">Marge avant pub</dt>
-          <dd className="font-semibold text-cyan-300">
-            {formatEuro(DECISION_METRICS.marginBeforeAds)}
-          </dd>
+          <dd className="font-semibold text-cyan-300">{formatEuro(m.sale.marginBeforeAds)}</dd>
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt className="text-white/60">Prix conseillé</dt>
-          <dd className="font-semibold text-white">
-            {formatEuro(MARGIN_EXAMPLE.recommendedPrice)}
-          </dd>
+          <dd className="font-semibold text-white">{formatEuro(m.estimate.recommendedPrice)}</dd>
         </div>
       </dl>
       <p className="mt-2.5 text-[10px] text-white/50">
-        Exemple illustratif — tes chiffres dépendent du produit analysé.
+        Exemple en direct — tes chiffres dépendent du produit analysé.
       </p>
     </div>
   );
 }
 
-const visuals: Record<string, () => JSX.Element> = {
+const visuals: Record<string, (props: VisualProps) => JSX.Element> = {
   recherche: SearchVisual,
   analyse: AnalyzeVisual,
   marge: MarginVisual,
@@ -200,6 +199,8 @@ const visuals: Record<string, () => JSX.Element> = {
 };
 
 export function QuickGuide() {
+  const live = useLiveDemo();
+  const demo = live.status === "ready" ? live.data : null;
   const trackRef = useRef<HTMLUListElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -288,7 +289,7 @@ export function QuickGuide() {
               </h3>
               <p className="mt-2 text-sm text-white/70">{step.description}</p>
               <div className="mt-auto pt-1">
-                <Visual />
+                <Visual demo={demo} />
               </div>
             </li>
           );
