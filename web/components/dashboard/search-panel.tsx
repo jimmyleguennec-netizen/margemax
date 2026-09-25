@@ -63,6 +63,15 @@ export type ApiResult = {
   /** true pour un resultat rouvert depuis l'historique du compte : aucun
    * appel reseau ni credit, image et variante detaillee non conservees. */
   isFromHistory?: boolean;
+  /** Comparaison de fournisseurs similaires (voir lib/aliexpress-search.ts). */
+  supplierComparison?: {
+    candidatesCompared: number;
+    selectedIsAlternative: boolean;
+    originalUrl: string;
+    originalTitle: string;
+    originalLandedCost: number;
+    savings: number;
+  };
 };
 
 function asFieldStatus(v: string | null | undefined): FieldStatus {
@@ -687,6 +696,30 @@ export function SearchPanel({
             {result.isFromHistory && (
               <div className="flex items-center gap-1.5 border-b border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-xs font-medium text-cyan-200">
                 Résultat rouvert depuis ton historique — aucun crédit utilisé (image et variante détaillée non conservées).
+              </div>
+            )}
+            {result.supplierComparison && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-emerald-400/20 bg-emerald-400/10 px-5 py-2 text-xs font-medium text-emerald-200">
+                <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Meilleur prix identifié parmi{" "}
+                  {result.supplierComparison.candidatesCompared} fournisseurs similaires
+                </span>
+                {result.supplierComparison.selectedIsAlternative && (
+                  <span className="font-normal text-emerald-200/80">
+                    — {formatEuro(result.supplierComparison.savings)} de moins que l&apos;annonce
+                    d&apos;origine (
+                    <Link
+                      href={result.supplierComparison.originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                    >
+                      voir
+                    </Link>
+                    )
+                  </span>
+                )}
               </div>
             )}
             {result.isExample && (

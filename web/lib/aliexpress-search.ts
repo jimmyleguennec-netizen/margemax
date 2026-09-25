@@ -71,6 +71,9 @@ export type AliExpressSearchResult = {
   /** Horodatage serveur de l'analyse (ISO 8601) -- pas l'horodatage client,
    * qui peut deriver ou etre falsifie. */
   analyzedAt: string;
+  /** Present uniquement quand la comparaison de fournisseurs a ete lancee
+   * (parcours Dashboard) : voir SupplierComparison. */
+  supplierComparison?: SupplierComparison;
 };
 
 export class AliExpressSearchError extends Error {
@@ -799,7 +802,8 @@ function assertKeywordOrThrowUrlError(query: string): void {
 }
 
 export async function performAliExpressSearch(
-  query: string
+  query: string,
+  options: { compareSuppliers?: boolean } = {}
 ): Promise<AliExpressSearchResult> {
   const deadline = Date.now() + ANALYSIS_BUDGET_MS;
   const directProductId = extractProductId(query);
@@ -814,8 +818,20 @@ export async function performAliExpressSearch(
     );
   }
 
+  const primary = await analyzeProductPage(productId, deadline);
+  if (!options.compareSuppliers) return primary;
+  return selectCheapestSupplier(primary, productId, deadline);
+}
+
+/** Analyse d'UNE fiche produit (extraction + couts atterris). Partagee par
+ * l'analyse principale et la comparaison de fournisseurs. */
+async function analyzeProductPage(
+  productId: string,
+  deadline: number,
+  scrape: ScrapeOptions = {}
+): Promise<AliExpressSearchResult> {
   const targetUrl = buildProductUrl(productId);
-  const html = await fetchHtmlViaFirecrawl(targetUrl, deadline);
+  const html = await fetchHtmlViaFirecrawl(targetUrl, deadline, scrape);
 
   // La page peut etre veritablement bloquee (verification anti-bot,
   // longueur quasi nulle) OU seulement partiellement rendue -- dans les
@@ -942,4 +958,160 @@ export function signTopRest(
 
 export function isAliExpressApiConfigured(): boolean {
   return Boolean(ALIEXPRESS_APP_KEY && ALIEXPRESS_APP_SECRET);
+}
+
+/**
+ * Comparaison de fournisseurs : l'annonce retenue est celle dont le cout
+ * atterri (sous-total + livraison + taxes, voir partialTotal) est le plus
+ * bas parmi l'annonce analysee et ses alternatives similaires.
+ */
+export type SupplierComparison = {
+  /** Nombre d'annonces reellement comparees (annonce d'origine incluse). */
+  candidatesCompared: number;
+  /** true si l'annonce renvoyee n'est PAS celle demandee/trouvee en premier. */
+  selectedIsAlternative: boolean;
+  originalUrl: string;
+  originalTitle: string;
+  originalLandedCost: number;
+  /** Economie vs l'annonce d'origine (>= 0). */
+  savings: number;
+};
+
+const MAX_SUPPLIER_CANDIDATES = 5;
+// Reserve minimale de budget pour qu'une comparaison vaille la peine d'etre
+// lancee : en dessous, on renvoie l'analyse principale telle quelle.
+const MIN_COMPARISON_BUDGET_MS = 18000;
+const MIN_TITLE_SIMILARITY = 0.5;
+
+const TITLE_STOPWORDS = new Set([
+  "pour", "avec", "sans", "les", "des", "une", "the", "and", "for", "with",
+  "new", "hot", "sale", "promo", "livraison", "gratuite", "free", "shipping",
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word))
+  );
+}
+
+/** Part des mots du plus petit titre retrouves dans l'autre (0-1). Garde-fou
+ * contre un "fournisseur similaire" qui serait en fait un autre produit. */
+export function titleSimilarity(a: string, b: string): number {
+  const ta = titleTokens(a);
+  const tb = titleTokens(b);
+  const smaller = Math.min(ta.size, tb.size);
+  if (smaller === 0) return 0;
+  let shared = 0;
+  for (const word of ta) if (tb.has(word)) shared++;
+  return shared / smaller;
+}
+
+/** Firecrawl /v1/search restreint aux fiches AliExpress, sur le titre du
+ * produit. Renvoie des candidats (id + titre) distincts de l'annonce d'origine. */
+async function searchSimilarListings(
+  title: string,
+  excludeProductId: string,
+  deadline: number
+): Promise<{ id: string; title: string }[]> {
+  if (!getFirecrawlKey()) return [];
+  const remaining = deadline - Date.now();
+  const words = title.split(/\s+/).filter(Boolean).slice(0, 10).join(" ");
+
+  const response = await fetch("https://api.firecrawl.dev/v1/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getFirecrawlKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `site:aliexpress.com/item ${words}`,
+      limit: 10,
+      lang: "fr",
+      country: "fr",
+      timeout: Math.max(3000, Math.min(12000, remaining - 8000)),
+    }),
+    signal: AbortSignal.timeout(Math.max(3000, Math.min(14000, remaining - 4000))),
+  });
+  if (!response.ok) return [];
+
+  const payload = (await response.json()) as {
+    success?: boolean;
+    data?: { url?: string; title?: string }[];
+  };
+  if (!payload.success || !Array.isArray(payload.data)) return [];
+
+  const seen = new Set<string>([excludeProductId]);
+  const candidates: { id: string; title: string }[] = [];
+  for (const hit of payload.data) {
+    const id = hit.url ? extractProductId(hit.url) : null;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    // Titre de resultat de recherche absent : on laisse passer, la
+    // similarite est de toute facon re-verifiee sur le titre de la fiche.
+    if (hit.title && titleSimilarity(title, hit.title) < MIN_TITLE_SIMILARITY) continue;
+    candidates.push({ id, title: hit.title ?? "" });
+    if (candidates.length >= MAX_SUPPLIER_CANDIDATES) break;
+  }
+  return candidates;
+}
+
+/**
+ * Meilleur effort, JAMAIS bloquant : toute erreur, manque de budget ou
+ * absence d'alternative renvoie simplement l'analyse principale (sans
+ * `supplierComparison`) -- la comparaison ne doit jamais faire echouer ni
+ * retarder un resultat deja obtenu au-dela du budget global.
+ */
+async function selectCheapestSupplier(
+  primary: AliExpressSearchResult,
+  primaryProductId: string,
+  deadline: number
+): Promise<AliExpressSearchResult> {
+  try {
+    if (deadline - Date.now() < MIN_COMPARISON_BUDGET_MS) return primary;
+
+    const candidates = await searchSimilarListings(primary.title, primaryProductId, deadline);
+    if (candidates.length === 0) return primary;
+
+    const settled = await Promise.allSettled(
+      candidates.map((candidate) =>
+        analyzeProductPage(candidate.id, deadline, { maxAttempts: 1 })
+      )
+    );
+
+    const comparable = settled
+      .flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []))
+      .filter(
+        (listing) =>
+          listing.currency === primary.currency &&
+          (listing.subtotal ?? 0) > 0 &&
+          titleSimilarity(primary.title, listing.title) >= MIN_TITLE_SIMILARITY
+      );
+    if (comparable.length === 0) return primary;
+
+    const all = [primary, ...comparable];
+    const best = all.reduce((cheapest, listing) =>
+      listing.partialTotal < cheapest.partialTotal ? listing : cheapest
+    );
+    const selectedIsAlternative = best !== primary;
+
+    return {
+      ...best,
+      supplierComparison: {
+        candidatesCompared: all.length,
+        selectedIsAlternative,
+        originalUrl: primary.url,
+        originalTitle: primary.title,
+        originalLandedCost: primary.partialTotal,
+        savings: Math.max(0, Math.round((primary.partialTotal - best.partialTotal) * 100) / 100),
+      },
+    };
+  } catch (err) {
+    console.warn("[aliexpress-search] Comparaison de fournisseurs abandonnée :", err);
+    return primary;
+  }
 }

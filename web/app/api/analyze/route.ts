@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { computeMarginEstimate } from "@/lib/margin-estimate";
 import {
   AliExpressSearchError,
   performAliExpressSearch,
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
 
   let result;
   try {
-    result = await performAliExpressSearch(query);
+    result = await performAliExpressSearch(query, { compareSuppliers: true });
   } catch (error) {
     console.error("[api/analyze] Échec de l'analyse (aucun crédit débité) :", error);
     const status = error instanceof AliExpressSearchError ? error.status : 502;
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
   // perdue pour autant. Voir app/api/history/route.ts (lecture) et
   // components/dashboard/history-panel.tsx (dégradation visible côté UI
   // si la persistance n'est pas disponible).
-  const { error: historyError } = await supabase.from("search_history").insert({
+  const baseRow = {
     user_id: user.id,
     query,
     result_count: 1,
@@ -172,10 +173,33 @@ export async function POST(request: Request) {
     partial_total: result.partialTotal,
     is_complete: result.isComplete,
     currency: result.currency,
-  });
+  };
+  // Colonnes ajoutees par migration_search_history_v2.sql : image du produit
+  // et donnees de marge (prix bas/conseille/haut + comparaison fournisseurs).
+  const estimate = computeMarginEstimate(result.partialTotal, result.importFee);
+  const richRow = {
+    ...baseRow,
+    image_url: result.product_image_url,
+    margin_data: {
+      recommendedPrice: estimate.recommendedPrice,
+      lowPrice: estimate.lowPrice,
+      highPrice: estimate.highPrice,
+      marginLow: estimate.marginLow,
+      marginHigh: estimate.marginHigh,
+      supplierComparison: result.supplierComparison ?? null,
+    },
+  };
+
+  let { error: historyError } = await supabase.from("search_history").insert(richRow);
+  if (historyError?.code === "42703" || historyError?.code === "PGRST204") {
+    // Migration v2 pas encore executee : on enregistre au moins les
+    // colonnes de base plutot que de perdre toute l'entree.
+    ({ error: historyError } = await supabase.from("search_history").insert(baseRow));
+  }
   if (historyError) {
-    console.warn(
-      "[api/analyze] Historique non persisté (migration_search_history_details.sql peut-être pas encore exécutée) :",
+    console.error(
+      "[api/analyze] Historique non persisté (migration_search_history_details.sql / _v2.sql exécutées ?) :",
+      historyError.code,
       historyError.message
     );
   }
