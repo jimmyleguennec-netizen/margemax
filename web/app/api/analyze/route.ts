@@ -117,7 +117,13 @@ export async function POST(request: Request) {
   );
 
   if (consumeError) {
-    console.error("[api/analyze] Échec du débit de crédit :", consumeError);
+    console.error(
+      "[api/analyze] Échec du débit de crédit (rpc consume_credit) :",
+      consumeError.code,
+      consumeError.message,
+      consumeError.details,
+      consumeError.hint
+    );
     return NextResponse.json(
       {
         error:
