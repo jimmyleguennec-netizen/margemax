@@ -14,6 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { OtpVerifyForm } from "@/components/auth/otp-verify-form";
+import { OTP_RATE_LIMIT_MESSAGE } from "@/lib/auth-errors";
 import { NeonField, NeonMessage, NeonSubmitButton } from "@/components/auth/neon-form-fields";
 import {
   CheckoutConsentDialog,
@@ -131,7 +132,12 @@ function SignupForm({
   // immediate) : bascule vers la saisie du code OTP plutot que d'afficher
   // a nouveau le formulaire d'inscription.
   if (state.pendingEmail) {
-    return <OtpVerifyForm email={state.pendingEmail} />;
+    return (
+      <OtpVerifyForm
+        email={state.pendingEmail}
+        notice={state.message === OTP_RATE_LIMIT_MESSAGE ? state.message : undefined}
+      />
+    );
   }
 
   return (
@@ -361,7 +367,11 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
     document.title = MODE_TITLES[mode];
     const path = mode === "login" ? "/login" : "/signup";
     if (window.location.pathname !== path) {
-      window.history.replaceState(null, "", path + window.location.search);
+      // "expired" n'a de sens que sur /login : ne pas le reporter sur /signup.
+      const params = new URLSearchParams(window.location.search);
+      params.delete("expired");
+      const query = params.toString();
+      window.history.replaceState(null, "", path + (query ? `?${query}` : ""));
     }
   }, [mode]);
 

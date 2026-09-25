@@ -169,7 +169,9 @@ export async function signup(
       // laisser croire qu'un nouveau code vient d'etre envoye. Ne revele rien
       // sur l'existence du compte (la limite porte sur l'envoi, pas l'adresse).
       if (isSupabaseRateLimitError(error)) {
-        return { error: OTP_RATE_LIMIT_MESSAGE };
+        // Un code vient d'etre envoye : on affiche directement la saisie du
+        // code (avec un avertissement) plutot qu'une simple erreur.
+        return { message: OTP_RATE_LIMIT_MESSAGE, pendingEmail: email };
       }
       // Compte deja existant : message explicite + bouton vers la connexion
       // (choix produit : clarte pour l'utilisateur, au prix d'une possible

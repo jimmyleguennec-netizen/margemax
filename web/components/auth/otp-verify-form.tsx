@@ -23,7 +23,7 @@ const OTP_LENGTH = 8;
 
 type Status = "idle" | "verifying" | "verified" | "error";
 
-export function OtpVerifyForm({ email }: { email: string }) {
+export function OtpVerifyForm({ email, notice }: { email: string; notice?: string }) {
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -136,6 +136,15 @@ export function OtpVerifyForm({ email }: { email: string }) {
           <span className="text-cyan-300">{email}</span>.
         </p>
       </div>
+
+      {notice && (
+        <p
+          role="status"
+          className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200"
+        >
+          {notice}
+        </p>
+      )}
 
       <div className="space-y-1.5">
         <label
