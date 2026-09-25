@@ -130,9 +130,10 @@ describe("POST /api/contact", () => {
     const response = await postContact(VALID_BODY, POST);
     const body = await response.json();
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     expect(body.ok).toBeUndefined();
     expect(body.error).toMatch(/impossible d'envoyer/i);
+    expect(body.error).toContain("Invalid API key");
     // Une seule tentative : une cle API invalide ne se resout pas en
     // changeant l'adresse d'expediteur, retenter n'aurait aucun sens.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -150,7 +151,7 @@ describe("POST /api/contact", () => {
       RESEND_FROM_EMAIL: undefined,
     });
     const response = await postContact(VALID_BODY, POST);
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(500);
     // Pas de deuxieme tentative : on utilisait deja l'adresse de secours,
     // reessayer avec la meme adresse ne changerait rien.
     expect(fetchMock).toHaveBeenCalledTimes(1);

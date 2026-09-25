@@ -118,12 +118,17 @@ export async function POST(request: Request) {
   }
 
   if (!result.ok) {
+    const generic =
+      "Impossible d'envoyer ton message pour le moment. Réessaie, ou écris-nous directement à contact@autoutilshop.fr.";
+    // Erreur Resend explicite (cle invalide, limite, etc.) : on renvoie
+    // son message pour que le formulaire affiche la vraie cause. Panne
+    // reseau : pas de message Resend, on garde le message generique.
+    if (result.reason === "network_error") {
+      return NextResponse.json({ error: generic }, { status: 502 });
+    }
     return NextResponse.json(
-      {
-        error:
-          "Impossible d'envoyer ton message pour le moment. Réessaie, ou écris-nous directement à contact@autoutilshop.fr.",
-      },
-      { status: 502 }
+      { error: `${generic} (Détail : ${result.detail})` },
+      { status: 500 }
     );
   }
 
@@ -132,7 +137,12 @@ export async function POST(request: Request) {
 
 type SendResult =
   | { ok: true }
-  | { ok: false; reason: "domain_not_verified" | "resend_error" | "network_error" };
+  | {
+      ok: false;
+      reason: "domain_not_verified" | "resend_error" | "network_error";
+      /** Message d'erreur renvoye par Resend (ou description de la panne). */
+      detail: string;
+    };
 
 /**
  * Un seul appel a l'API Resend, avec des logs assez precis pour diagnostiquer
@@ -171,7 +181,7 @@ async function sendViaResend(
       `[api/contact] Impossible de joindre l'API Resend (from="${fromEmail}") :`,
       err
     );
-    return { ok: false, reason: "network_error" };
+    return { ok: false, reason: "network_error", detail: "API Resend injoignable" };
   }
 
   if (response.ok) {
@@ -203,5 +213,9 @@ async function sendViaResend(
     /domain/i.test(parsedMessage) &&
     /verif/i.test(parsedMessage);
 
-  return { ok: false, reason: looksLikeUnverifiedDomain ? "domain_not_verified" : "resend_error" };
+  return {
+    ok: false,
+    reason: looksLikeUnverifiedDomain ? "domain_not_verified" : "resend_error",
+    detail: parsedMessage || `Resend HTTP ${response.status}`,
+  };
 }
