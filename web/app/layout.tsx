@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { MotionProvider } from "@/components/motion-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+
+// Identifiant AdSense (public, deja present dans public/ads.txt). Surcharge possible
+// via NEXT_PUBLIC_ADSENSE_CLIENT_ID (format "ca-pub-XXXXXXXXXXXXXXXX").
+const ADSENSE_CLIENT_ID =
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID?.trim() || "ca-pub-9592641407372261";
 
 const SITE_URL = "https://www.margemax.com";
 const SITE_TITLE = "MargeMax — Trouve tes meilleures opportunités de sourcing";
@@ -37,6 +43,8 @@ export const metadata: Metadata = {
   verification: {
     google: "gJcfuk7q5PrqMQwIS7V4pDk__BcxwG6kdAU-zv-PS2c",
   },
+  // Balise de verification AdSense (visible dans le HTML statique pour le robot de Google).
+  other: { "google-adsense-account": ADSENSE_CLIENT_ID },
   openGraph: {
     type: "website",
     url: SITE_URL,
@@ -72,6 +80,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark overflow-x-clip" suppressHydrationWarning>
+      <head>
+        {/* Script AdSense : verification du site (landing page) et annonces. */}
+        <Script
+          id="adsense-script"
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className={`${inter.variable} overflow-x-clip bg-background font-sans text-foreground antialiased`}>
         {/* Desactive la restauration de scroll native du navigateur
             (rechargement de page, retour arriere) le plus tot possible --
