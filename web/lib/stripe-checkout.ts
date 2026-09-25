@@ -30,6 +30,16 @@ export function buildCheckoutSessionParams(
     client_reference_id: `${pack.key}:${userId}`,
     ...(email ? { customer_email: email } : {}),
     customer_creation: "always",
+    // Facture (PDF) creee pour chaque achat : c'est elle qui apparait dans le
+    // portail client Stripe ("Gerer mes factures"). Sans ceci, un paiement
+    // unique ne genere aucune facture et l'historique reste vide.
+    invoice_creation: {
+      enabled: true,
+      invoice_data: {
+        description: `Pack ${pack.label} — ${pack.credits} crédits MargeMax`,
+        footer: "AutOutilShop SAS — SIREN 107 057 432 — TVA intracommunautaire FR70107057432",
+      },
+    },
     line_items: [
       priceId
         ? { quantity: 1, price: priceId }
