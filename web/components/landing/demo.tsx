@@ -95,7 +95,6 @@ function MacDemoWindow({ live }: { live: ReturnType<typeof useLiveDemo> }) {
           ) : (
             <MacDemoBody demo={live.data} />
           )}
-          </div>
         </div>
       </div>
     </motion.div>
@@ -167,6 +166,7 @@ function CalculatorDemoWindow({ live }: { live: ReturnType<typeof useLiveDemo> }
           ) : (
             <CalculatorDemoBody demo={live.data} />
           )}
+        </div>
       </div>
     </motion.div>
   );

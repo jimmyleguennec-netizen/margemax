@@ -91,7 +91,7 @@ function StepOneMockup({ demo }: { demo: LiveDemo | null }) {
       <div className="flex items-center gap-3 rounded-lg border border-cyan-400/30 bg-white/5 px-4 py-3 shadow-[0_0_20px_-4px_rgba(34,211,238,0.5)]">
         <Link2 aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-300" />
         <span className="truncate text-sm text-white/70">
-          {demo ? demo.url.replace(/^https?:///, "") : "fr.aliexpress.com/item/…"}
+          {demo ? demo.url.replace("https://", "") : "fr.aliexpress.com/item/…"}
         </span>
         <Clipboard aria-hidden="true" className="ml-auto h-4 w-4 shrink-0 text-white/50" />
       </div>
