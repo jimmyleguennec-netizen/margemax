@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function ConfidentialitePage() {
   return (
-    <LegalPage title="Politique de confidentialité" updatedAt="15 septembre 2026">
+    <LegalPage title="Politique de confidentialité" updatedAt="25 septembre 2026">
       <LegalSection title="Responsable du traitement">
         <p>
           Le responsable du traitement des données personnelles collectées
@@ -55,6 +55,19 @@ export default function ConfidentialitePage() {
           hébergement des données de compte) et Stripe (traitement des
           paiements). Aucune donnée n&apos;est cédée, louée ou vendue à des
           tiers à des fins commerciales.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Cookies et publicité">
+        <p>
+          <strong className="text-white">
+            Publicités tiers et Google AdSense :
+          </strong>{" "}
+          Nous utilisons Google AdSense pour afficher des annonces sur notre
+          site. Google utilise des cookies pour diffuser des publicités en
+          fonction des visites antérieures des utilisateurs sur notre site ou
+          sur d&apos;autres pages web. Vous pouvez désactiver la publicité
+          personnalisée dans les paramètres de votre compte Google.
         </p>
       </LegalSection>
 
