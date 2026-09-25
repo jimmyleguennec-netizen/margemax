@@ -30,6 +30,13 @@ export function buildCheckoutSessionParams(
     client_reference_id: `${pack.key}:${userId}`,
     ...(email ? { customer_email: email } : {}),
     customer_creation: "always",
+    // Recu par e-mail : en mode live, un `receipt_email` explicite declenche
+    // l'envoi du recu Stripe au client meme si l'option n'est pas activee dans
+    // le tableau de bord (Parametres -> E-mails clients).
+    payment_intent_data: {
+      description: `Pack ${pack.label} — ${pack.credits} crédits MargeMax`,
+      ...(email ? { receipt_email: email } : {}),
+    },
     // Facture (PDF) creee pour chaque achat : c'est elle qui apparait dans le
     // portail client Stripe ("Gerer mes factures"). Sans ceci, un paiement
     // unique ne genere aucune facture et l'historique reste vide.
