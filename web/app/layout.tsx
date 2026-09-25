@@ -27,12 +27,15 @@ export const metadata: Metadata = {
   // heritee par TOUTES les pages dirait a Google que /cgv, /mentions-legales
   // ... sont des doublons de la page d'accueil et les ferait desindexer.
   alternates: { canonical: "./" },
-  // Fichiers app/favicon.ico, app/icon.png et app/apple-icon.png (servis
-  // par Next sous /favicon.ico, /icon.png, /apple-icon.png).
+  // Favicon pour Google Search : PNG carres dont la taille est un MULTIPLE DE 48
+  // (48, 96, 192 -- exigence de Google), servis depuis public/. app/icon.png
+  // (256 px, non multiple de 48) est supprime pour ne plus etre declare.
   icons: {
     icon: [
+      { url: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
+      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      { url: "/favicon-192x192.png", type: "image/png", sizes: "192x192" },
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png", sizes: "256x256" },
     ],
     shortcut: "/favicon.ico",
     apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
