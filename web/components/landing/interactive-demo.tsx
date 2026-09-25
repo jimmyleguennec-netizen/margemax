@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeCheck,
   Calculator,
+  AlertTriangle,
   CheckCircle2,
   Clipboard,
   Link2,
@@ -14,7 +15,7 @@ import {
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
-import { computeMarginEstimate } from "@/lib/margin-estimate";
+import { demoMetrics, isDemoVerified, useLiveDemo, type LiveDemo } from "@/lib/hooks/use-live-demo";
 
 function formatEuro(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
@@ -24,15 +25,6 @@ function formatPct(n: number): string {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
 }
 
-// Memes chiffres d'exemple que components/landing/demo.tsx et quick-guide.tsx
-// (Station de charge 3-en-1, sous-total 14,49 € + taxes 3,60 € = 18,09 €) --
-// marge/ROI toujours recalcules via computeMarginEstimate(), jamais une
-// valeur fixe recopiee a la main (d'anciens chiffres 21,81 €/120,6 % ici
-// dataient d'une formule de marge anterieure, desynchronisee de la vraie
-// methode -- voir lib/margin-estimate.ts).
-const DEMO_TOTAL_COST = 18.09;
-const DEMO_IMPORT_FEE = 3.6;
-const DEMO_ESTIMATE = computeMarginEstimate(DEMO_TOTAL_COST, DEMO_IMPORT_FEE);
 
 const steps = [
   {
@@ -85,7 +77,7 @@ function MockupWindow({ children }: { children: React.ReactNode }) {
   );
 }
 
-function StepOneMockup() {
+function StepOneMockup({ demo }: { demo: LiveDemo | null }) {
   return (
     <motion.div
       key="step-1"
@@ -99,7 +91,7 @@ function StepOneMockup() {
       <div className="flex items-center gap-3 rounded-lg border border-cyan-400/30 bg-white/5 px-4 py-3 shadow-[0_0_20px_-4px_rgba(34,211,238,0.5)]">
         <Link2 aria-hidden="true" className="h-4 w-4 shrink-0 text-cyan-300" />
         <span className="truncate text-sm text-white/70">
-          fr.aliexpress.com/item/1005006478208156.html
+          {demo ? demo.url.replace(/^https?:///, "") : "fr.aliexpress.com/item/…"}
         </span>
         <Clipboard aria-hidden="true" className="ml-auto h-4 w-4 shrink-0 text-white/50" />
       </div>
@@ -111,13 +103,15 @@ function StepOneMockup() {
   );
 }
 
-const CHECKOUT_ROWS = [
-  { label: "Sous-total", value: 14.49 },
-  { label: "Port", value: 0 },
-  { label: "Taxes", value: 3.6 },
-];
-
-function StepTwoMockup() {
+function StepTwoMockup({ demo }: { demo: LiveDemo | null }) {
+  const m = demo ? demoMetrics(demo) : null;
+  const checkoutRows = m
+    ? [
+        { label: "Sous-total", value: m.subtotal },
+        { label: demo?.shippingStatus === "estimated" ? "Port (estimé)" : "Port", value: m.shipping },
+        { label: demo?.importFeeStatus === "confirmed" ? "Taxes" : "Taxes (estimées)", value: m.importFee },
+      ]
+    : [];
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -136,18 +130,18 @@ function StepTwoMockup() {
       className="flex h-full flex-col justify-center gap-4"
     >
       <div className="flex items-center gap-3">
-        {!revealed && <RgbLoader size={22} />}
+        {(!revealed || !demo) && <RgbLoader size={22} />}
         <p className="text-sm text-white/60">
-          {revealed ? "Décompte réel du checkout" : "Analyse en cours..."}
+          {!demo ? "Chargement de l'exemple en direct…" : revealed ? "Décompte de l'exemple en direct" : "Analyse en cours..."}
         </p>
       </div>
       <AnimatePresence mode="wait">
-        {revealed && (
+        {revealed && demo && (
           <motion.div
             key="rows"
             className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm"
           >
-            {CHECKOUT_ROWS.map((row, i) => (
+            {checkoutRows.map((row, i) => (
               <motion.div
                 key={row.label}
                 initial={{ opacity: 0, x: -8 }}
@@ -172,7 +166,23 @@ function StepTwoMockup() {
   );
 }
 
-function StepThreeMockup() {
+function StepThreeMockup({ demo }: { demo: LiveDemo | null }) {
+  if (!demo) {
+    return (
+      <motion.div
+        key="step-3"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
+        className="flex h-full items-center justify-center gap-3 text-sm text-white/60"
+      >
+        <RgbLoader size={22} />
+        Chargement de l'exemple en direct…
+      </motion.div>
+    );
+  }
+  const m = demoMetrics(demo);
+  const verified = isDemoVerified(demo);
   return (
     <motion.div
       key="step-3"
@@ -184,25 +194,35 @@ function StepThreeMockup() {
     >
       <div>
         <p className="font-medium leading-tight text-white">
-          Station de charge 3-en-1
+          {demo.title}
         </p>
-        <div className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]">
-          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
-          Coût vérifié
+        <div
+          className={
+            verified
+              ? "mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs font-medium text-green-300 shadow-[0_0_14px_-4px_rgba(74,222,128,0.7)]"
+              : "mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-300"
+          }
+        >
+          {verified ? (
+            <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+          ) : (
+            <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+          )}
+          {verified ? "Coût vérifié" : "Partiellement vérifié"} · exemple en direct
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.04] p-4">
         <div>
-          <p className="text-xs text-white/60">Total checkout</p>
+          <p className="text-xs text-white/60">Coût total estimé</p>
           <p className="text-xl font-bold text-white">
-            <CountUp value={DEMO_TOTAL_COST} format={formatEuro} />
+            <CountUp value={m.totalCost} format={formatEuro} />
           </p>
         </div>
         <div>
           <p className="text-xs text-white/60">Marge avant pub</p>
           <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
-            <CountUp value={DEMO_ESTIMATE.marginHigh} format={formatEuro} />
+            <CountUp value={m.sale.marginBeforeAds} format={formatEuro} />
           </p>
         </div>
         <div>
@@ -210,8 +230,8 @@ function StepThreeMockup() {
             <TrendingUp aria-hidden="true" className="h-3.5 w-3.5" /> ROI
           </p>
           <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
-            {DEMO_ESTIMATE.roiHigh !== null ? (
-              <CountUp value={DEMO_ESTIMATE.roiHigh} format={formatPct} />
+            {m.sale.roiPct !== null ? (
+              <CountUp value={m.sale.roiPct} format={formatPct} />
             ) : (
               "—"
             )}
@@ -220,7 +240,7 @@ function StepThreeMockup() {
         <div>
           <p className="text-xs text-white/60">Prix conseillé</p>
           <p className="text-xl font-bold text-white">
-            <CountUp value={39.9} format={formatEuro} />
+            <CountUp value={m.estimate.recommendedPrice} format={formatEuro} />
           </p>
         </div>
       </div>
@@ -230,6 +250,8 @@ function StepThreeMockup() {
 
 export function InteractiveDemo() {
   const [active, setActive] = useState<1 | 2 | 3>(1);
+  const live = useLiveDemo();
+  const demo = live.status === "ready" ? live.data : null;
 
   return (
     <section className="container py-20 sm:py-28">
@@ -289,9 +311,9 @@ export function InteractiveDemo() {
 
         <MockupWindow>
           <AnimatePresence mode="wait">
-            {active === 1 && <StepOneMockup />}
-            {active === 2 && <StepTwoMockup />}
-            {active === 3 && <StepThreeMockup />}
+            {active === 1 && <StepOneMockup demo={demo} />}
+            {active === 2 && <StepTwoMockup demo={demo} />}
+            {active === 3 && <StepThreeMockup demo={demo} />}
           </AnimatePresence>
         </MockupWindow>
       </div>
