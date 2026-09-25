@@ -23,6 +23,7 @@ import { Logo } from "@/components/ui/logo";
 import { RgbLoader } from "@/components/ui/rgb-loader";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { SessionWatcher } from "@/components/dashboard/session-watcher";
+import { AdWrapper } from "@/components/layout/ad-wrapper";
 import { PurchaseSuccessModal } from "@/components/dashboard/purchase-success-modal";
 import {
   clearPendingPurchase,
@@ -556,6 +557,7 @@ export function DashboardShell({
           <ActiveTabHint active={active} />
         </header>
 
+        <AdWrapper>
         <main className="relative z-10 container overflow-x-clip py-10 pointer-events-auto">
           <AnimatePresence mode="wait">
             <motion.div
@@ -610,6 +612,7 @@ export function DashboardShell({
             </motion.div>
           </AnimatePresence>
         </main>
+        </AdWrapper>
       </div>
 
       <PurchaseSuccessModal
