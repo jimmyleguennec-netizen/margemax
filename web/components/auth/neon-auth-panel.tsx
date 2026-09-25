@@ -14,7 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { OtpVerifyForm } from "@/components/auth/otp-verify-form";
-import { OTP_RATE_LIMIT_MESSAGE } from "@/lib/auth-errors";
+import { OTP_RATE_LIMIT_MESSAGE, SIGNUP_SLOW_NOTICE } from "@/lib/auth-errors";
 import { NeonField, NeonMessage, NeonSubmitButton } from "@/components/auth/neon-form-fields";
 import {
   CheckoutConsentDialog,
@@ -135,7 +135,11 @@ function SignupForm({
     return (
       <OtpVerifyForm
         email={state.pendingEmail}
-        notice={state.message === OTP_RATE_LIMIT_MESSAGE ? state.message : undefined}
+        notice={
+          state.message === OTP_RATE_LIMIT_MESSAGE || state.message === SIGNUP_SLOW_NOTICE
+            ? state.message
+            : undefined
+        }
       />
     );
   }
@@ -384,7 +388,26 @@ export function NeonAuthPanel({ initialMode }: { initialMode: Mode }) {
         ? { error: CALLBACK_ERROR_MESSAGE }
         : initialState;
   const [loginState, loginActionFn] = useFormState(login, initialLoginState);
-  const [signupState, signupActionFn] = useFormState(signup, initialState);
+  // Filet de securite : si la Server Action d'inscription ne repond pas
+  // (delai depasse, coupure reseau), React reinitialise le formulaire SANS
+  // aucun message -- exactement le symptome "je remplis, tout s'efface, rien
+  // ne se passe". On intercepte donc l'echec : le code a tres probablement
+  // ete envoye, on affiche donc directement la saisie du code.
+  const safeSignup = async (
+    prevState: AuthActionState,
+    formData: FormData
+  ): Promise<AuthActionState> => {
+    try {
+      return await signup(prevState, formData);
+    } catch (err) {
+      console.error("[auth] L'inscription n'a pas répondu :", err);
+      const email = String(formData.get("email") ?? "").trim();
+      return email
+        ? { message: SIGNUP_SLOW_NOTICE, pendingEmail: email }
+        : { error: "Une erreur est survenue. Réessaie dans un instant." };
+    }
+  };
+  const [signupState, signupActionFn] = useFormState(safeSignup, initialState);
   const router = useRouter();
 
   const isSuccess = Boolean(loginState.success || signupState.success);

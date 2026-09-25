@@ -13,3 +13,8 @@ export function isSupabaseRateLimitError(
   if (error.code && /rate_limit/i.test(error.code)) return true;
   return /rate limit|after \d+ seconds|too many requests/i.test(error.message ?? "");
 }
+
+/** Affiche quand la reponse du serveur a l'inscription n'est pas arrivee
+ * (delai depasse, coupure) : le code a tres probablement ete envoye quand meme. */
+export const SIGNUP_SLOW_NOTICE =
+  "La demande a mis du temps à répondre. Si tu as reçu un code par e-mail, saisis-le ici ; sinon, renvoie-le.";

@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { NeonAuthPanelClient } from "@/components/auth/neon-auth-panel-client";
 
 export const dynamic = "force-dynamic";
+// Les Server Actions de connexion/inscription (envoi d'e-mail via Supabase) heritent de
+// cette duree : sans elle, le defaut de 10 s peut couper une inscription lente
+// et faire disparaitre le formulaire sans aucun message.
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
   title: "Créer un compte — MargeMax",
