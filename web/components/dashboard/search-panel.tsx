@@ -26,6 +26,7 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
 import type { HistoryEntry } from "@/components/dashboard/history-panel";
 import { VARIANT_WARNING } from "@/lib/variant-warning";
+import { InfoTip, TIP_AD_BUDGET, TIP_ROI } from "@/components/ui/info-tip";
 
 type Status = "idle" | "loading" | "result" | "error";
 
@@ -237,11 +238,11 @@ function EstimateBlock({
   const bound = !isComplete && shippingMissing ? "≤ " : "";
   const pct = (n: number | null) => (n === null ? "Non calculable" : `${bound}${formatPct(n)}`);
 
-  const tiles: { label: string; value: string }[] = [
-    { label: "Marge avant pub", value: `${bound}${formatEuro(metrics.marginBeforeAds)}` },
+  const tiles: { label: string; value: string; tip?: string }[] = [
+    { label: "Marge avant pub", value: `${bound}${formatEuro(metrics.marginBeforeAds)}`, tip: TIP_AD_BUDGET },
     { label: "Taux de marge (sur vente)", value: pct(metrics.marginRatePct) },
-    { label: "ROI (sur coût)", value: pct(metrics.roiPct) },
-    { label: "Budget pub max / vente", value: `${bound}${formatEuro(metrics.adBudgetMax)}` },
+    { label: "ROI (sur coût)", value: pct(metrics.roiPct), tip: TIP_ROI },
+    { label: "Budget pub max / vente", value: `${bound}${formatEuro(metrics.adBudgetMax)}`, tip: TIP_AD_BUDGET },
   ];
 
   return (
@@ -287,9 +288,17 @@ function EstimateBlock({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {tiles.map((tile) => (
+        {tiles.map((tile, index) => (
           <div key={tile.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-3 glow-hover">
-            <p className="text-[11px] text-white/60">{tile.label}</p>
+            <p className="text-[11px] text-white/60">
+              {tile.tip ? (
+                <InfoTip text={tile.tip} align={index % 2 === 1 ? "right" : "left"}>
+                  {tile.label}
+                </InfoTip>
+              ) : (
+                tile.label
+              )}
+            </p>
             <p className="mt-1 text-base font-bold text-white">{tile.value}</p>
           </div>
         ))}

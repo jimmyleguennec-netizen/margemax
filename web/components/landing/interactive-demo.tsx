@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { InfoTip, TIP_AD_BUDGET, TIP_ROI } from "@/components/ui/info-tip";
 import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 import { demoMetrics, isDemoVerified, useLiveDemo, type LiveDemo } from "@/lib/hooks/use-live-demo";
@@ -220,14 +221,17 @@ function StepThreeMockup({ demo }: { demo: LiveDemo | null }) {
           </p>
         </div>
         <div>
-          <p className="text-xs text-white/60">Marge avant pub</p>
+          <p className="text-xs text-white/60">
+            <InfoTip text={TIP_AD_BUDGET}>Marge avant pub</InfoTip>
+          </p>
           <p className="text-xl font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
             <CountUp value={m.sale.marginBeforeAds} format={formatEuro} />
           </p>
         </div>
         <div>
           <p className="flex items-center gap-1 text-xs text-white/60">
-            <TrendingUp aria-hidden="true" className="h-3.5 w-3.5" /> ROI
+            <TrendingUp aria-hidden="true" className="h-3.5 w-3.5" />
+            <InfoTip text={TIP_ROI} align="right">ROI</InfoTip>
           </p>
           <p className="text-xl font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
             {m.sale.roiPct !== null ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { StaggerList } from "@/components/ui/stagger";
 import { AlertTriangle, ExternalLink, History as HistoryIcon, RefreshCw } from "lucide-react";
@@ -104,6 +105,9 @@ export function HistoryPanel({
    * a échoué, auquel cas seules les entrées de cette session s'affichent. */
   persisted?: boolean;
 }) {
+  // Entree dont l'actualisation payante (1 credit) attend une confirmation.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   if (entries.length === 0) {
     return (
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm">
@@ -148,7 +152,7 @@ export function HistoryPanel({
                 Recherché : « {entry.query} » · {formatTime(entry.timestamp)}
               </p>
             </div>
-            <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:justify-end">
               <EntryTotal entry={entry} />
               {entry.detail && onReopen && (
                 <button
@@ -159,16 +163,43 @@ export function HistoryPanel({
                   Rouvrir
                 </button>
               )}
-              {entry.url && onRefresh && (
+              {entry.url && onRefresh && confirmingId !== entry.id && (
                 <button
                   type="button"
-                  onClick={() => onRefresh(entry)}
+                  onClick={() => setConfirmingId(entry.id)}
                   title="Nouveau scrape en direct de cette annonce (1 crédit)"
                   className="inline-flex items-center gap-1 rounded-full border border-fuchsia-400/30 px-3 py-1 text-xs font-semibold text-fuchsia-200 transition-colors hover:bg-fuchsia-400/10"
                 >
                   <RefreshCw aria-hidden="true" className="h-3 w-3" />
                   Actualiser le prix (1 crédit)
                 </button>
+              )}
+              {entry.url && onRefresh && confirmingId === entry.id && (
+                <span
+                  role="alertdialog"
+                  aria-label="Confirmer l'actualisation du prix"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 py-2 text-xs text-fuchsia-100"
+                >
+                  <span>Consommer 1 crédit pour re-scraper et mettre à jour ce produit ?</span>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={() => {
+                      setConfirmingId(null);
+                      onRefresh(entry);
+                    }}
+                    className="rounded-full bg-fuchsia-500 px-3 py-1 font-semibold text-white transition-colors hover:bg-fuchsia-400"
+                  >
+                    Confirmer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingId(null)}
+                    className="rounded-full border border-white/20 px-3 py-1 font-semibold text-white/80 transition-colors hover:bg-white/10"
+                  >
+                    Annuler
+                  </button>
+                </span>
               )}
               {entry.url && (
                 <Link

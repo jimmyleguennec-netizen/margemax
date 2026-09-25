@@ -18,6 +18,7 @@ import { MIconBadge } from "@/components/ui/m-icon-badge";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { InfoTip, TIP_ROI } from "@/components/ui/info-tip";
 import { demoMetrics, isDemoVerified, useLiveDemo, type LiveDemo } from "@/lib/hooks/use-live-demo";
 
 function formatEuro(n: number): string {
@@ -409,7 +410,8 @@ function CalculatorDemoBody({ demo }: { demo: LiveDemo }) {
             </div>
             <div>
               <p className="flex items-center gap-1 text-xs text-white/60">
-                <TrendingUp aria-hidden="true" className="h-3 w-3" /> ROI
+                <TrendingUp aria-hidden="true" className="h-3 w-3" />
+                <InfoTip text={TIP_ROI} align="right">ROI</InfoTip>
               </p>
               <p className="mt-1 text-lg font-bold text-fuchsia-300 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">
                 <CountUp value={m.sale.roiPct ?? 0} format={formatPct} />

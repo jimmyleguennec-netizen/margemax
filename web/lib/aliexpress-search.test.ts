@@ -174,7 +174,7 @@ describe("performAliExpressSearch — complétude du résultat", () => {
 
     expect(result.variantStatus).toBe("missing");
     expect(result.variantWarning).toBe(
-      "Prix basé sur l'offre d'appel. Le checkout réel peut varier selon la variante sélectionnée."
+      "Prix de l'offre de base confirmé. Pense à vérifier la variante exacte lors de ta commande."
     );
     expect(result.variantPriceRange).toEqual({ low: 9.9, high: 14.5 });
     expect(result.isComplete).toBe(false);

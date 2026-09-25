@@ -12,6 +12,7 @@ import {
 } from "@/lib/margin-estimate";
 import { ReliabilityBadge } from "@/components/ui/reliability-badge";
 import { CountUp } from "@/components/ui/count-up";
+import { InfoTip, TIP_AD_BUDGET, TIP_ROI } from "@/components/ui/info-tip";
 
 function formatEuro(n: number): string {
   return (
@@ -278,7 +279,9 @@ export function CalculatorPanel() {
                 }`}
               >
                 <div>
-                  <p className="text-xs text-white/60">Marge avant pub</p>
+                  <p className="text-xs text-white/60">
+                    <InfoTip text={TIP_AD_BUDGET}>Marge avant pub</InfoTip>
+                  </p>
                   <AnimatedNumber
                     value={formatEuro(estimate.margin)}
                     className={`mt-1 text-lg font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.6)] ${
@@ -295,7 +298,8 @@ export function CalculatorPanel() {
                 </div>
                 <div>
                   <p className="flex items-center gap-1 text-xs text-white/60">
-                    <TrendingUp aria-hidden="true" className="h-3 w-3" /> ROI (sur coût)
+                    <TrendingUp aria-hidden="true" className="h-3 w-3" />
+                    <InfoTip text={TIP_ROI} align="right">ROI (sur coût)</InfoTip>
                   </p>
                   <AnimatedNumber
                     value={formatPct(estimate.roiPct)}
@@ -313,7 +317,9 @@ export function CalculatorPanel() {
 
               <div className="mt-3 rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/[0.05] px-4 py-2.5 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-white/70">Budget pub maximum par vente (TikTok/Meta)</span>
+                  <span className="text-white/70">
+                    <InfoTip text={TIP_AD_BUDGET}>Budget pub maximum par vente (TikTok/Meta)</InfoTip>
+                  </span>
                   <span
                     className={`font-bold drop-shadow-[0_0_8px_rgba(217,70,239,0.6)] ${
                       isProfitable ? "text-fuchsia-300" : "text-pink-400"
