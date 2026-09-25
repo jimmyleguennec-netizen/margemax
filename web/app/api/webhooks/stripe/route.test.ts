@@ -9,6 +9,7 @@ const insertCalls: { table: string; row: unknown }[] = [];
 const rpcCalls: { name: string; params: unknown }[] = [];
 let webhookEventShouldConflict = false;
 let creditPurchaseShouldConflict = false;
+let profileExists = true;
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: () => ({
@@ -24,6 +25,17 @@ vi.mock("@/lib/supabase/server", () => ({
           }
           return { error: null };
         },
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: profileExists ? { id: "profil" } : null,
+              error: null,
+            }),
+          }),
+        }),
+        delete: () => ({
+          eq: async () => ({ error: null }),
+        }),
         update: () => ({
           eq: async () => ({ error: null }),
         }),
@@ -89,7 +101,9 @@ describe("POST /api/webhooks/stripe — idempotence & validation de montant", ()
     rpcCalls.length = 0;
     webhookEventShouldConflict = false;
     creditPurchaseShouldConflict = false;
+    profileExists = true;
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test";
   });
 
   it("crédite les crédits pour un paiement confirmé conforme au pack déclaré", async () => {
@@ -133,6 +147,42 @@ describe("POST /api/webhooks/stripe — idempotence & validation de montant", ()
     // bloqué avant tout appel à add_credits.
     expect(insertCalls.some((c) => c.table === "credit_purchases")).toBe(true);
     expect(rpcCalls.filter((c) => c.name === "add_credits")).toHaveLength(0);
+  });
+
+  it("utilisateur introuvable : aucun crédit, réponse JSON claire (pas de 500)", async () => {
+    profileExists = false;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postWebhook(buildStarterEvent({}));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ignored).toBe("utilisateur introuvable");
+    expect(rpcCalls.filter((c) => c.name === "add_credits")).toHaveLength(0);
+    expect(insertCalls.filter((c) => c.table === "credit_purchases")).toHaveLength(0);
+    errorSpy.mockRestore();
+  });
+
+  it("STRIPE_WEBHOOK_SECRET absente : 400 clair, sans crash", async () => {
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postWebhook(buildStarterEvent({}));
+
+    expect(response.status).toBe(400);
+    errorSpy.mockRestore();
+  });
+
+  it("SUPABASE_SERVICE_ROLE_KEY absente : JSON 500 explicite, sans crash", async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await postWebhook(buildStarterEvent({}));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toMatch(/configuration/i);
+    errorSpy.mockRestore();
   });
 
   it("bloque le crédit si le montant encaissé ne correspond pas au prix réel du pack déclaré", async () => {
