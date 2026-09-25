@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     .single();
 
   if (profileError || !profile) {
-    console.error("[api/analyze] profil introuvable pour", user.id, profileError);
+    console.error("[api-analyse] Profil introuvable pour l'utilisateur", user.id, profileError);
     return NextResponse.json(
       { error: "Impossible de vérifier ton solde de crédits pour le moment." },
       { status: 502 }
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       compareSuppliers: body.compare !== false,
     });
   } catch (error) {
-    console.error("[api/analyze] Échec de l'analyse (aucun crédit débité) :", error);
+    console.error("[api-analyse] Échec de l'analyse (aucun crédit débité) :", error);
     const status = error instanceof AliExpressSearchError ? error.status : 502;
     return NextResponse.json(
       {
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
 
   if (consumeError) {
     console.error(
-      "[api/analyze] Échec du débit de crédit (rpc consume_credit) :",
+      "[api-analyse] Échec du débit de crédit (fonction SQL consume_credit) :",
       consumeError.code,
       consumeError.message,
       consumeError.details,
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
   }
   if (historyError) {
     console.error(
-      "[api/analyze] Historique non persisté (migration_search_history_details.sql / _v2.sql exécutées ?) :",
+      "[api-analyse] Historique non enregistré (les migrations migration_search_history_details.sql et migration_search_history_v2.sql ont-elles été exécutées ?) :",
       historyError.code,
       historyError.message
     );

@@ -349,7 +349,7 @@ async function findFirstProductIdFromKeyword(
       if (id) return id;
     } catch (err) {
       console.warn(
-        "[aliexpress-search] recherche de secours (Firecrawl /search) echouee :",
+        "[recherche-aliexpress] recherche de secours (Firecrawl /search) échouée :",
         err instanceof Error ? err.message : err
       );
     }
@@ -523,7 +523,7 @@ async function fetchHtmlViaFirecrawl(
       lastError = err;
       if (!err.retryable || attempt === maxAttempts) throw err;
       console.warn(
-        `[aliexpress-search] tentative ${attempt}/${maxAttempts} echouee (${err.status}) -- nouvelle tentative`
+        `[recherche-aliexpress] tentative ${attempt}/${maxAttempts} échouée (${err.status}) -- nouvelle tentative`
       );
       await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
     }
@@ -1023,7 +1023,10 @@ const MAX_SUPPLIER_CANDIDATES = 5;
 // Reserve minimale de budget pour qu'une comparaison vaille la peine d'etre
 // lancee : en dessous, on renvoie l'analyse principale telle quelle.
 const MIN_COMPARISON_BUDGET_MS = 18000;
-const MIN_TITLE_SIMILARITY = 0.5;
+// Part de mots communs exigee entre deux titres. Assoupli de 0,5 a 0,35 pour ne
+// pas rater un meme produit dont le titre varie (mots-cles differents selon le
+// vendeur) ; contrepartie : un peu plus de risque d'annonce non identique.
+const MIN_TITLE_SIMILARITY = 0.35;
 
 const TITLE_STOPWORDS = new Set([
   "pour", "avec", "sans", "les", "des", "une", "the", "and", "for", "with",
@@ -1088,6 +1091,7 @@ async function searchSimilarListings(
   if (!payload.success || !Array.isArray(payload.data)) return [];
 
   const seen = new Set<string>([excludeProductId]);
+  let rejetesParSeuil = 0;
   const candidates: { id: string; title: string }[] = [];
   for (const hit of payload.data) {
     const id = hit.url ? extractProductId(hit.url) : null;
@@ -1095,9 +1099,17 @@ async function searchSimilarListings(
     seen.add(id);
     // Titre de resultat de recherche absent : on laisse passer, la
     // similarite est de toute facon re-verifiee sur le titre de la fiche.
-    if (hit.title && titleSimilarity(title, hit.title) < MIN_TITLE_SIMILARITY) continue;
+    if (hit.title && titleSimilarity(title, hit.title) < MIN_TITLE_SIMILARITY) {
+      rejetesParSeuil++;
+      continue;
+    }
     candidates.push({ id, title: hit.title ?? "" });
     if (candidates.length >= MAX_SUPPLIER_CANDIDATES) break;
+  }
+  if (candidates.length === 0 && rejetesParSeuil > 0) {
+    console.info(
+      `[comparateur-fournisseurs] Aucun candidat avec le seuil de mots communs requis (${rejetesParSeuil} annonce(s) écartée(s), seuil ${Math.round(MIN_TITLE_SIMILARITY * 100)} %)`
+    );
   }
   return candidates;
 }
@@ -1116,13 +1128,13 @@ async function selectCheapestSupplier(
   try {
     const budgetLeft = deadline - Date.now();
     if (budgetLeft < MIN_COMPARISON_BUDGET_MS) {
-      console.info(`[supplier-comparison] ignorée : budget restant insuffisant (${budgetLeft} ms)`);
+      console.info(`[comparateur-fournisseurs] Recherche ignorée : budget temps insuffisant (${Math.round(budgetLeft / 1000)} s restantes, ${MIN_COMPARISON_BUDGET_MS / 1000} s requises)`);
       return primary;
     }
 
     const candidates = await searchSimilarListings(primary.title, primaryProductId, deadline);
     if (candidates.length === 0) {
-      console.info("[supplier-comparison] ignorée : aucune annonce similaire trouvée par la recherche");
+      console.info("[comparateur-fournisseurs] Aucune annonce similaire trouvée par la recherche AliExpress");
       return primary;
     }
 
@@ -1142,7 +1154,7 @@ async function selectCheapestSupplier(
       );
     if (comparable.length === 0) {
       console.info(
-        `[supplier-comparison] ignorée : ${candidates.length} candidat(s) trouvé(s), aucun exploitable (échec du scrape, titre trop différent ou devise différente)`
+        `[comparateur-fournisseurs] ${candidates.length} candidat(s) trouvé(s) mais aucun exploitable (échec de l'analyse, titre trop différent ou devise différente)`
       );
       return primary;
     }
@@ -1165,7 +1177,7 @@ async function selectCheapestSupplier(
       },
     };
   } catch (err) {
-    console.warn("[aliexpress-search] Comparaison de fournisseurs abandonnée :", err);
+    console.warn("[comparateur-fournisseurs] Comparaison abandonnée après une erreur inattendue :", err);
     return primary;
   }
 }
