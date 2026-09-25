@@ -53,8 +53,15 @@ export default function ConfidentialitePage() {
           Les données personnelles sont traitées par AutOutilShop SAS et par
           ses sous-traitants techniques : Supabase (authentification et
           hébergement des données de compte) et Stripe (traitement des
-          paiements). Aucune donnée n&apos;est cédée, louée ou vendue à des
-          tiers à des fins commerciales.
+          paiements). Aucune donnée personnelle de compte n&apos;est cédée,
+          louée ou vendue à des tiers à des fins commerciales.
+        </p>
+        <p>
+          Les données d&apos;usage et les cookies publicitaires peuvent par
+          ailleurs être traités par nos partenaires de régie publicitaire
+          (par exemple Google AdSense) et de paiement (Stripe), uniquement
+          pour assurer le fonctionnement du service et l&apos;affichage
+          d&apos;annonces.
         </p>
       </LegalSection>
 
