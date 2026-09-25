@@ -177,7 +177,7 @@ function StepThreeMockup({ demo }: { demo: LiveDemo | null }) {
         className="flex h-full items-center justify-center gap-3 text-sm text-white/60"
       >
         <RgbLoader size={22} />
-        Chargement de l'exemple en direct…
+        Chargement de l&apos;exemple en direct…
       </motion.div>
     );
   }
