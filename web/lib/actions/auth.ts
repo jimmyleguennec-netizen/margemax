@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createClient, setRememberMeCookie } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site-url";
+import { OTP_RATE_LIMIT_MESSAGE, isSupabaseRateLimitError } from "@/lib/auth-errors";
 import {
   RATE_LIMITS,
   RATE_LIMIT_MESSAGE,
@@ -67,6 +68,10 @@ export async function login(
   try {
     const supabase = createClient({ rememberMe });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error && isSupabaseRateLimitError(error)) {
+      return { error: RATE_LIMIT_MESSAGE };
+    }
 
     if (error) {
       // Erreur retournee explicitement par Supabase (identifiants
@@ -155,6 +160,12 @@ export async function signup(
     // compte cote serveur.
     if (error) {
       console.error("[auth] signUp a renvoyé une erreur :", error);
+      // Limite d'envoi d'e-mails de Supabase : message clair plutot que de
+      // laisser croire qu'un nouveau code vient d'etre envoye. Ne revele rien
+      // sur l'existence du compte (la limite porte sur l'envoi, pas l'adresse).
+      if (isSupabaseRateLimitError(error)) {
+        return { error: OTP_RATE_LIMIT_MESSAGE };
+      }
       return {
         message: "Compte créé ! Un code de confirmation t'a été envoyé par e-mail.",
         pendingEmail: email,

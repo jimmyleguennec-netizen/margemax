@@ -7,8 +7,11 @@ import { CheckCircle2, RotateCw } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import { RgbLoader } from "@/components/ui/rgb-loader";
+import { OTP_RATE_LIMIT_MESSAGE, isSupabaseRateLimitError } from "@/lib/auth-errors";
 
-const RESEND_COOLDOWN_S = 30;
+// Delai avant de pouvoir redemander un code (un code vient d'etre envoye a
+// l'affichage de ce formulaire, donc le compte a rebours demarre des le debut).
+const RESEND_COOLDOWN_S = 60;
 /**
  * Doit correspondre exactement a la longueur de code configuree cote
  * Supabase (Authentication -> Settings -> OTP length). Si le projet
@@ -25,7 +28,8 @@ export function OtpVerifyForm({ email }: { email: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
-  const [cooldown, setCooldown] = useState(0);
+  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_S);
+  const [resendError, setResendError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -62,7 +66,9 @@ export function OtpVerifyForm({ email }: { email: string }) {
       if (error) {
         console.error("[otp] verifyOtp a renvoyé une erreur :", error);
         setErrorMessage(
-          `Code incorrect ou expiré. Vérifie les ${OTP_LENGTH} chiffres, ou demande un nouveau code.`
+          isSupabaseRateLimitError(error)
+            ? "Trop de tentatives. Patiente un instant avant de réessayer."
+            : `Code incorrect ou expiré. Vérifie les ${OTP_LENGTH} chiffres, ou demande un nouveau code.`
         );
         setStatus("error");
         return;
@@ -79,18 +85,30 @@ export function OtpVerifyForm({ email }: { email: string }) {
   async function handleResend() {
     if (resendState === "sending" || cooldown > 0) return;
     setResendState("sending");
+    setResendError(null);
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.resend({ type: "signup", email });
       if (error) {
         console.error("[otp] resend a renvoyé une erreur :", error);
+        setResendError(
+          isSupabaseRateLimitError(error)
+            ? OTP_RATE_LIMIT_MESSAGE
+            : "Impossible de renvoyer le code pour le moment. Réessaie dans quelques instants."
+        );
+        setResendState("idle");
+      } else {
+        setResendState("sent");
+        window.setTimeout(() => setResendState("idle"), 3000);
       }
     } catch (err) {
       console.error("[otp] Exception réseau pendant resend :", err);
+      setResendError("Impossible de renvoyer le code pour le moment. Réessaie dans quelques instants.");
+      setResendState("idle");
     } finally {
-      setResendState("sent");
+      // Compte a rebours dans tous les cas (succes, limite atteinte ou
+      // echec) : evite de marteler l'envoi de codes.
       setCooldown(RESEND_COOLDOWN_S);
-      window.setTimeout(() => setResendState("idle"), 3000);
     }
   }
 
@@ -158,6 +176,15 @@ export function OtpVerifyForm({ email }: { email: string }) {
         {status === "verifying" && <RgbLoader size={16} />}
         {status === "verifying" ? "Vérification..." : "Valider le code"}
       </button>
+
+      {resendError && (
+        <p
+          role="alert"
+          className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200"
+        >
+          {resendError}
+        </p>
+      )}
 
       <button
         type="button"
