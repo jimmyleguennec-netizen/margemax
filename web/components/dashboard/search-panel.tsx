@@ -61,7 +61,7 @@ export type ApiResult = {
   analyzedAt: string;
   creditsDebited?: boolean;
   credits?: number;
-  /** true pour l'exemple illustratif ("Voir une analyse exemple", aucun
+  /** true pour l'exemple en direct ("Voir une analyse exemple", aucun
    * appel reseau ni credit consomme) -- jamais pour une vraie analyse. */
   isExample?: boolean;
   /** true pour un resultat rouvert depuis l'historique du compte : aucun
@@ -108,8 +108,6 @@ export function historyEntryToResult(entry: HistoryEntry): ApiResult | null {
   };
 }
 
-const EXAMPLE_QUERY = "chargeur à induction pour iPhone";
-
 // Suggestions de mots-cles populaires -- remplissent le champ de
 // recherche au clic (jamais de soumission automatique : une analyse
 // coute un credit, l'utilisateur doit rester libre de relire/modifier
@@ -122,43 +120,6 @@ const POPULAR_KEYWORDS = [
   "support téléphone voiture",
 ];
 
-/**
- * Donnees fixes, non recuperees en direct -- memes chiffres que la
- * demonstration de la landing page (components/landing/demo.tsx), pour
- * ne jamais promettre un appel reseau reel gratuit illimite (couteux,
- * facture au fournisseur) alors qu'un exemple statique suffit a montrer
- * le fonctionnement.
- */
-function buildExampleResult(): ApiResult {
-  return {
-    title: "Station de charge sans fil 3-en-1 pliable",
-    // Exemple statique volontairement complet (tous les champs confirmes)
-    // pour illustrer le cas ideal -- un vrai résultat peut être partiel,
-    // voir le badge "Partiellement vérifié" documenté plus bas.
-    variant: "Blanc",
-    variantStatus: "confirmed",
-    url: "https://fr.aliexpress.com/item/1005006478208156.html",
-    // Asset statique reel (public/images/product-charger.jpg), pas une URL
-    // AliExpress -- jamais recuperee en direct, voir commentaire ci-dessus.
-    product_image_url: "/images/product-charger.jpg",
-    subtotal: 14.49,
-    shipping: 0,
-    shippingStatus: "confirmed",
-    importFee: 3.6,
-    importFeeStatus: "confirmed",
-    total: 18.09,
-    partialTotal: 18.09,
-    isComplete: true,
-    currency: "EUR",
-    // Memes chiffres que la demonstration de la landing (demo.tsx) : "3,9/5
-    // (47 vendus)".
-    rating: 3.9,
-    reviewCount: 47,
-    destination: "France",
-    analyzedAt: new Date().toISOString(),
-    isExample: true,
-  };
-}
 
 /** "Vérifié" UNIQUEMENT si tous les frais sont confirmes ET que le prix est
  * rattache a une variante precise, sans incertitude sur le sous-total. */
@@ -493,11 +454,31 @@ export function SearchPanel({
     }
   }
 
-  function showExample() {
+  // Exemple en direct : resultat reel (mis en cache cote serveur, voir
+  // app/api/demo/route.ts) du produit de demonstration -- aucun chiffre
+  // code en dur, aucun credit consomme. Echec = message, jamais de faux
+  // chiffres de secours.
+  async function showExample() {
     if (status === "loading") return;
     setErrorMessage(null);
-    setResult(buildExampleResult());
-    setStatus("result");
+    setStatus("loading");
+    try {
+      const response = await fetch("/api/demo");
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMessage(
+          data?.error ?? "L'exemple en direct est indisponible pour le moment. Réessaie dans un instant."
+        );
+        setStatus("error");
+        return;
+      }
+      setResult({ ...(data as ApiResult), isExample: true });
+      setStatus("result");
+    } catch (err) {
+      console.error("[SearchPanel] Échec de l'appel /api/demo :", err);
+      setErrorMessage("Impossible de charger l'exemple en direct pour le moment.");
+      setStatus("error");
+    }
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -765,9 +746,11 @@ export function SearchPanel({
               </div>
             )}
             {result.isExample && (
-              <div className="flex items-center gap-1.5 border-b border-amber-400/20 bg-amber-400/10 px-5 py-2 text-xs font-medium text-amber-200">
-                Exemple illustratif — aucun crédit utilisé, aucune donnée
-                récupérée en direct.
+              <div className="flex flex-wrap items-center gap-x-1.5 border-b border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-xs font-medium text-cyan-200">
+                <span>Exemple en direct — mis à jour automatiquement</span>
+                <span className="font-normal text-cyan-200/80">
+                  · aucun crédit utilisé · données du {formatAnalyzedAt(result.analyzedAt)}
+                </span>
               </div>
             )}
             <div className="flex items-center gap-4 border-b border-white/10 p-5">
