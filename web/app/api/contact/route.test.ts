@@ -133,7 +133,7 @@ describe("POST /api/contact", () => {
     expect(response.status).toBe(500);
     expect(body.ok).toBeUndefined();
     expect(body.error).toMatch(/impossible d'envoyer/i);
-    expect(body.error).toContain("Invalid API key");
+    expect(body.error).not.toContain("Invalid API key");
     // Une seule tentative : une cle API invalide ne se resout pas en
     // changeant l'adresse d'expediteur, retenter n'aurait aucun sens.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -145,10 +145,10 @@ describe("POST /api/contact", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    // RESEND_FROM_EMAIL non défini -> déjà onboarding@resend.dev par défaut.
+    // RESEND_FROM_EMAIL déjà réglé sur l'adresse de secours resend.dev.
     const { POST } = await loadRouteWithEnv({
       RESEND_API_KEY: "re_test_key",
-      RESEND_FROM_EMAIL: undefined,
+      RESEND_FROM_EMAIL: "MargeMax <onboarding@resend.dev>",
     });
     const response = await postContact(VALID_BODY, POST);
     expect(response.status).toBe(500);

@@ -18,8 +18,9 @@ const RESEND_FALLBACK_FROM_EMAIL = "MargeMax <onboarding@resend.dev>";
 // sur RESEND_FALLBACK_FROM_EMAIL plutot que de faire echouer tout le
 // formulaire de contact a cause d'une configuration DNS incomplete.
 // `||` (pas `??`) : une variable Vercel presente mais vide ("") retombe aussi
-// sur l'adresse de secours au lieu d'un From vide rejete par Resend.
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || RESEND_FALLBACK_FROM_EMAIL;
+// sur l'adresse par defaut (domaine autoutilshop.fr) au lieu d'un From vide rejete par Resend.
+const RESEND_DEFAULT_FROM_EMAIL = "MargeMax <contact@autoutilshop.fr>";
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || RESEND_DEFAULT_FROM_EMAIL;
 const CONTACT_DESTINATION_EMAIL =
   process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "contact@autoutilshop.fr";
 
@@ -118,17 +119,17 @@ export async function POST(request: Request) {
   }
 
   if (!result.ok) {
-    const generic =
-      "Impossible d'envoyer ton message pour le moment. Réessaie, ou écris-nous directement à contact@autoutilshop.fr.";
-    // Erreur Resend explicite (cle invalide, limite, etc.) : on renvoie
-    // son message pour que le formulaire affiche la vraie cause. Panne
-    // reseau : pas de message Resend, on garde le message generique.
-    if (result.reason === "network_error") {
-      return NextResponse.json({ error: generic }, { status: 502 });
-    }
+    // Message public generique : la cause reelle (Resend) n'est jamais
+    // exposee aux visiteurs, seulement loguee cote serveur (Vercel).
+    console.error(
+      `[api/contact] Échec d'envoi (${result.reason}) — Détail : ${result.detail}`
+    );
     return NextResponse.json(
-      { error: `${generic} (Détail : ${result.detail})` },
-      { status: 500 }
+      {
+        error:
+          "Impossible d'envoyer le message pour le moment. Réessaye plus tard, ou écris-nous directement à contact@autoutilshop.fr.",
+      },
+      { status: result.reason === "network_error" ? 502 : 500 }
     );
   }
 
