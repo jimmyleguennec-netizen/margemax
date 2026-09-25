@@ -1,3 +1,5 @@
+// Variables STRIPE_LINK_<PACK> (sans NEXT_PUBLIC_) acceptees en secours cote
+// serveur si seule cette variante est definie sur Vercel.
 // Payment Links Stripe des packs de credits -- publics par nature (concus
 // pour etre partages avec les clients), donc lus via des variables
 // NEXT_PUBLIC_ resolues cote client par pricing.tsx et credit-calculator.tsx.
@@ -6,11 +8,11 @@
 // pas leur portee) -- reutilisees telles quelles par buildStripeCheckoutUrl
 // ci-dessous, appelee depuis app/api/checkout/route.ts.
 const STRIPE_LINKS: Record<string, string | undefined> = {
-  starter: process.env.NEXT_PUBLIC_STRIPE_LINK_STARTER,
-  essentiel: process.env.NEXT_PUBLIC_STRIPE_LINK_ESSENTIEL,
-  avance: process.env.NEXT_PUBLIC_STRIPE_LINK_AVANCE,
-  pro: process.env.NEXT_PUBLIC_STRIPE_LINK_PRO,
-  ultimate: process.env.NEXT_PUBLIC_STRIPE_LINK_ULTIMATE,
+  starter: process.env.NEXT_PUBLIC_STRIPE_LINK_STARTER ?? process.env.STRIPE_LINK_STARTER,
+  essentiel: process.env.NEXT_PUBLIC_STRIPE_LINK_ESSENTIEL ?? process.env.STRIPE_LINK_ESSENTIEL,
+  avance: process.env.NEXT_PUBLIC_STRIPE_LINK_AVANCE ?? process.env.STRIPE_LINK_AVANCE,
+  pro: process.env.NEXT_PUBLIC_STRIPE_LINK_PRO ?? process.env.STRIPE_LINK_PRO,
+  ultimate: process.env.NEXT_PUBLIC_STRIPE_LINK_ULTIMATE ?? process.env.STRIPE_LINK_ULTIMATE,
 };
 
 /**

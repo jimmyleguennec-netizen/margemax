@@ -99,8 +99,8 @@ export async function POST(request: Request) {
       console.error(`[api/checkout] Session Stripe ${session.id} creee sans URL.`);
     } catch (err) {
       console.error(
-        `[api/checkout] Echec creation Checkout Session (pack "${pack.key}") :`,
-        err instanceof Error ? err.message : err
+        `Checkout initiation failed: (pack "${pack.key}")`,
+        err
       );
       // On tente quand meme le Payment Link ci-dessous s'il existe.
     }

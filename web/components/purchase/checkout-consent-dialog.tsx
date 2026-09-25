@@ -82,6 +82,7 @@ export function CheckoutConsentDialog({
         .catch(() => ({}));
 
       if (!checkoutRes.ok || !checkoutData.url) {
+        console.error("Checkout initiation failed:", checkoutRes.status, checkoutData);
         setError(
           checkoutData.error ??
             "Impossible de démarrer le paiement pour le moment. Réessaie."
@@ -96,7 +97,8 @@ export function CheckoutConsentDialog({
       // Redirection externe reelle (domaine Stripe) -- pas router.push, qui
       // est concu pour la navigation interne Next.js.
       window.location.href = checkoutData.url;
-    } catch {
+    } catch (error) {
+      console.error("Checkout initiation failed:", error);
       setError(
         "Impossible de démarrer le paiement pour le moment. Réessaie."
       );
