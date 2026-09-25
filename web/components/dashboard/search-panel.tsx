@@ -171,7 +171,7 @@ function formatEuro(n: number | null): string {
 
 const STATUS_LABEL: Record<FieldStatus, string> = {
   confirmed: "confirmé",
-  estimated: "estimé (TVA 20 %)",
+  estimated: "estimé (TVA/IOSS)",
   missing: "manquant",
 };
 
@@ -829,24 +829,20 @@ export function SearchPanel({
               </div>
             </StaggerList>
 
-            {typeof result.creditsDebited === "boolean" && (
+            {result.creditsDebited === true && (
               <p className="border-t border-white/10 px-5 py-3 text-xs text-white/60">
-                {result.creditsDebited ? (
-                  result.isComplete ? (
-                    "1 crédit débité — analyse complète (tous les frais confirmés)."
-                  ) : (
-                    <>
-                      1 crédit débité — l&apos;annonce a été analysée avec
-                      succès (produit et sous-total confirmés), même si le
-                      coût ci-dessus reste{" "}
-                      <strong className="text-amber-300/80">partiel</strong> :
-                      l&apos;analyse elle-même a bien eu lieu et a un coût
-                      réel côté fournisseur de données, que le résultat soit
-                      complet ou non.
-                    </>
-                  )
+                {result.isComplete ? (
+                  "1 crédit débité — analyse complète (tous les frais confirmés)."
                 ) : (
-                  "Aucun crédit débité pour cette analyse (incident technique passager) — ton solde n'a pas changé."
+                  <>
+                    1 crédit débité — l&apos;annonce a été analysée avec
+                    succès (produit et sous-total confirmés), même si le
+                    coût ci-dessus reste{" "}
+                    <strong className="text-amber-300/80">partiel</strong> :
+                    l&apos;analyse elle-même a bien eu lieu et a un coût
+                    réel côté fournisseur de données, que le résultat soit
+                    complet ou non.
+                  </>
                 )}
               </p>
             )}

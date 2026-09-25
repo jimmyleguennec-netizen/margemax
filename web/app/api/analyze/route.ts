@@ -104,6 +104,42 @@ export async function POST(request: Request) {
     );
   }
 
+  // Debit atomique d'1 credit pour TOUTE analyse reussie, y compris un
+  // resultat partiel ("partiellement verifie") : l'analyse a un cout reel
+  // cote fournisseur (Firecrawl) quel que soit son degre de completude.
+  // Aucun chemin ne renvoie un resultat sans debit : si le debit echoue
+  // (panne DB) ou si le solde est tombe a 0 entre-temps (requete
+  // concurrente), le resultat n'est PAS livre et rien n'est enregistre
+  // dans l'historique.
+  const { data: newBalance, error: consumeError } = await supabase.rpc(
+    "consume_credit",
+    { p_user_id: user.id }
+  );
+
+  if (consumeError) {
+    console.error("[api/analyze] Échec du débit de crédit :", consumeError);
+    return NextResponse.json(
+      {
+        error:
+          "Impossible de finaliser l'analyse pour le moment. Réessaie dans quelques instants.",
+        creditsDebited: false,
+      },
+      { status: 502 }
+    );
+  }
+
+  if (newBalance === null) {
+    return NextResponse.json(
+      {
+        error:
+          "Solde de crédits insuffisant. Achète un pack pour continuer à analyser des produits.",
+        credits: 0,
+        creditsDebited: false,
+      },
+      { status: 402 }
+    );
+  }
+
   // Persistance best-effort de l'historique lié au compte (colonnes
   // ajoutées par migration_search_history_details.sql à la table
   // public.search_history déjà existante). Ne doit JAMAIS faire échouer
@@ -136,36 +172,6 @@ export async function POST(request: Request) {
       "[api/analyze] Historique non persisté (migration_search_history_details.sql peut-être pas encore exécutée) :",
       historyError.message
     );
-  }
-
-  const { data: newBalance, error: consumeError } = await supabase.rpc(
-    "consume_credit",
-    { p_user_id: user.id }
-  );
-
-  if (consumeError) {
-    console.error("[api/analyze] Échec du débit de crédit :", consumeError);
-    // L'analyse a reussi mais le debit a echoue techniquement (panne DB) --
-    // on renvoie quand meme le resultat (deja paye a Firecrawl) plutot que
-    // de le jeter, en signalant clairement que le credit n'a pas ete
-    // debite pour que le client ne prenne pas ca pour un solde a jour.
-    return NextResponse.json({
-      ...result,
-      creditsDebited: false,
-      credits: profile.credits,
-    });
-  }
-
-  if (newBalance === null) {
-    // Solde tombe a 0 entre la lecture (etape 2) et le debit atomique --
-    // requete concurrente sur le meme compte. L'analyse a deja ete
-    // effectuee (et facturee cote Firecrawl) : on la renvoie quand meme,
-    // mais sans decompter un credit inexistant.
-    return NextResponse.json({
-      ...result,
-      creditsDebited: false,
-      credits: 0,
-    });
   }
 
   return NextResponse.json({

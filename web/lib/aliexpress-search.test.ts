@@ -115,8 +115,8 @@ describe("performAliExpressSearch — complétude du résultat", () => {
 
     expect(result.importFeeStatus).toBe("estimated");
     expect(result.importFeeEstimated).toBe(true);
-    // (11.19 + 5.41) * 0.20 = 3.32 €.
-    expect(result.importFee).toBeCloseTo(3.32, 5);
+    // max(3,60 ; (11.19 + 5.41) * 0.20 = 3,32) = plancher 3,60 €.
+    expect(result.importFee).toBeCloseTo(3.6, 5);
     expect(result.isComplete).toBe(false);
     expect(result.total).toBeNull();
   });
@@ -124,14 +124,14 @@ describe("performAliExpressSearch — complétude du résultat", () => {
   it("arrondi de l'estimation TVA au centime le plus proche", async () => {
     mockFirecrawlSuccess(
       fakeProductHtml({
-        price: "14.995",
+        price: "29.995",
         shippingLine: "Livraison : 1,00 €",
       })
     );
 
     const result = await performAliExpressSearch(PRODUCT_URL);
-    // (14.995 + 1.00) * 0.20 = 3.199 -> arrondi à 3,20 €.
-    expect(result.importFee).toBeCloseTo(3.2, 5);
+    // (29.995 + 1.00) * 0.20 = 6.199 (> plancher 3,60) -> arrondi à 6,20 €.
+    expect(result.importFee).toBeCloseTo(6.2, 5);
   });
 
   it("variante non identifiée -> variantStatus=missing, empêche isComplete même si livraison/taxe confirmées", async () => {

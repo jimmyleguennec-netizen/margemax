@@ -743,6 +743,11 @@ function extractShippingAndImportFee(html: string): {
 // jamais presentee comme une valeur "confirmee".
 const ESTIMATED_VAT_RATE = 0.2;
 
+/** Plancher des taxes d'import estimees : au checkout AliExpress France, un
+ * petit article porte un frais fixe d'environ 3,60 EUR (IOSS) plutot que
+ * 20 % de TVA pure. */
+export const ESTIMATED_IMPORT_FEE_FLOOR = 3.6;
+
 /** Frais de livraison estimes (livraison standard France, ex. Cainiao/Choice)
  * appliques UNIQUEMENT quand la fiche publique n'en affiche aucun : mieux
  * vaut un cout realiste marque "estimated" qu'une livraison a 0 EUR qui
@@ -750,7 +755,7 @@ const ESTIMATED_VAT_RATE = 0.2;
 export const ESTIMATED_SHIPPING_FEE = 1.99;
 
 function estimateImportFee(taxableBase: number): number {
-  return Math.round(taxableBase * ESTIMATED_VAT_RATE * 100) / 100;
+  return Math.round(Math.max(ESTIMATED_IMPORT_FEE_FLOOR, taxableBase * ESTIMATED_VAT_RATE) * 100) / 100;
 }
 
 /**
@@ -872,7 +877,7 @@ export async function performAliExpressSearch(
   // marquee "estimated" -- jamais "confirmed", donc isComplete reste false.
   const shippingStatus: FieldStatus = extractedShipping === null ? "estimated" : "confirmed";
   const shipping = extractedShipping ?? ESTIMATED_SHIPPING_FEE;
-  // Taxes manquantes : TVA 20 % sur (sous-total + livraison).
+  // Taxes manquantes : max(3,60 EUR, 20 % de (sous-total + livraison)).
   const importFee = extractedImportFee ?? estimateImportFee(subtotal + shipping);
   const variantStatus: FieldStatus = variant ? "confirmed" : "missing";
 
