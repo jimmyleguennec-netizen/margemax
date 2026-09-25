@@ -9,4 +9,4 @@ export const DEMO_PRODUCT_URL =
   "https://fr.aliexpress.com/item/1005006478208156.html";
 
 /** Duree pendant laquelle le resultat reste en cache avant un nouveau scrape. */
-export const DEMO_REFRESH_SECONDS = 6 * 60 * 60;
+export const DEMO_REFRESH_SECONDS = 60 * 60;

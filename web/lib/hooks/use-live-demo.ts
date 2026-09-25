@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { computeMarginEstimate, computeSaleMetrics } from "@/lib/margin-estimate";
 
 /** Sous-ensemble de la reponse de /api/demo utilise par les demos de la
- * landing (voir app/api/demo/route.ts : analyse reelle, mise en cache 6 h). */
+ * landing (voir app/api/demo/route.ts : analyse reelle, mise en cache 1 h). */
 export type LiveDemo = {
   title: string;
   url: string;
@@ -28,7 +28,7 @@ type State =
   | { status: "error"; data: null };
 
 // Une seule requete par chargement de page, partagee entre toutes les demos
-// (Demo et InteractiveDemo) -- et c'est le cache 6 h de /api/demo (memoire +
+// (Demo et InteractiveDemo) -- et c'est le cache 1 h de /api/demo (memoire +
 // CDN) qui evite tout scrape Firecrawl supplementaire.
 let pending: Promise<LiveDemo> | null = null;
 

@@ -30,7 +30,7 @@ function formatPct(n: number | null): string {
 }
 
 // Toutes les valeurs affichees viennent de l'exemple EN DIRECT (/api/demo :
-// vraie analyse du produit de demonstration, cache 6 h) -- aucun chiffre
+// vraie analyse du produit de demonstration, cache 1 h) -- aucun chiffre
 // fixe. Marge/ROI/prix conseille toujours via computeMarginEstimate(), la
 // meme fonction que le dashboard.
 

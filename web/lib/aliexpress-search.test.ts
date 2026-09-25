@@ -181,6 +181,29 @@ describe("performAliExpressSearch — complétude du résultat", () => {
     expect(result.total).toBeNull();
   });
 
+  it("livraison gratuite lue dans le module dynamic-shipping, situé après les avis (hors zone principale)", async () => {
+    const shippingModule =
+      '<div class="dynamic-shipping"><div class="dynamic-shipping-line dynamic-shipping-titleLayout"><strong>Points de retrait</strong>&nbsp;</div>' +
+      '<div class="dynamic-shipping-line dynamic-shipping-titleLayout"><strong>Livraison gratuite</strong>&nbsp;</div>' +
+      '<div class="dynamic-shipping-line dynamic-shipping-contentLayout"><strong>Livraison : sep. 30 - oct. 04</strong></div></div>';
+    mockFirecrawlSuccess(
+      fakeProductHtml({
+        price: "15.59",
+        offerName: "Variante A",
+        // Le module apparait apres "Avis des acheteurs" : coupe par
+        // isolateMainProductHtml, il doit quand meme etre trouve.
+        offProductDecoy: shippingModule,
+      })
+    );
+
+    const result = await performAliExpressSearch(PRODUCT_URL);
+
+    expect(result.shipping).toBe(0);
+    expect(result.shippingStatus).toBe("confirmed");
+    // 15,59 + 0 + 3,60 (taxes estimées, plancher) = 19,19 € comme au checkout.
+    expect(result.partialTotal).toBeCloseTo(19.19, 2);
+  });
+
   it("livraison gratuite sans condition -> shipping=0 confirmé (jamais null)", async () => {
     mockFirecrawlSuccess(
       fakeProductHtml({

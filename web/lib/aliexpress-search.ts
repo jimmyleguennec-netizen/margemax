@@ -737,6 +737,34 @@ function findFirstValidAmount(html: string, pattern: RegExp): string | null {
   return null;
 }
 
+/**
+ * Livraison lue dans le module de livraison propre au produit
+ * (`class="dynamic-shipping"`), ex. « Livraison gratuite » ou
+ * « Livraison : 2,99 € ». 0 = gratuite, nombre = frais, null = introuvable
+ * ou conditionnelle (« gratuite dès 10 € »).
+ */
+function extractDynamicShipping(html: string): number | null {
+  const start = html.indexOf("dynamic-shipping");
+  if (start === -1) return null;
+  const text = html
+    .slice(start, start + 2500)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\\"/g, '"')
+    .replace(/\s+/g, " ");
+
+  const free = [...text.matchAll(/(?:free shipping|livraison gratuite)([^<{}]{0,20})/gi)].some(
+    (match) => !THRESHOLD_WORDS.test(match[1])
+  );
+  if (free) return 0;
+
+  const amount = findFirstValidAmount(
+    text,
+    /(?:Shipping|Livraison)\s*:?\s*([^\d]{0,40}?)(\d+[.,]\d{2})\s*(?:€|EUR)/gi
+  );
+  return parseNumber(amount);
+}
+
 function extractShippingAndImportFee(html: string): {
   shipping: number | null;
   importFee: number | null;
@@ -763,7 +791,11 @@ function extractShippingAndImportFee(html: string): {
   );
 
   return {
-    shipping: freeShipping ? 0 : parseNumber(shippingRaw),
+    // Le bloc "dynamic-shipping" de la fiche (module de livraison du produit)
+    // se trouve APRES les marqueurs de coupure de isolateMainProductHtml
+    // (avis, produits recommandes) : il est donc lu sur le HTML complet, en
+    // dernier recours seulement.
+    shipping: freeShipping ? 0 : (parseNumber(shippingRaw) ?? extractDynamicShipping(html)),
     importFee: parseNumber(importFeeRaw),
   };
 }
