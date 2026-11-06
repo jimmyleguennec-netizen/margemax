@@ -22,8 +22,36 @@ function isProtectedPath(pathname: string): boolean {
   );
 }
 
+/** Delai max d'un appel Supabase dans le middleware : sans lui, une panne ou
+ * un projet Supabase en pause fait expirer TOUTES les pages (504
+ * MIDDLEWARE_INVOCATION_TIMEOUT), landing publique comprise. */
+const SUPABASE_TIMEOUT_MS = 4000;
+
+class SupabaseTimeoutError extends Error {}
+
+function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new SupabaseTimeoutError("délai dépassé")), ms);
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({ request });
+
+  // Pages publiques (landing, CGV, login...) : aucun appel Supabase ici, elles
+  // n'en ont pas besoin et ne doivent jamais dependre de sa disponibilite.
+  // Le rafraichissement de session se fait sur les routes protegees.
+  if (!isProtectedPath(request.nextUrl.pathname)) return response;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -66,7 +94,7 @@ export async function updateSession(request: NextRequest) {
     // Rafraîchit la session si besoin -- ne pas retirer cet appel.
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await withTimeout(supabase.auth.getUser(), SUPABASE_TIMEOUT_MS);
 
     if (!user && isProtectedPath(request.nextUrl.pathname)) {
       // Cookies d'auth presents mais session invalide/expiree : on les
@@ -89,7 +117,12 @@ export async function updateSession(request: NextRequest) {
 
     return supabaseResponse;
   } catch (error) {
-    console.error("[middleware] Echec du rafraichissement de session Supabase :", error);
+    console.error(
+      error instanceof SupabaseTimeoutError
+        ? "[middleware] Supabase ne répond pas (délai dépassé) -- page servie sans rafraîchir la session. Vérifie que le projet Supabase est actif et que NEXT_PUBLIC_SUPABASE_URL est correcte."
+        : "[middleware] Echec du rafraichissement de session Supabase :",
+      error instanceof SupabaseTimeoutError ? "" : error
+    );
     return response;
   }
 }
